@@ -45,7 +45,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('AuthContext не найден. Оберните приложение в AuthProvider.');
+    throw new Error('AuthContext is not available. Wrap the app with AuthProvider.');
   }
   return context;
 };

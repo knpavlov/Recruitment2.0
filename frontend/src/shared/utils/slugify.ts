@@ -1,8 +1,8 @@
-// Простейшая утилита для генерации slug на основе названия папки
+// Minimal slug generator based on folder names
 export const slugify = (value: string) => {
   return value
     .toLowerCase()
     .trim()
-    .replace(/[^a-z0-9а-яё\s-]/gi, '')
+    .replace(/[^\p{L}0-9\s-]/gu, '')
     .replace(/\s+/g, '-');
 };

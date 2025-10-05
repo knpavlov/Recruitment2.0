@@ -67,12 +67,12 @@ export const CaseFolderCard = ({ folder, onRename, onDelete, onUpload, onRemoveF
       <div className={styles.fileInfo}>
         <p className={styles.fileName}>{file.fileName}</p>
         <p className={styles.fileMeta}>
-          {Math.round(file.size / 1024)} Кб · {new Date(file.uploadedAt).toLocaleString('ru-RU')}
+          {Math.round(file.size / 1024)} KB · {new Date(file.uploadedAt).toLocaleString('en-US')}
         </p>
       </div>
       <div className={styles.fileActionsStack}>
         <a className={styles.secondaryButton} href={file.dataUrl} download={file.fileName}>
-          Скачать
+          Download
         </a>
         <button
           className={styles.dangerButton}
@@ -85,7 +85,7 @@ export const CaseFolderCard = ({ folder, onRename, onDelete, onUpload, onRemoveF
             }
           }}
         >
-          Удалить
+          Delete
         </button>
       </div>
     </li>
@@ -107,9 +107,9 @@ export const CaseFolderCard = ({ folder, onRename, onDelete, onUpload, onRemoveF
         }}
         onDrop={handleDrop}
       >
-        <p>Перетащите файлы сюда или загрузите вручную</p>
+        <p>Drag files here or upload them manually</p>
         <button className={styles.secondaryButton} onClick={() => fileInputRef.current?.click()}>
-          Выбрать файлы
+          Choose files
         </button>
         <input
           ref={fileInputRef}
@@ -121,7 +121,7 @@ export const CaseFolderCard = ({ folder, onRename, onDelete, onUpload, onRemoveF
       </div>
 
       {folder.files.length === 0 ? (
-        <div className={styles.emptyFiles}>Папка пустая. Загрузите кейсы, чтобы сделать её активной.</div>
+        <div className={styles.emptyFiles}>The folder is empty. Upload cases to activate it.</div>
       ) : (
         <ul className={styles.filesList}>{folder.files.map(renderFile)}</ul>
       )}
@@ -133,7 +133,7 @@ export const CaseFolderCard = ({ folder, onRename, onDelete, onUpload, onRemoveF
               <input value={draftName} onChange={(event) => setDraftName(event.target.value)} />
               <div className={styles.renameButtons}>
                 <button className={styles.primaryButton} onClick={submitRename}>
-                  Сохранить
+                  Save
                 </button>
                 <button
                   className={styles.secondaryButton}
@@ -143,7 +143,7 @@ export const CaseFolderCard = ({ folder, onRename, onDelete, onUpload, onRemoveF
                     setError(null);
                   }}
                 >
-                  Отмена
+                  Cancel
                 </button>
               </div>
             </div>
@@ -157,12 +157,12 @@ export const CaseFolderCard = ({ folder, onRename, onDelete, onUpload, onRemoveF
                   setError(null);
                 }}
               >
-                Переименовать
+                Rename
               </button>
               <button
                 className={styles.dangerButton}
                 onClick={async () => {
-                  const confirmed = window.confirm('Удалить папку и все вложенные файлы безвозвратно?');
+                  const confirmed = window.confirm('Delete the folder and all nested files permanently?');
                   if (!confirmed) {
                     return;
                   }
@@ -174,14 +174,14 @@ export const CaseFolderCard = ({ folder, onRename, onDelete, onUpload, onRemoveF
                   }
                 }}
               >
-                Удалить
+                Delete
               </button>
             </div>
           )}
         </div>
         <div className={styles.folderMeta}>
-          <span>Обновлено: {new Date(folder.updatedAt).toLocaleString('ru-RU')}</span>
-          <span>Версия: {folder.version}</span>
+          <span>Updated: {new Date(folder.updatedAt).toLocaleString('en-US')}</span>
+          <span>Version: {folder.version}</span>
         </div>
       </footer>
 

@@ -11,7 +11,7 @@ export const CasesScreen = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const sortedFolders = useMemo(
-    () => [...folders].sort((a, b) => a.name.localeCompare(b.name, 'ru-RU')),
+    () => [...folders].sort((a, b) => a.name.localeCompare(b.name, 'en-US')),
     [folders]
   );
 
@@ -20,15 +20,15 @@ export const CasesScreen = () => {
     if (!result.ok) {
       const message =
         result.error === 'duplicate'
-          ? 'Папка с таким именем уже существует.'
+          ? 'A folder with this name already exists.'
           : result.error === 'invalid-input'
-            ? 'Введите корректное название.'
-            : 'Не удалось создать папку. Попробуйте позже.';
+            ? 'Enter a valid name.'
+            : 'Failed to create the folder. Try again later.';
       setErrorMessage(message);
       setInfoMessage(null);
       return;
     }
-    setInfoMessage(`Папка «${result.data.name}» создана.`);
+    setInfoMessage(`Folder "${result.data.name}" has been created.`);
     setErrorMessage(null);
     setNewFolderName('');
   };
@@ -37,33 +37,33 @@ export const CasesScreen = () => {
     const result = await renameFolder(folderId, name, folderVersion);
     if (!result.ok) {
       if (result.error === 'version-conflict') {
-        throw new Error('Папка была изменена другим пользователем. Обновите страницу.');
+        throw new Error('The folder was modified by another user. Refresh the page.');
       }
       if (result.error === 'duplicate') {
-        throw new Error('Папка с таким названием уже существует.');
+        throw new Error('A folder with this name already exists.');
       }
       if (result.error === 'invalid-input') {
-        throw new Error('Введите корректное название.');
+        throw new Error('Enter a valid name.');
       }
       if (result.error === 'not-found') {
-        throw new Error('Папка не найдена. Обновите страницу.');
+        throw new Error('Folder not found. Refresh the page.');
       }
-      throw new Error('Не удалось переименовать папку.');
+      throw new Error('Failed to rename the folder.');
     }
-    setInfoMessage(`Папка переименована в «${result.data.name}».`);
+    setInfoMessage(`Folder renamed to "${result.data.name}".`);
     setErrorMessage(null);
   };
 
   const handleDelete = async (folderId: string) => {
     const result = await deleteFolder(folderId);
     if (!result.ok) {
-      setErrorMessage('Не удалось удалить папку.');
+      setErrorMessage('Failed to delete the folder.');
       if (result.error === 'not-found') {
-        throw new Error('Папка уже была удалена.');
+        throw new Error('The folder has already been removed.');
       }
-      throw new Error('Не удалось удалить папку.');
+      throw new Error('Failed to delete the folder.');
     }
-    setInfoMessage('Папка удалена.');
+    setInfoMessage('Folder deleted.');
     setErrorMessage(null);
   };
 
@@ -72,17 +72,17 @@ export const CasesScreen = () => {
     const result = await registerFiles(folderId, records, folderVersion);
     if (!result.ok) {
       if (result.error === 'version-conflict') {
-        throw new Error('Файлы не сохранены: папка была изменена другим пользователем.');
+        throw new Error('Files were not saved: the folder was modified by another user.');
       }
       if (result.error === 'invalid-input') {
-        throw new Error('Выберите хотя бы один файл для загрузки.');
+        throw new Error('Select at least one file to upload.');
       }
       if (result.error === 'not-found') {
-        throw new Error('Папка не найдена. Обновите страницу.');
+        throw new Error('Folder not found. Refresh the page.');
       }
-      throw new Error('Не удалось загрузить файлы.');
+      throw new Error('Failed to upload files.');
     }
-    setInfoMessage(`Загружено файлов: ${records.length}.`);
+    setInfoMessage(`Uploaded files: ${records.length}.`);
     setErrorMessage(null);
   };
 
@@ -90,14 +90,14 @@ export const CasesScreen = () => {
     const result = await removeFile(folderId, fileId, folderVersion);
     if (!result.ok) {
       if (result.error === 'version-conflict') {
-        throw new Error('Файл не удалён: в папке уже есть свежие изменения.');
+        throw new Error('File was not deleted: the folder already has newer changes.');
       }
       if (result.error === 'not-found') {
-        throw new Error('Файл не найден. Обновите страницу.');
+        throw new Error('File not found. Refresh the page.');
       }
-      throw new Error('Не удалось удалить файл.');
+      throw new Error('Failed to delete the file.');
     }
-    setInfoMessage('Файл удалён.');
+    setInfoMessage('File deleted.');
     setErrorMessage(null);
   };
 
@@ -105,17 +105,17 @@ export const CasesScreen = () => {
     <section className={styles.wrapper}>
       <header className={styles.header}>
         <div>
-          <h1>База кейсов</h1>
-          <p className={styles.subtitle}>Управляйте структурами кейсов и быстрым доступом к материалам.</p>
+          <h1>Case library</h1>
+          <p className={styles.subtitle}>Organize case folders and keep materials within easy reach.</p>
         </div>
         <div className={styles.createBlock}>
           <input
             value={newFolderName}
             onChange={(event) => setNewFolderName(event.target.value)}
-            placeholder="Название новой папки"
+            placeholder="New folder name"
           />
           <button className={styles.primaryButton} onClick={() => void handleCreateFolder()}>
-            Создать папку
+            Create folder
           </button>
         </div>
       </header>
@@ -129,8 +129,8 @@ export const CasesScreen = () => {
       <div className={styles.foldersArea}>
         {sortedFolders.length === 0 ? (
           <div className={styles.emptyState}>
-            <h2>Здесь пока пусто</h2>
-            <p>Добавьте первую папку, чтобы начать наполнять базу кейсов.</p>
+            <h2>Nothing here yet</h2>
+            <p>Add the first folder to start building the case library.</p>
           </div>
         ) : (
           <div className={styles.foldersGrid}>

@@ -15,18 +15,19 @@ export const parseResumeText = (text: string): Partial<CandidateProfile> => {
   const firstLine = safeText.split('\n').find((line) => line.trim().length > 0) ?? '';
   const [maybeFirstName, maybeLastName] = firstLine.split(/\s+/);
 
-  const firstName = extractValue(safeText, [/Имя[:\-]\s*(.+)/i, /First Name[:\-]\s*(.+)/i]) || maybeFirstName;
-  const lastName = extractValue(safeText, [/Фамилия[:\-]\s*(.+)/i, /Last Name[:\-]\s*(.+)/i]) || maybeLastName;
-  const city = extractValue(safeText, [/Город[:\-]\s*(.+)/i, /City[:\-]\s*(.+)/i]);
-  const desiredPosition = extractValue(safeText, [/Желаемая должность[:\-]\s*(.+)/i, /Position[:\-]\s*(.+)/i]);
-  const phone = extractValue(safeText, [/Телефон[:\-]\s*(.+)/i, /(\+\d[\d\s\-()]{6,})/]);
+  const firstName =
+    extractValue(safeText, [/(?:First Name|Given Name|Name)[:\-]\s*(.+)/i]) || maybeFirstName;
+  const lastName = extractValue(safeText, [/(?:Last Name|Family Name|Surname)[:\-]\s*(.+)/i]) || maybeLastName;
+  const city = extractValue(safeText, [/(?:City|Location|Town)[:\-]\s*(.+)/i]);
+  const desiredPosition = extractValue(safeText, [/(?:Desired Position|Target Role|Position)[:\-]\s*(.+)/i]);
+  const phone = extractValue(safeText, [/(?:Phone|Mobile|Telephone)[:\-]\s*(.+)/i, /(\+\d[\d\s\-()]{6,})/]);
   const email = extractValue(safeText, [/Email[:\-]\s*(.+)/i, /E-mail[:\-]\s*(.+)/i, /([\w.-]+@[\w.-]+)/]);
-  const lastCompany = extractValue(safeText, [/Последняя компания[:\-]\s*(.+)/i, /Last Company[:\-]\s*(.+)/i]);
-  const lastPosition = extractValue(safeText, [/Должность[:\-]\s*(.+)/i, /Position[:\-]\s*(.+)/i]);
+  const lastCompany = extractValue(safeText, [/(?:Last Company|Most Recent Company|Employer)[:\-]\s*(.+)/i]);
+  const lastPosition = extractValue(safeText, [/(?:Last Position|Most Recent Position|Role)[:\-]\s*(.+)/i]);
   const experienceSummary = extractValue(safeText, [/Summary[:\-]\s*([\s\S]+?)\n\n/i]);
 
-  const totalExpMatch = safeText.match(/(\d{1,2})\s*(?:лет|years)\s*(?:опыта|experience)/i);
-  const consultingExpMatch = safeText.match(/(\d{1,2})\s*(?:лет|years).*консалт/i);
+  const totalExpMatch = safeText.match(/(\d{1,2})\s*(?:years|yrs)\s*(?:of\s+)?experience/i);
+  const consultingExpMatch = safeText.match(/(\d{1,2})\s*(?:years|yrs).*consult/i);
 
   return {
     firstName: firstName || '',

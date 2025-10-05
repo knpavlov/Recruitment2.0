@@ -1,5 +1,5 @@
-// Этот модуль отвечает за определение базовых URL для сетевых запросов на стороне клиента,
-// чтобы логика работы с API оставалась изолированной и удобной для последующей миграции.
+// This module resolves base URLs for client-side network requests
+// so API logic stays isolated and migration-friendly.
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, '');
 
@@ -41,8 +41,8 @@ const readGlobalConfig = (): string | undefined => {
   return globalConfig?.apiBaseUrl?.trim() || undefined;
 };
 
-// Пытаемся восстановить домен backend-службы на основе домена фронтенда.
-// Это покрывает деплой, где сервисы названы по шаблону «frontend»/«backend» на Railway.
+// Attempt to derive the backend host from the frontend host name.
+// Covers deployments where services follow a "frontend"/"backend" naming scheme (e.g. Railway).
 const deriveBackendHost = (hostname: string): string | undefined => {
   const attempts: string[] = [];
 
@@ -102,7 +102,7 @@ const isLocalHostname = (hostname: string) => {
   );
 };
 
-// Для браузера пробуем вычислить origin backend-службы из адресной строки.
+// In the browser, try to infer the backend origin from the current location.
 const deriveBackendOriginFromLocation = (): string | undefined => {
   if (!isBrowserEnvironment()) {
     return undefined;

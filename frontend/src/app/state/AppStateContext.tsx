@@ -71,7 +71,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       setFolders(remote);
       return remote;
     } catch (error) {
-      console.error('Не удалось загрузить папки кейсов:', error);
+      console.error('Failed to load case folders:', error);
       return null;
     }
   }, []);
@@ -86,7 +86,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
         const remote = await accountsApi.list();
         setAccounts(remote);
       } catch (error) {
-        console.error('Не удалось загрузить аккаунты:', error);
+        console.error('Failed to load accounts:', error);
       }
     };
     void loadAccounts();
@@ -113,7 +113,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
               return { ok: false, error: 'invalid-input' };
             }
           }
-          console.error('Не удалось создать папку:', error);
+          console.error('Failed to create folder:', error);
           return { ok: false, error: 'unknown' };
         }
       },
@@ -145,7 +145,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
               return { ok: false, error: 'not-found' };
             }
           }
-          console.error('Не удалось переименовать папку:', error);
+          console.error('Failed to rename folder:', error);
           return { ok: false, error: 'unknown' };
         }
       },
@@ -162,7 +162,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
           if (error instanceof ApiError && (error.code === 'not-found' || error.status === 404)) {
             return { ok: false, error: 'not-found' };
           }
-          console.error('Не удалось удалить папку:', error);
+          console.error('Failed to delete folder:', error);
           return { ok: false, error: 'unknown' };
         }
       },
@@ -190,7 +190,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
               return { ok: false, error: 'not-found' };
             }
           }
-          console.error('Не удалось загрузить файлы в папку:', error);
+          console.error('Failed to upload files to folder:', error);
           return { ok: false, error: 'unknown' };
         }
       },
@@ -212,7 +212,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
               return { ok: false, error: 'not-found' };
             }
           }
-          console.error('Не удалось удалить файл из папки:', error);
+          console.error('Failed to delete file from folder:', error);
           return { ok: false, error: 'unknown' };
         }
       }
@@ -304,7 +304,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
               return { ok: false, error: 'invalid-input' };
             }
           }
-          console.error('Не удалось отправить приглашение:', error);
+          console.error('Failed to send invitation:', error);
           return { ok: false, error: 'unknown' };
         }
       },
@@ -321,7 +321,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
           if (error instanceof ApiError && (error.code === 'not-found' || error.status === 404)) {
             return { ok: false, error: 'not-found' };
           }
-          console.error('Не удалось активировать аккаунт:', error);
+          console.error('Failed to activate account:', error);
           return { ok: false, error: 'unknown' };
         }
       },
@@ -343,7 +343,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
               return { ok: false, error: 'invalid-input' };
             }
           }
-          console.error('Не удалось удалить аккаунт:', error);
+          console.error('Failed to delete account:', error);
           return { ok: false, error: 'unknown' };
         }
       }
@@ -356,7 +356,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
 export const useAppState = () => {
   const context = useContext(AppStateContext);
   if (!context) {
-    throw new Error('AppStateContext отсутствует. Оберните компонент в AppStateProvider.');
+    throw new Error('AppStateContext is missing. Wrap the component with AppStateProvider.');
   }
   return context;
 };

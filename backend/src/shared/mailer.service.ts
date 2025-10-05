@@ -96,7 +96,7 @@ const createResponseReader = (socket: SmtpSocket) => {
   return () =>
     new Promise<string>((resolve, reject) => {
       if (resolver) {
-        reject(new Error('Ожидается предыдущий SMTP-ответ.'));
+        reject(new Error('Awaiting the previous SMTP response.'));
         return;
       }
       resolver = resolve;
@@ -126,7 +126,7 @@ const createSocket = async (config: MailerConfig): Promise<{ socket: SmtpSocket;
   });
 
   const wait = createResponseReader(socket);
-  await wait(); // приветствие сервера (220)
+  await wait(); // server greeting (220)
   return { socket, wait };
 };
 
@@ -141,7 +141,7 @@ const sendCommand = async (
   const response = await wait();
   const code = Number(response.slice(0, 3));
   if (!codes.includes(code)) {
-    throw new Error(`SMTP-команда «${command}» завершилась ошибкой: ${response}`);
+    throw new Error(`SMTP command "${command}" failed: ${response}`);
   }
   return response;
 };
@@ -155,11 +155,11 @@ export class MailerService {
   private readonly config = resolveConfig();
   private warned = false;
 
-  // Если SMTP не настроен, просто фиксируем уведомление в журнале
+  // Log a notice if SMTP is not configured
   private ensureConfig(): MailerConfig | null {
     if (!this.config) {
       if (!this.warned) {
-        console.warn('SMTP не настроен. Письма не будут отправлены.');
+        console.warn('SMTP is not configured. Emails will not be sent.');
         this.warned = true;
       }
       return null;
@@ -170,7 +170,7 @@ export class MailerService {
   private async deliver(to: string, subject: string, text: string) {
     const config = this.ensureConfig();
     if (!config) {
-      console.info(`[mailer] Письмо для ${to}: ${subject} — ${text}`);
+      console.info(`[mailer] Message for ${to}: ${subject} — ${text}`);
       return;
     }
 
@@ -202,7 +202,7 @@ export class MailerService {
       socket.write(`${payload}\r\n.\r\n`);
       const dataResponse = await wait();
       if (!dataResponse.startsWith('250')) {
-        throw new Error(`SMTP не подтвердил приём письма: ${dataResponse}`);
+        throw new Error(`SMTP did not confirm message delivery: ${dataResponse}`);
       }
       await sendCommand(socket, wait, 'QUIT', 221);
     } finally {
@@ -211,19 +211,19 @@ export class MailerService {
   }
 
   async sendInvitation(email: string, token: string) {
-    const subject = 'Приглашение в систему управления кейсами';
+    const subject = 'Invitation to the case management system';
     const inviteUrl = process.env.INVITE_URL?.trim();
     const bodyLines = [
-      'Вас пригласили в систему управления кейсами.',
-      inviteUrl ? `Ссылка для активации: ${inviteUrl}` : null,
-      `Токен приглашения: ${token}`
+      'You have been invited to the case management system.',
+      inviteUrl ? `Activation link: ${inviteUrl}` : null,
+      `Invitation token: ${token}`
     ].filter((line): line is string => Boolean(line));
     await this.deliver(email, subject, bodyLines.join('\n\n'));
   }
 
   async sendAccessCode(email: string, code: string) {
-    const subject = 'Ваш код доступа';
-    const body = `Одноразовый код доступа: ${code}. Введите его в течение 10 минут.`;
+    const subject = 'Your access code';
+    const body = `One-time access code: ${code}. Enter it within 10 minutes.`;
     await this.deliver(email, subject, body);
   }
 }

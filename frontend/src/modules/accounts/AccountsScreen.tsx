@@ -21,8 +21,8 @@ export const AccountsScreen = () => {
     return (
       <section className={styles.wrapper}>
         <div className={styles.restricted}>
-          <h1>Доступ ограничен</h1>
-          <p>Только суперадмин может управлять аккаунтами.</p>
+          <h1>Access denied</h1>
+          <p>Only the super admin can manage accounts.</p>
         </div>
       </section>
     );
@@ -33,24 +33,24 @@ export const AccountsScreen = () => {
     if (!result.ok) {
       const message =
         result.error === 'duplicate'
-          ? 'Такой пользователь уже приглашён.'
+          ? 'This user has already been invited.'
           : result.error === 'invalid-input'
-            ? 'Введите корректный email.'
-            : 'Не удалось отправить приглашение. Попробуйте позже.';
+            ? 'Enter a valid email.'
+            : 'Failed to send the invitation. Try again later.';
       setBanner({ type: 'error', text: message });
       return;
     }
-    setBanner({ type: 'info', text: `Приглашение отправлено на ${result.data.email}.` });
+    setBanner({ type: 'info', text: `Invitation sent to ${result.data.email}.` });
     setEmail('');
   };
 
   const handleCopyToken = async (token: string) => {
     try {
       await navigator.clipboard.writeText(token);
-      setBanner({ type: 'info', text: 'Токен приглашения скопирован.' });
+      setBanner({ type: 'info', text: 'Invitation token copied.' });
     } catch (error) {
-      console.error('Не удалось скопировать токен приглашения:', error);
-      setBanner({ type: 'error', text: 'Не удалось скопировать токен. Скопируйте его вручную.' });
+      console.error('Failed to copy the invitation token:', error);
+      setBanner({ type: 'error', text: 'Unable to copy the token. Copy it manually.' });
     }
   };
 
@@ -58,15 +58,15 @@ export const AccountsScreen = () => {
     const result = await activateAccount(id);
     if (!result.ok) {
       const message =
-        result.error === 'not-found' ? 'Аккаунт не найден.' : 'Не удалось активировать аккаунт.';
+        result.error === 'not-found' ? 'Account not found.' : 'Failed to activate the account.';
       setBanner({ type: 'error', text: message });
       return;
     }
-    setBanner({ type: 'info', text: `Аккаунт ${result.data.email} активирован.` });
+    setBanner({ type: 'info', text: `Account ${result.data.email} activated.` });
   };
 
   const handleRemove = async (id: string) => {
-    const confirmed = window.confirm('Удалить аккаунт безвозвратно?');
+    const confirmed = window.confirm('Delete the account permanently?');
     if (!confirmed) {
       return;
     }
@@ -74,23 +74,23 @@ export const AccountsScreen = () => {
     if (!result.ok) {
       const message =
         result.error === 'not-found'
-          ? 'Аккаунт не найден.'
+          ? 'Account not found.'
           : result.error === 'invalid-input'
-            ? 'Нельзя удалить суперадмина.'
-            : 'Не удалось удалить аккаунт.';
+            ? 'Cannot delete the super admin.'
+            : 'Failed to delete the account.';
       setBanner({ type: 'error', text: message });
       return;
     }
-    setBanner({ type: 'info', text: 'Аккаунт удалён.' });
+    setBanner({ type: 'info', text: 'Account deleted.' });
   };
 
   return (
     <section className={styles.wrapper}>
       <header className={styles.header}>
         <div>
-          <h1>Управление аккаунтами</h1>
+          <h1>Account management</h1>
           <p className={styles.subtitle}>
-            Приглашайте админов и пользователей, отслеживайте активацию и удаляйте учётные записи.
+            Invite admins and users, track activation, and remove accounts.
           </p>
         </div>
         <div className={styles.inviteBlock}>
@@ -105,11 +105,11 @@ export const AccountsScreen = () => {
             value={targetRole}
             onChange={(event) => setTargetRole(event.target.value as 'admin' | 'user')}
           >
-            <option value="admin">Админ</option>
-            <option value="user">Пользователь</option>
+            <option value="admin">Admin</option>
+            <option value="user">User</option>
           </select>
           <button className={styles.primaryButton} onClick={() => void handleInvite()}>
-            Отправить приглашение
+            Send invitation
           </button>
         </div>
       </header>
@@ -123,10 +123,10 @@ export const AccountsScreen = () => {
           <thead>
             <tr>
               <th>Email</th>
-              <th>Статус</th>
-              <th>Роль</th>
-              <th>Приглашение</th>
-              <th>Действия</th>
+              <th>Status</th>
+              <th>Role</th>
+              <th>Invitation</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -139,10 +139,10 @@ export const AccountsScreen = () => {
                       account.status === 'active' ? styles.statusBadgeActive : styles.statusBadgePending
                     }
                   >
-                    {account.status === 'active' ? 'Активен' : 'Не активирован'}
+                    {account.status === 'active' ? 'Active' : 'Not activated'}
                   </span>
                 </td>
-                <td>{account.role === 'super-admin' ? 'Суперадмин' : account.role === 'admin' ? 'Админ' : 'Пользователь'}</td>
+                <td>{account.role === 'super-admin' ? 'Super admin' : account.role === 'admin' ? 'Admin' : 'User'}</td>
                 <td>
                   {account.status === 'pending' ? (
                     <div className={styles.tokenCell}>
@@ -151,11 +151,11 @@ export const AccountsScreen = () => {
                         className={styles.secondaryButton}
                         onClick={() => void handleCopyToken(account.invitationToken)}
                       >
-                        Скопировать
+                        Copy
                       </button>
                     </div>
                   ) : (
-                    <span className={styles.tokenInfo}>Аккаунт активен</span>
+                    <span className={styles.tokenInfo}>Account active</span>
                   )}
                 </td>
                 <td className={styles.actionsCell}>
@@ -164,7 +164,7 @@ export const AccountsScreen = () => {
                       className={styles.secondaryButton}
                       onClick={() => void handleActivate(account.id)}
                     >
-                      Активировать
+                      Activate
                     </button>
                   )}
                   {account.role !== 'super-admin' && (
@@ -172,7 +172,7 @@ export const AccountsScreen = () => {
                       className={styles.dangerButton}
                       onClick={() => void handleRemove(account.id)}
                     >
-                      Удалить
+                      Delete
                     </button>
                   )}
                 </td>
