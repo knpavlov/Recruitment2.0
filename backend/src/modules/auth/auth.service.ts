@@ -1,57 +1,55 @@
 import { randomUUID } from 'crypto';
-import { accountsService } from '../accounts/accounts.module.js';
+import type { AccountsService } from '../accounts/accounts.service.js';
 import { MailerService } from '../../shared/mailer.service.js';
 import { OtpService } from '../../shared/otp.service.js';
-
-interface AccessCodeRecord {
-  email: string;
-  code: string;
-  expiresAt: Date;
-}
+import { AccessCodesRepository } from './accessCodes.repository.js';
 
 export class AuthService {
-  private codes: AccessCodeRecord[] = [];
-  private mailer = new MailerService();
-  private otp = new OtpService();
+  constructor(
+    private readonly accountsService: AccountsService,
+    private readonly codesRepository = new AccessCodesRepository(),
+    private readonly mailer = new MailerService(),
+    private readonly otp = new OtpService()
+  ) {}
 
   async requestAccessCode(email: string) {
-    const account = await accountsService.findByEmail(email.trim().toLowerCase());
+    const account = await this.accountsService.findByEmail(email.trim().toLowerCase());
     if (!account) {
       throw new Error('ACCOUNT_NOT_FOUND');
     }
     const code = this.otp.generateCode();
-    const record: AccessCodeRecord = {
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+    await this.codesRepository.saveCode({
       email: account.email,
       code,
-      expiresAt: new Date(Date.now() + 5 * 60 * 1000)
-    };
-    this.codes = this.codes.filter((item) => item.email !== account.email);
-    this.codes.push(record);
+      expiresAt
+    });
     await this.mailer.sendAccessCode(account.email, code);
     return { email: account.email };
   }
 
   async verifyAccessCode(email: string, code: string) {
     const normalized = email.trim().toLowerCase();
-    const record = this.codes.find((item) => item.email === normalized && item.code === code);
+    const record = await this.codesRepository.findCode(normalized, code);
     if (!record) {
       throw new Error('CODE_INVALID');
     }
     if (record.expiresAt.getTime() < Date.now()) {
-      this.codes = this.codes.filter((item) => item !== record);
+      await this.codesRepository.deleteCode(normalized);
       throw new Error('CODE_EXPIRED');
     }
 
-    const account = await accountsService.findByEmail(normalized);
+    const account = await this.accountsService.findByEmail(normalized);
     if (!account) {
+      await this.codesRepository.deleteCode(normalized);
       throw new Error('ACCOUNT_NOT_FOUND');
     }
 
     if (account.status === 'pending') {
-      await accountsService.activateAccount(account.id);
+      await this.accountsService.activateAccount(account.id);
     }
 
-    this.codes = this.codes.filter((item) => item !== record);
+    await this.codesRepository.deleteCode(normalized);
 
     return {
       token: randomUUID(),

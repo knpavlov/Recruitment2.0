@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import { MailerService } from '../../shared/mailer.service.js';
+import { AccountsRepository } from './accounts.repository.js';
 
 export type AccountRole = 'super-admin' | 'admin' | 'user';
 export type AccountStatus = 'pending' | 'active';
@@ -15,28 +16,14 @@ export interface AccountRecord {
 }
 
 export class AccountsService {
-  private storage: AccountRecord[] = [];
-  private mailer = new MailerService();
-
-  constructor() {
-    const superAdmin: AccountRecord = {
-      id: randomUUID(),
-      email: 'super.admin@company.com',
-      role: 'super-admin',
-      status: 'active',
-      invitationToken: 'seed',
-      createdAt: new Date(),
-      activatedAt: new Date()
-    };
-    this.storage.push(superAdmin);
-  }
+  constructor(private readonly repository: AccountsRepository, private readonly mailer = new MailerService()) {}
 
   async listAccounts() {
-    return this.storage;
+    return this.repository.listAccounts();
   }
 
   async findByEmail(email: string) {
-    return this.storage.find((account) => account.email === email.toLowerCase()) ?? null;
+    return this.repository.findByEmail(email);
   }
 
   async inviteAccount(email: string, role: AccountRole) {
@@ -57,30 +44,32 @@ export class AccountsService {
       invitationToken,
       createdAt: new Date()
     };
-    this.storage.push(record);
+    const saved = await this.repository.insertAccount(record);
     await this.mailer.sendInvitation(normalized, invitationToken);
-    return record;
+    return saved;
   }
 
   async activateAccount(id: string) {
-    const account = this.storage.find((item) => item.id === id);
-    if (!account) {
+    const activatedAt = new Date();
+    const updated = await this.repository.updateActivation(id, activatedAt);
+    if (!updated) {
       throw new Error('NOT_FOUND');
     }
-    account.status = 'active';
-    account.activatedAt = new Date();
-    return account;
+    return updated;
   }
 
   async removeAccount(id: string) {
-    const account = this.storage.find((item) => item.id === id);
+    const account = await this.repository.findById(id);
     if (!account) {
       throw new Error('NOT_FOUND');
     }
     if (account.role === 'super-admin') {
       throw new Error('FORBIDDEN');
     }
-    this.storage = this.storage.filter((item) => item.id !== id);
-    return account;
+    const removed = await this.repository.removeAccount(id);
+    if (!removed) {
+      throw new Error('NOT_FOUND');
+    }
+    return removed;
   }
 }
