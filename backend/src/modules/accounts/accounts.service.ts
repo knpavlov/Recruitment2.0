@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { MailerService } from '../../shared/mailer.service';
+import { MailerService } from '../../shared/mailer.service.js';
 
 export type AccountRole = 'super-admin' | 'admin' | 'user';
 export type AccountStatus = 'pending' | 'active';
