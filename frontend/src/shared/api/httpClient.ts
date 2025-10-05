@@ -51,11 +51,11 @@ export const apiRequest = async <T>(
       const snippet = text.slice(0, 120).trim();
 
       if (!response.ok) {
-        throw new ApiError(response.status, undefined, 'Не удалось выполнить запрос.');
+        throw new ApiError(response.status, undefined, 'Request failed.');
       }
 
       throw new Error(
-        `Сервер вернул неожиданный ответ: ${snippet || 'пустое тело'}. Проверьте конфигурацию API.`
+        `The server returned an unexpected response: ${snippet || 'empty body'}. Check the API configuration.`
       );
     }
   }
@@ -67,7 +67,7 @@ export const apiRequest = async <T>(
     const messageValue = structuredPayload?.message;
     const codeValue = structuredPayload?.code;
 
-    const message = typeof messageValue === 'string' ? messageValue : 'Не удалось выполнить запрос.';
+    const message = typeof messageValue === 'string' ? messageValue : 'Request failed.';
     const code = typeof codeValue === 'string' ? codeValue : undefined;
     throw new ApiError(response.status, code, message);
   }

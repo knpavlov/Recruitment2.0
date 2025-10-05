@@ -96,7 +96,7 @@ export const CandidateModal = ({ initialProfile, onSave, onDelete, onClose }: Ca
     <div className={styles.overlay}>
       <div className={styles.modal}>
         <header className={styles.header}>
-          <h2>{initialProfile ? 'Редактирование кандидата' : 'Новый кандидат'}</h2>
+          <h2>{initialProfile ? 'Edit candidate' : 'New candidate'}</h2>
           <button className={styles.closeButton} onClick={onClose}>
             ×
           </button>
@@ -117,22 +117,22 @@ export const CandidateModal = ({ initialProfile, onSave, onDelete, onClose }: Ca
               <>
                 <p className={styles.resumeName}>{resume.fileName}</p>
                 <p className={styles.resumeMeta}>
-                  Загружено {new Date(resume.uploadedAt).toLocaleString('ru-RU')} · {(resume.size / 1024).toFixed(1)} Кб
+                  Uploaded {new Date(resume.uploadedAt).toLocaleString('en-US')} · {(resume.size / 1024).toFixed(1)} KB
                 </p>
               </>
             ) : (
-              <p>Перетащите резюме сюда или выберите файл</p>
+              <p>Drag a resume here or pick a file</p>
             )}
           </div>
           <div className={styles.uploadActions}>
             <button className={styles.secondaryButton} onClick={() => fileInputRef.current?.click()}>
-              Выбрать файл
+              Choose file
             </button>
             <button className={styles.secondaryButton} onClick={() => submitSave(false)} disabled={!resume}>
-              Сохранить резюме
+              Save resume
             </button>
             <button className={styles.primaryButton} onClick={handleAiFill} disabled={!resume || aiStatus === 'loading'}>
-              {aiStatus === 'loading' ? 'ИИ анализирует…' : 'Заполнить с помощью ИИ'}
+              {aiStatus === 'loading' ? 'AI is analysing…' : 'Fill with AI'}
             </button>
             <input
               ref={fileInputRef}
@@ -141,21 +141,21 @@ export const CandidateModal = ({ initialProfile, onSave, onDelete, onClose }: Ca
               onChange={(event) => event.target.files && handleResumeSelection(event.target.files)}
             />
           </div>
-          {aiStatus === 'success' && <p className={styles.aiSuccess}>Данные заполнены автоматически.</p>}
-          {aiStatus === 'error' && <p className={styles.aiError}>Загрузите текстовое резюме для анализа.</p>}
+          {aiStatus === 'success' && <p className={styles.aiSuccess}>Fields populated automatically.</p>}
+          {aiStatus === 'error' && <p className={styles.aiError}>Upload a text-based resume for analysis.</p>}
         </section>
 
         <div className={styles.formGrid}>
           <label>
-            <span>Имя</span>
+            <span>First name</span>
             <input value={profile.firstName} onChange={(e) => handleChange('firstName', e.target.value)} />
           </label>
           <label>
-            <span>Фамилия</span>
+            <span>Last name</span>
             <input value={profile.lastName} onChange={(e) => handleChange('lastName', e.target.value)} />
           </label>
           <label>
-            <span>Возраст</span>
+            <span>Age</span>
             <input
               value={profile.age ?? ''}
               onChange={(e) => handleChange('age', e.target.value ? Number(e.target.value) : undefined)}
@@ -164,15 +164,15 @@ export const CandidateModal = ({ initialProfile, onSave, onDelete, onClose }: Ca
             />
           </label>
           <label>
-            <span>Город</span>
+            <span>City</span>
             <input value={profile.city} onChange={(e) => handleChange('city', e.target.value)} />
           </label>
           <label>
-            <span>Желаемая позиция</span>
+            <span>Desired position</span>
             <input value={profile.desiredPosition} onChange={(e) => handleChange('desiredPosition', e.target.value)} />
           </label>
           <label>
-            <span>Телефон</span>
+            <span>Phone</span>
             <input value={profile.phone} onChange={(e) => handleChange('phone', e.target.value)} />
           </label>
           <label>
@@ -180,14 +180,14 @@ export const CandidateModal = ({ initialProfile, onSave, onDelete, onClose }: Ca
             <input value={profile.email} onChange={(e) => handleChange('email', e.target.value)} />
           </label>
           <label className={styles.fullWidth}>
-            <span>Summary профессионального опыта</span>
+            <span>Professional experience summary</span>
             <textarea
               value={profile.experienceSummary}
               onChange={(e) => handleChange('experienceSummary', e.target.value)}
             />
           </label>
           <label>
-            <span>Кол-во лет опыта</span>
+            <span>Total years of experience</span>
             <input
               value={profile.totalExperienceYears ?? ''}
               onChange={(e) =>
@@ -198,7 +198,7 @@ export const CandidateModal = ({ initialProfile, onSave, onDelete, onClose }: Ca
             />
           </label>
           <label>
-            <span>Кол-во лет в консалтинге</span>
+            <span>Years in consulting</span>
             <input
               value={profile.consultingExperienceYears ?? ''}
               onChange={(e) =>
@@ -212,40 +212,40 @@ export const CandidateModal = ({ initialProfile, onSave, onDelete, onClose }: Ca
             />
           </label>
           <label className={styles.fullWidth}>
-            <span>Консалтинговые фирмы</span>
+            <span>Consulting firms</span>
             <input
               value={profile.consultingCompanies}
               onChange={(e) => handleChange('consultingCompanies', e.target.value)}
-              placeholder="Через запятую"
+              placeholder="Comma-separated"
             />
           </label>
           <label>
-            <span>Место последней работы</span>
+            <span>Most recent company</span>
             <input value={profile.lastCompany} onChange={(e) => handleChange('lastCompany', e.target.value)} />
           </label>
           <label>
-            <span>Должность последней работы</span>
+            <span>Most recent position</span>
             <input value={profile.lastPosition} onChange={(e) => handleChange('lastPosition', e.target.value)} />
           </label>
           <label>
-            <span>Продолжительность последней работы</span>
+            <span>Duration at last job</span>
             <input value={profile.lastDuration} onChange={(e) => handleChange('lastDuration', e.target.value)} />
           </label>
         </div>
 
         <footer className={styles.footer}>
           <button className={styles.dangerButton} onClick={handleDelete} disabled={!initialProfile}>
-            Удалить профиль
+            Delete profile
           </button>
           <div className={styles.footerActions}>
             <button className={styles.secondaryButton} onClick={onClose}>
-              Отмена
+              Cancel
             </button>
             <button className={styles.secondaryButton} onClick={() => submitSave(false)}>
-              Сохранить
+              Save
             </button>
             <button className={styles.primaryButton} onClick={() => submitSave(true)}>
-              Сохранить и закрыть
+              Save and close
             </button>
           </div>
         </footer>

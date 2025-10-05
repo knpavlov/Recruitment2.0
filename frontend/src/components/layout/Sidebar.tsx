@@ -35,11 +35,11 @@ export const Sidebar = ({ navigationItems, activeItem, onNavigate }: SidebarProp
         <button
           className={styles.logoutButton}
           onClick={() => {
-            // Заглушка для будущей интеграции с бэкендом
+            // Placeholder for future backend integration
             setRole('user');
           }}
         >
-          Выйти
+          Sign out
         </button>
       </div>
     </aside>

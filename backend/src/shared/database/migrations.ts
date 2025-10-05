@@ -133,7 +133,7 @@ const syncSuperAdmin = async () => {
 
     if (conflict.rowCount > 0) {
       console.warn(
-        `Невозможно обновить email суперадмина: адрес ${SUPER_ADMIN_EMAIL} уже занят другим аккаунтом.`
+        `Cannot update the super admin email: address ${SUPER_ADMIN_EMAIL} is already used by another account.`
       );
       await client.query('ROLLBACK');
       return;
@@ -158,7 +158,7 @@ const syncSuperAdmin = async () => {
 };
 
 export const runMigrations = async () => {
-  // В простом варианте выполняем миграции последовательно при старте сервера
+  // In this lightweight version we run migrations sequentially during server startup
   await createTables();
   await syncSuperAdmin();
 };

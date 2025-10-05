@@ -1,4 +1,4 @@
-// Утилита генерации идентификаторов с учётом отсутствия crypto в некоторых окружениях
+// ID generation utility that accounts for missing crypto in some environments
 export const generateId = () => {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
     return crypto.randomUUID();

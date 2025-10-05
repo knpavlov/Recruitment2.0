@@ -15,10 +15,10 @@ export interface NavigationItem {
 }
 
 export const navigationItems: NavigationItem[] = [
-  { key: 'cases', label: 'База кейсов', roleAccess: ['super-admin', 'admin'] },
-  { key: 'questions', label: 'База фит вопросов', roleAccess: ['super-admin', 'admin'] },
-  { key: 'candidates', label: 'База кандидатов', roleAccess: ['super-admin', 'admin'] },
-  { key: 'evaluation', label: 'Оценка', roleAccess: ['super-admin', 'admin', 'user'] },
-  { key: 'stats', label: 'Статистика', roleAccess: ['super-admin', 'admin'] },
-  { key: 'accounts', label: 'Управление аккаунтами', roleAccess: ['super-admin'] }
+  { key: 'cases', label: 'Case library', roleAccess: ['super-admin', 'admin'] },
+  { key: 'questions', label: 'Fit questions', roleAccess: ['super-admin', 'admin'] },
+  { key: 'candidates', label: 'Candidate database', roleAccess: ['super-admin', 'admin'] },
+  { key: 'evaluation', label: 'Evaluation', roleAccess: ['super-admin', 'admin', 'user'] },
+  { key: 'stats', label: 'Analytics', roleAccess: ['super-admin', 'admin'] },
+  { key: 'accounts', label: 'Account management', roleAccess: ['super-admin'] }
 ];
