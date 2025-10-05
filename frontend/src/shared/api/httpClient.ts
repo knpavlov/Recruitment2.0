@@ -1,3 +1,5 @@
+import { buildApiUrl } from '../config/runtimeConfig';
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -28,25 +30,45 @@ const buildHeaders = (input?: HeadersInit, body?: unknown) => {
   return headers;
 };
 
-const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
-
 export const apiRequest = async <T>(
   path: string,
   options: RequestOptions = {}
 ): Promise<T> => {
   const { body, headers, ...rest } = options;
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await fetch(buildApiUrl(path), {
     ...rest,
     headers: buildHeaders(headers, body),
     body: resolveBody(body)
   });
 
   const text = await response.text();
-  const payload = text ? JSON.parse(text) : null;
+  let payload: unknown = null;
+
+  if (text) {
+    try {
+      payload = JSON.parse(text);
+    } catch (error) {
+      const snippet = text.slice(0, 120).trim();
+
+      if (!response.ok) {
+        throw new ApiError(response.status, undefined, 'Не удалось выполнить запрос.');
+      }
+
+      throw new Error(
+        `Сервер вернул неожиданный ответ: ${snippet || 'пустое тело'}. Проверьте конфигурацию API.`
+      );
+    }
+  }
+
+  const structuredPayload =
+    payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : null;
 
   if (!response.ok) {
-    const message = payload?.message ?? 'Не удалось выполнить запрос.';
-    const code = payload?.code as string | undefined;
+    const messageValue = structuredPayload?.message;
+    const codeValue = structuredPayload?.code;
+
+    const message = typeof messageValue === 'string' ? messageValue : 'Не удалось выполнить запрос.';
+    const code = typeof codeValue === 'string' ? codeValue : undefined;
     throw new ApiError(response.status, code, message);
   }
 
