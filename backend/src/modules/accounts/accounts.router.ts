@@ -15,10 +15,10 @@ router.post('/invite', async (req, res) => {
     res.status(201).json(account);
   } catch (error) {
     if (error instanceof Error && error.message === 'ALREADY_EXISTS') {
-      res.status(409).json({ code: 'duplicate', message: 'Указанный пользователь уже приглашён.' });
+      res.status(409).json({ code: 'duplicate', message: 'The specified user has already been invited.' });
       return;
     }
-    res.status(400).json({ code: 'invalid-input', message: 'Не удалось отправить приглашение.' });
+    res.status(400).json({ code: 'invalid-input', message: 'Failed to send the invitation.' });
   }
 });
 
@@ -27,7 +27,7 @@ router.post('/:id/activate', async (req, res) => {
     const account = await accountsService.activateAccount(req.params.id);
     res.json(account);
   } catch (error) {
-    res.status(404).json({ code: 'not-found', message: 'Аккаунт не найден.' });
+    res.status(404).json({ code: 'not-found', message: 'Account not found.' });
   }
 });
 
@@ -37,10 +37,10 @@ router.delete('/:id', async (req, res) => {
     res.json(account);
   } catch (error) {
     if (error instanceof Error && error.message === 'FORBIDDEN') {
-      res.status(403).json({ code: 'invalid-input', message: 'Нельзя удалить суперадмина.' });
+      res.status(403).json({ code: 'invalid-input', message: 'Cannot delete the super admin.' });
       return;
     }
-    res.status(404).json({ code: 'not-found', message: 'Аккаунт не найден.' });
+    res.status(404).json({ code: 'not-found', message: 'Account not found.' });
   }
 });
 

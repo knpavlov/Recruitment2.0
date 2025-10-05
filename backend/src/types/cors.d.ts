@@ -1,7 +1,7 @@
 declare module 'cors' {
   import type { RequestHandler } from 'express';
 
-  // Облегчённое объявление типов для cors, чтобы сборка не падала даже без @types/cors
+  // Lightweight type declaration for cors so the build succeeds even without @types/cors
   export interface CorsOptions {
     origin?: boolean | string | RegExp | (string | RegExp)[];
     methods?: string | string[];

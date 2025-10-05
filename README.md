@@ -1,17 +1,16 @@
 # Recruitment 2.0
 
-Моно-репозиторий портала для команды рекрутинга. Структура разделена на фронтенд (React + Vite) и бэкенд (Express + TypeScript)
-с учётом будущей миграции логики в независимые пакеты.
+Monorepo for the recruitment team portal. The structure is split into the frontend (React + Vite) and the backend (Express + TypeScript) with future extraction of shared logic into independent packages in mind.
 
-## Структура
+## Structure
 
-- `frontend/` — SPA с современным интерфейсом, навигация по левому меню и экраны кейсов, кандидатов, оценок и управления аккаунтами.
-- `backend/` — API-слой Express с модульной организацией доменов.
-- `docs/` — документация по архитектуре и дальнейшим шагам.
+- `frontend/` — Single Page Application with modern UI, left-side navigation, and screens for cases, candidates, evaluations, and account management.
+- `backend/` — Express API layer with modular domain organization.
+- `docs/` — architectural documentation and planning notes.
 
-## Быстрый старт
+## Quick start
 
-### Фронтенд
+### Frontend
 
 ```bash
 cd frontend
@@ -19,7 +18,7 @@ npm install
 npm run dev
 ```
 
-### Бэкенд
+### Backend
 
 ```bash
 cd backend
@@ -27,14 +26,14 @@ npm install
 npm run dev
 ```
 
-### Настройка базы данных
+### Database setup
 
-Бэкенд использует PostgreSQL. Поддерживаются как строка подключения `DATABASE_URL`, так и отдельные параметры (`PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE`).
+The backend uses PostgreSQL. Both a single `DATABASE_URL` connection string and individual parameters (`PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE`) are supported.
 
-1. Создайте файл `.env` в каталоге `backend/` и пропишите переменные окружения Railway (или другой СУБД). Пример:
+1. Create a `.env` file inside `backend/` and provide your Railway (or other provider) environment variables. Example:
    ```dotenv
    DATABASE_URL=postgresql://user:password@host:port/database
-   # или альтернативно
+   # or alternatively
    # PGHOST=...
    # PGPORT=...
    # PGUSER=...
@@ -42,22 +41,22 @@ npm run dev
    # PGDATABASE=...
    SUPER_ADMIN_EMAIL=super.admin@company.com
    ```
-2. Выполните `npm install` — вместе с остальными пакетами подтянется драйвер `pg` и будет сгенерирован локальный `package-lock.json`.
-3. При первом запуске `npm run dev` или `npm run start` будут автоматически созданы таблицы и учётная запись суперадмина.
+2. Run `npm install` — the `pg` driver will be installed alongside other packages and a local `package-lock.json` will be generated.
+3. On the first `npm run dev` or `npm run start`, the tables and the super admin account will be created automatically.
 
-> ⚙️ Для деплоя в Railway в репозитории лежит `.nixpacks.toml`: он явно запускает `npm install` в `backend/`, поэтому новые зависимости подтянутся даже без заранее сгенерированного `package-lock.json`.
+> ⚙️ For Railway deployments the repo ships with `.nixpacks.toml`: it explicitly runs `npm install` inside `backend/`, so new dependencies will be installed even if `package-lock.json` was not committed in advance.
 
-## Что реализовано сейчас
+## Current functionality
 
-- Управление кейсами: создание, переименование, drag&drop-файлы и контроль конфликтов версий.
-- База кандидатов с загрузкой резюме, автозаполнением полей и версионированием карточек.
-- Настройка оценок: выбор кандидатов, кейсов, автоматическая генерация статусов интервью.
-- Управление аккаунтами: приглашения, активация, удаление и генерация одноразовых кодов входа.
-- Аутентификация через временные коды и заглушечный почтовый сервис.
+- Case management: create folders, rename them, upload files via drag & drop, and prevent version conflicts.
+- Candidate database with resume uploads, AI-assisted field auto-fill, and profile versioning.
+- Evaluation setup: select candidates and cases, automatically generate interview statuses.
+- Account management: invitations, activation, deletion, and issuing one-time login codes.
+- Authentication through temporary codes and a stub mailer service.
 
-## Следующие этапы
+## Next steps
 
-- Подключение реальной БД (например, PostgreSQL) и вынесение работы с данными в репозитории.
-- Интеграция промышленного почтового сервиса и постоянного хранения кодов/сессий.
-- Интеграция полноценного API ИИ для разбора резюме и обратной связи интервьюеров.
-- Добавление механизмов синхронизации в реальном времени (WebSocket) и блокировок на уровне БД.
+- Connect a production-grade database (for example, PostgreSQL) and move data access into repositories.
+- Integrate an industrial mail provider and persistent storage for codes/sessions.
+- Integrate a full AI API for resume analysis and interviewer feedback.
+- Add real-time synchronization (WebSocket) and database-level locks.

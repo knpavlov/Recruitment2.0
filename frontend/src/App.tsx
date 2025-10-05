@@ -29,13 +29,13 @@ const AppContent = () => {
       case 'cases':
         return <CasesScreen />;
       case 'questions':
-        return <PlaceholderScreen title="База фит вопросов" description="Раздел находится в разработке." />;
+        return <PlaceholderScreen title="Fit question library" description="This section is under development." />;
       case 'candidates':
         return <CandidatesScreen />;
       case 'evaluation':
         return <EvaluationScreen />;
       case 'stats':
-        return <PlaceholderScreen title="Статистика" description="Раздел появится на следующем этапе." />;
+        return <PlaceholderScreen title="Analytics" description="This section will appear in the next milestone." />;
       case 'accounts':
         return <AccountsScreen />;
       default:

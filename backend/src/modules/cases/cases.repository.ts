@@ -30,7 +30,7 @@ const mapRowsToFolder = (rows: CaseJoinedRow[]): CaseFolder | null => {
     }
     files.push({
       id: row.file_id,
-      fileName: row.file_name ?? 'Файл',
+      fileName: row.file_name ?? 'File',
       mimeType: row.file_mime_type ?? 'application/octet-stream',
       size: Number(row.file_size ?? 0),
       uploadedAt: row.file_uploaded_at ? new Date(row.file_uploaded_at).toISOString() : new Date().toISOString(),

@@ -34,14 +34,14 @@ export const EvaluationScreen = () => {
     const result = saveEvaluation(evaluation, options.expectedVersion);
     if (!result.ok) {
       if (result.error === 'version-conflict') {
-        setBanner({ type: 'error', text: 'Конфликт версий. Обновите страницу, чтобы увидеть актуальные данные.' });
+        setBanner({ type: 'error', text: 'Version conflict. Refresh the page to load the latest data.' });
       } else {
-        setBanner({ type: 'error', text: 'Укажите кандидата и убедитесь, что все поля заполнены.' });
+        setBanner({ type: 'error', text: 'Select a candidate and make sure all fields are filled in.' });
       }
       return;
     }
 
-    setBanner({ type: 'info', text: 'Настройка оценки сохранена.' });
+    setBanner({ type: 'info', text: 'Evaluation settings saved.' });
     if (options.closeAfterSave) {
       setModalEvaluation(null);
       setIsModalOpen(false);
@@ -51,16 +51,16 @@ export const EvaluationScreen = () => {
   };
 
   const handleDelete = (id: string) => {
-    const confirmed = window.confirm('Удалить настройку оценки и все связанные интервью?');
+    const confirmed = window.confirm('Delete the evaluation setup and all related interviews?');
     if (!confirmed) {
       return;
     }
     const result = removeEvaluation(id);
     if (!result.ok) {
-      setBanner({ type: 'error', text: 'Не удалось удалить настройку.' });
+      setBanner({ type: 'error', text: 'Failed to delete the evaluation.' });
       return;
     }
-    setBanner({ type: 'info', text: 'Настройка оценки удалена.' });
+    setBanner({ type: 'info', text: 'Evaluation deleted.' });
     setModalEvaluation(null);
     setIsModalOpen(false);
   };
@@ -69,11 +69,11 @@ export const EvaluationScreen = () => {
     <section className={styles.wrapper}>
       <header className={styles.header}>
         <div>
-          <h1>Оценка кандидатов</h1>
-          <p className={styles.subtitle}>Настраивайте интервью и отслеживайте статус форм оценок.</p>
+          <h1>Candidate evaluations</h1>
+          <p className={styles.subtitle}>Configure interviews and track the status of evaluation forms.</p>
         </div>
         <button className={styles.primaryButton} onClick={handleCreate}>
-          Создать новую оценку
+          Create new evaluation
         </button>
       </header>
 
@@ -84,22 +84,22 @@ export const EvaluationScreen = () => {
       <div className={styles.cardsGrid}>
         {list.length === 0 ? (
           <div className={styles.emptyState}>
-            <h2>Нет активных оценок</h2>
-            <p>Создайте первую оценку, чтобы назначить интервьюеров и кейсы.</p>
+            <h2>No active evaluations</h2>
+            <p>Create the first evaluation to assign interviewers and cases.</p>
           </div>
         ) : (
-      list.map((item) => (
-        <EvaluationCard
-          key={item.id}
-          evaluation={item}
-          candidateName={item.candidateId ? candidateNames.get(item.candidateId) ?? 'Не выбран' : 'Не выбран'}
-          onEdit={() => {
-            setModalEvaluation(item);
-            setIsModalOpen(true);
-          }}
-          onOpenStatus={() => setStatusEvaluation(item)}
-        />
-      ))
+          list.map((item) => (
+            <EvaluationCard
+              key={item.id}
+              evaluation={item}
+              candidateName={item.candidateId ? candidateNames.get(item.candidateId) ?? 'Not selected' : 'Not selected'}
+              onEdit={() => {
+                setModalEvaluation(item);
+                setIsModalOpen(true);
+              }}
+              onOpenStatus={() => setStatusEvaluation(item)}
+            />
+          ))
         )}
       </div>
 

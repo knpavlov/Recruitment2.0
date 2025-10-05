@@ -14,7 +14,7 @@ export const CandidatesScreen = () => {
   const [modalCandidate, setModalCandidate] = useState<CandidateProfile | null>(null);
 
   const sortedCandidates = useMemo(
-    () => [...list].sort((a, b) => `${a.lastName}${a.firstName}`.localeCompare(`${b.lastName}${b.firstName}`, 'ru-RU')),
+    () => [...list].sort((a, b) => `${a.lastName}${a.firstName}`.localeCompare(`${b.lastName}${b.firstName}`, 'en-US')),
     [list]
   );
 
@@ -27,14 +27,14 @@ export const CandidatesScreen = () => {
     const result = saveProfile(profile, options.expectedVersion);
     if (!result.ok) {
       if (result.error === 'version-conflict') {
-        setBanner({ type: 'error', text: 'Изменения не сохранены: запись уже обновлена другим пользователем. Обновите страницу.' });
+        setBanner({ type: 'error', text: 'Changes were not saved: another user has already updated this record. Refresh the page.' });
       } else {
-        setBanner({ type: 'error', text: 'Проверьте заполнение обязательных полей.' });
+        setBanner({ type: 'error', text: 'Check the required fields before saving.' });
       }
       return;
     }
 
-    setBanner({ type: 'info', text: 'Карточка кандидата сохранена.' });
+    setBanner({ type: 'info', text: 'Candidate profile saved.' });
 
     if (options.closeAfterSave) {
       setIsModalOpen(false);
@@ -44,16 +44,16 @@ export const CandidatesScreen = () => {
   };
 
   const handleDelete = (id: string) => {
-    const confirmed = window.confirm('Удалить карточку кандидата безвозвратно?');
+    const confirmed = window.confirm('Delete the candidate profile permanently?');
     if (!confirmed) {
       return;
     }
     const result = removeProfile(id);
     if (!result.ok) {
-      setBanner({ type: 'error', text: 'Не удалось удалить кандидата.' });
+      setBanner({ type: 'error', text: 'Failed to delete the candidate.' });
       return;
     }
-    setBanner({ type: 'info', text: 'Карточка кандидата удалена.' });
+    setBanner({ type: 'info', text: 'Candidate profile deleted.' });
     setIsModalOpen(false);
     setModalCandidate(null);
   };
@@ -62,11 +62,11 @@ export const CandidatesScreen = () => {
     <section className={styles.wrapper}>
       <header className={styles.header}>
         <div>
-          <h1>База кандидатов</h1>
-          <p className={styles.subtitle}>Создавайте и редактируйте карточки кандидатов с помощью ИИ.</p>
+          <h1>Candidate database</h1>
+          <p className={styles.subtitle}>Create and edit candidate profiles with AI assistance.</p>
         </div>
         <button className={styles.primaryButton} onClick={handleCreate}>
-          Создать профиль
+          Create profile
         </button>
       </header>
 
@@ -77,8 +77,8 @@ export const CandidatesScreen = () => {
       <div className={styles.cardsGrid}>
         {sortedCandidates.length === 0 ? (
           <div className={styles.emptyState}>
-            <h2>Пока нет кандидатов</h2>
-            <p>Используйте кнопку «Создать профиль», чтобы добавить первого кандидата.</p>
+            <h2>No candidates yet</h2>
+            <p>Use the “Create profile” button to add the first candidate.</p>
           </div>
         ) : (
           sortedCandidates.map((candidate) => (

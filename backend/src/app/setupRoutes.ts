@@ -8,7 +8,7 @@ import { healthRouter } from '../shared/health.router.js';
 import { authRouter } from '../modules/auth/auth.router.js';
 
 export const registerAppRoutes = (app: Application) => {
-  // TODO: добавить middleware для аутентификации и логирования запросов
+  // TODO: add middleware for authentication and request logging
   app.use('/health', healthRouter);
   app.use('/accounts', accountsRouter);
   app.use('/auth', authRouter);

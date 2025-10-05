@@ -1,34 +1,34 @@
-# Архитектура Recruitment 2.0
+# Recruitment 2.0 Architecture
 
-Документ описывает стартовую модульную структуру проекта и ключевые принципы развития.
+This document describes the initial modular structure of the project and the key development principles.
 
-## Общие принципы
+## Guiding principles
 
-- Чёткое разделение слоёв: UI, состояние, сервисы и инфраструктура.
-- Возможность вынесения бизнес-логики в независимые пакеты для будущей миграции на Unity.
-- Использование TypeScript как единого языка для фронтенда и бэкенда.
+- Strict separation of layers: UI, state management, services, and infrastructure.
+- Ability to extract business logic into independent packages for a future migration to Unity.
+- TypeScript as the shared language for both the frontend and the backend.
 
-## Фронтенд
+## Frontend
 
-- `src/app` — базовая компоновка приложения и навигация.
-- `src/components` — переиспользуемые визуальные компоненты без бизнес-логики.
-- `src/modules` — экраны и их состояние.
-- `src/shared` — типы, утилиты и UI-заглушки.
-- Стили размещены в `src/styles` и подключаются по CSS-модулям.
+- `src/app` — base application layout and navigation.
+- `src/components` — reusable visual components without business logic.
+- `src/modules` — screen-level modules with their own state.
+- `src/shared` — types, utilities, and UI placeholders.
+- Styles live in `src/styles` and are loaded via CSS modules.
 
-## Бэкенд
+## Backend
 
-- `src/app` — точка входа Express и регистрация маршрутов.
-- `src/modules` — отдельные домены (аккаунты, кейсы, кандидаты, оценки, вопросы, аутентификация).
-- `src/shared` — общие элементы инфраструктуры (например, health-check).
-- В сервисах используется слой репозиториев, который инкапсулирует работу с PostgreSQL через пул подключений.
-- При запуске сервера выполняются лёгкие миграции: создаются таблицы и добавляется суперадмин.
-- Для деплоя используется `nixpacks`-конфигурация `.nixpacks.toml`, которая устанавливает зависимости через `npm install` и прогоняет сборку до старта сервера.
+- `src/app` — Express entry point and route registration.
+- `src/modules` — domain-specific modules (accounts, cases, candidates, evaluations, questions, authentication).
+- `src/shared` — common infrastructure pieces (for example, the health check).
+- Services rely on repository classes that encapsulate PostgreSQL access through a connection pool.
+- During server startup lightweight migrations create tables and seed the super admin account.
+- Deployment uses the `.nixpacks.toml` configuration, which installs dependencies via `npm install` and runs the build before the server starts.
 
-## Следующие шаги
+## Next steps
 
-1. Вынести миграции в полноценный инструмент (например, `node-pg-migrate` или Prisma) и добавить контроль версий схемы.
-2. Подключить очередь писем и интеграцию с провайдером рассылок.
-3. Перенести одноразовые коды и сессии в постоянное хранилище с учётом масштабирования.
-4. Интегрировать реальный API ИИ для разбора резюме и сопоставления навыков.
-5. Добавить оптимистичные блокировки и синхронизацию через WebSocket для уведомлений об обновлениях.
+1. Move migrations to a dedicated tool (for example, `node-pg-migrate` or Prisma) and add schema version control.
+2. Connect an email queue and integrate with a mailing provider.
+3. Store one-time codes and sessions in persistent storage with scalability in mind.
+4. Integrate a production AI API for resume parsing and skill matching.
+5. Add optimistic locking and WebSocket-based synchronization to notify about updates.
