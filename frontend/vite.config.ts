@@ -29,7 +29,7 @@ export default defineConfig(({ mode }) => {
       host: true
     },
     preview: {
-      // Разрешаем предпросмотр из Railway и даём возможность настраивать параметры через .env
+      // Allow preview from Railway and enable configuration via .env variables
       host: previewHost,
       port: previewPort,
       allowedHosts: previewAllowedHosts

@@ -13,18 +13,18 @@ export const EvaluationCard = ({ evaluation, candidateName, onEdit, onOpenStatus
   return (
     <div className={styles.card}>
       <div>
-        <h3>Оценка #{evaluation.id.slice(0, 6)}</h3>
-        <p className={styles.meta}>Кандидат: {candidateName}</p>
+        <h3>Evaluation #{evaluation.id.slice(0, 6)}</h3>
+        <p className={styles.meta}>Candidate: {candidateName}</p>
         <p className={styles.meta}>
-          Интервью: {evaluation.interviewCount} · Формы: {completedForms}/{evaluation.interviewCount}
+          Interviews: {evaluation.interviewCount} · Forms: {completedForms}/{evaluation.interviewCount}
         </p>
       </div>
       <div className={styles.actions}>
         <button className={styles.secondaryButton} onClick={onEdit}>
-          Редактировать
+          Edit
         </button>
         <button className={styles.primaryButton} onClick={onOpenStatus}>
-          Статус
+          Status
         </button>
       </div>
     </div>

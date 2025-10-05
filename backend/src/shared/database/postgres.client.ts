@@ -28,7 +28,7 @@ const buildPoolConfig = (): PoolConfig => {
 const pool = new Pool(buildPoolConfig());
 
 pool.on('error', (error: Error) => {
-  console.error('Пул подключения к PostgreSQL получил ошибку:', error);
+  console.error('PostgreSQL connection pool reported an error:', error);
 });
 
 export const postgresPool = pool;

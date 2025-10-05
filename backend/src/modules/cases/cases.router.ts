@@ -5,26 +5,26 @@ const router = Router();
 
 const handleError = (error: unknown, res: Response) => {
   if (!(error instanceof Error)) {
-    res.status(500).json({ code: 'unknown', message: 'Непредвиденная ошибка.' });
+    res.status(500).json({ code: 'unknown', message: 'Unexpected error.' });
     return;
   }
 
   switch (error.message) {
     case 'INVALID_NAME':
     case 'INVALID_INPUT':
-      res.status(400).json({ code: 'invalid-input', message: 'Некорректные данные.' });
+      res.status(400).json({ code: 'invalid-input', message: 'Invalid input.' });
       return;
     case 'DUPLICATE_NAME':
-      res.status(409).json({ code: 'duplicate', message: 'Папка с таким названием уже существует.' });
+      res.status(409).json({ code: 'duplicate', message: 'A folder with the same name already exists.' });
       return;
     case 'VERSION_CONFLICT':
-      res.status(409).json({ code: 'version-conflict', message: 'Версия папки устарела.' });
+      res.status(409).json({ code: 'version-conflict', message: 'The folder version is outdated.' });
       return;
     case 'NOT_FOUND':
-      res.status(404).json({ code: 'not-found', message: 'Папка не найдена.' });
+      res.status(404).json({ code: 'not-found', message: 'Folder not found.' });
       return;
     default:
-      res.status(500).json({ code: 'unknown', message: 'Не удалось обработать запрос.' });
+      res.status(500).json({ code: 'unknown', message: 'Failed to process the request.' });
   }
 };
 
@@ -46,7 +46,7 @@ router.post('/', async (req, res) => {
 router.patch('/:id', async (req, res) => {
   const { name, expectedVersion } = req.body as { name?: string; expectedVersion?: number };
   if (typeof expectedVersion !== 'number') {
-    res.status(400).json({ code: 'invalid-input', message: 'Укажите ожидаемую версию.' });
+    res.status(400).json({ code: 'invalid-input', message: 'Provide the expected version.' });
     return;
   }
   try {
@@ -69,7 +69,7 @@ router.delete('/:id', async (req, res) => {
 router.post('/:id/files', async (req, res) => {
   const { files, expectedVersion } = req.body as { files?: any[]; expectedVersion?: number };
   if (!Array.isArray(files) || typeof expectedVersion !== 'number') {
-    res.status(400).json({ code: 'invalid-input', message: 'Некорректные данные запроса.' });
+    res.status(400).json({ code: 'invalid-input', message: 'Invalid request data.' });
     return;
   }
   try {
@@ -83,7 +83,7 @@ router.post('/:id/files', async (req, res) => {
 router.delete('/:id/files/:fileId', async (req, res) => {
   const { expectedVersion } = req.body as { expectedVersion?: number };
   if (typeof expectedVersion !== 'number') {
-    res.status(400).json({ code: 'invalid-input', message: 'Некорректные данные запроса.' });
+    res.status(400).json({ code: 'invalid-input', message: 'Invalid request data.' });
     return;
   }
   try {

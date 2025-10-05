@@ -5,7 +5,7 @@ import { registerAppRoutes } from './setupRoutes.js';
 import { runMigrations } from '../shared/database/migrations.js';
 
 const bootstrap = async () => {
-  // Сначала убеждаемся, что база данных готова
+  // Ensure the database is ready before serving requests
   await runMigrations();
 
   const app = express();
@@ -17,12 +17,12 @@ const bootstrap = async () => {
   const port = process.env.PORT || 4000;
 
   app.listen(port, () => {
-    // Логируем запуск сервера
-    console.log(`API сервера запущено на порту ${port}`);
+    // Log server startup
+    console.log(`API server is running on port ${port}`);
   });
 };
 
 bootstrap().catch((error) => {
-  console.error('Не удалось запустить сервер:', error);
+  console.error('Failed to start the server:', error);
   process.exit(1);
 });
