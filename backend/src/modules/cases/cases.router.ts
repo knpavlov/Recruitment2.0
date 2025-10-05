@@ -1,11 +1,10 @@
 import { Router } from 'express';
-import { CasesService } from './cases.service.js';
+import { casesService } from './cases.module.js';
 
 const router = Router();
-const service = new CasesService();
 
 router.get('/', async (_req, res) => {
-  const folders = await service.listFolders();
+  const folders = await casesService.listFolders();
   res.json(folders);
 });
 

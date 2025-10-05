@@ -1,3 +1,5 @@
 import { AccountsService } from './accounts.service.js';
+import { AccountsRepository } from './accounts.repository.js';
 
-export const accountsService = new AccountsService();
+const repository = new AccountsRepository();
+export const accountsService = new AccountsService(repository);

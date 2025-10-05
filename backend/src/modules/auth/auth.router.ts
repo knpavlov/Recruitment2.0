@@ -1,12 +1,11 @@
 import { Router } from 'express';
-import { AuthService } from './auth.service.js';
+import { authService } from './auth.module.js';
 
 const router = Router();
-const service = new AuthService();
 
 router.post('/request-code', async (req, res) => {
   try {
-    const result = await service.requestAccessCode(String(req.body.email ?? ''));
+    const result = await authService.requestAccessCode(String(req.body.email ?? ''));
     res.status(201).json(result);
   } catch (error) {
     res.status(404).json({ message: 'Аккаунт не найден или не имеет доступа.' });
@@ -20,7 +19,7 @@ router.post('/verify-code', async (req, res) => {
     return;
   }
   try {
-    const session = await service.verifyAccessCode(email, code);
+    const session = await authService.verifyAccessCode(email, code);
     res.json(session);
   } catch (error) {
     if (error instanceof Error && error.message === 'CODE_EXPIRED') {

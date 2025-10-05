@@ -1,6 +1,7 @@
 # Recruitment 2.0
 
-Моно-репозиторий портала для команды рекрутинга. Структура разделена на фронтенд (React + Vite) и бэкенд (Express + TypeScript) с учётом будущей миграции логики в независимые пакеты.
+Моно-репозиторий портала для команды рекрутинга. Структура разделена на фронтенд (React + Vite) и бэкенд (Express + TypeScript)
+с учётом будущей миграции логики в независимые пакеты.
 
 ## Структура
 
@@ -25,6 +26,24 @@ cd backend
 npm install
 npm run dev
 ```
+
+### Настройка базы данных
+
+Бэкенд использует PostgreSQL. Поддерживаются как строка подключения `DATABASE_URL`, так и отдельные параметры (`PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE`).
+
+1. Создайте файл `.env` в каталоге `backend/` и пропишите переменные окружения Railway (или другой СУБД). Пример:
+   ```dotenv
+   DATABASE_URL=postgresql://user:password@host:port/database
+   # или альтернативно
+   # PGHOST=...
+   # PGPORT=...
+   # PGUSER=...
+   # PGPASSWORD=...
+   # PGDATABASE=...
+   SUPER_ADMIN_EMAIL=super.admin@company.com
+   ```
+2. Запустите `npm install`, чтобы подтянуть зависимость `pg`.
+3. При первом запуске `npm run dev` или `npm run start` будут автоматически созданы таблицы и учётная запись суперадмина.
 
 ## Что реализовано сейчас
 
