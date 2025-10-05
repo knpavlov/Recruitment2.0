@@ -1,11 +1,10 @@
 import { Router } from 'express';
-import { EvaluationsService } from './evaluations.service.js';
+import { evaluationsService } from './evaluations.module.js';
 
 const router = Router();
-const service = new EvaluationsService();
 
 router.get('/', async (_req, res) => {
-  const evaluations = await service.listEvaluations();
+  const evaluations = await evaluationsService.listEvaluations();
   res.json(evaluations);
 });
 
