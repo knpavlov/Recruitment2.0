@@ -6,7 +6,8 @@ import { useAuth } from '../auth/AuthContext';
 type Banner = { type: 'info' | 'error'; text: string } | null;
 
 export const AccountsScreen = () => {
-  const { role } = useAuth();
+  const { session } = useAuth();
+  const role = session?.role ?? 'user';
   const { list, inviteAccount, activateAccount, removeAccount } = useAccountsState();
   const [email, setEmail] = useState('');
   const [targetRole, setTargetRole] = useState<'admin' | 'user'>('admin');

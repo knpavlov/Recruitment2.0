@@ -37,6 +37,7 @@ export const apiRequest = async <T>(
   const { body, headers, ...rest } = options;
   const response = await fetch(buildApiUrl(path), {
     ...rest,
+    credentials: 'include',
     headers: buildHeaders(headers, body),
     body: resolveBody(body)
   });

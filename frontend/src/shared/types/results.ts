@@ -3,6 +3,7 @@ export type DomainErrorCode =
   | 'version-conflict'
   | 'duplicate'
   | 'invalid-input'
+  | 'unauthorized'
   | 'unknown';
 
 export interface DomainFailure {

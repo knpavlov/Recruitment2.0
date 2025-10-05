@@ -213,11 +213,27 @@ export class MailerService {
   async sendInvitation(email: string, token: string) {
     const subject = 'Invitation to the case management system';
     const inviteUrl = process.env.INVITE_URL?.trim();
+
+    const link = inviteUrl
+      ? (() => {
+          try {
+            const url = new URL(inviteUrl);
+            url.searchParams.set('token', token);
+            return url.toString();
+          } catch (error) {
+            console.warn('Failed to format invitation URL:', error);
+            return inviteUrl;
+          }
+        })()
+      : null;
+
     const bodyLines = [
       'You have been invited to the case management system.',
-      inviteUrl ? `Activation link: ${inviteUrl}` : null,
-      `Invitation token: ${token}`
+      link ? `Open the dashboard: ${link}` : null,
+      `Invitation token: ${token}`,
+      'Use the dashboard to request a one-time access code.'
     ].filter((line): line is string => Boolean(line));
+
     await this.deliver(email, subject, bodyLines.join('\n\n'));
   }
 
