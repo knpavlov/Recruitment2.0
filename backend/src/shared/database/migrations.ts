@@ -1,5 +1,7 @@
 import { randomUUID } from 'crypto';
 import { postgresPool } from './postgres.client.js';
+import { shouldUseInMemoryDatabase } from './environment.js';
+import { inMemoryStore } from './inMemoryStore.js';
 
 const SUPER_ADMIN_EMAIL = process.env.SUPER_ADMIN_EMAIL ?? 'super.admin@company.com';
 
@@ -7,6 +9,10 @@ const connectClient = async () =>
   (postgresPool as unknown as { connect: () => Promise<any> }).connect();
 
 const createTables = async () => {
+  if (shouldUseInMemoryDatabase) {
+    return;
+  }
+
   await postgresPool.query(`
     CREATE TABLE IF NOT EXISTS accounts (
       id UUID PRIMARY KEY,
@@ -95,6 +101,11 @@ const createTables = async () => {
 };
 
 const syncSuperAdmin = async () => {
+  if (shouldUseInMemoryDatabase) {
+    inMemoryStore.accounts.ensureSuperAdmin(SUPER_ADMIN_EMAIL);
+    return;
+  }
+
   const client = await connectClient();
   try {
     await client.query('BEGIN');
@@ -158,7 +169,11 @@ const syncSuperAdmin = async () => {
 };
 
 export const runMigrations = async () => {
-  // В простом варианте выполняем миграции последовательно при старте сервера
+  if (shouldUseInMemoryDatabase) {
+    console.warn(
+      'PostgreSQL не настроен. Запускаем резервный in-memory слой данных. Данные сохраняются до перезапуска сервера.'
+    );
+  }
   await createTables();
   await syncSuperAdmin();
 };

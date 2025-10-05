@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { Pool, PoolConfig } from 'pg';
+import { shouldUseInMemoryDatabase } from './environment.js';
 
 const buildPoolConfig = (): PoolConfig => {
   const connectionString = process.env.DATABASE_URL;
@@ -10,12 +11,20 @@ const buildPoolConfig = (): PoolConfig => {
     };
   }
 
+  const host = process.env.PGHOST;
+  const user = process.env.PGUSER;
+  const database = process.env.PGDATABASE;
+
+  if (!host || !user || !database) {
+    throw new Error('Недостаточно данных для подключения к PostgreSQL.');
+  }
+
   const config: PoolConfig = {
-    host: process.env.PGHOST ?? 'localhost',
+    host,
     port: Number(process.env.PGPORT ?? 5432),
-    user: process.env.PGUSER,
+    user,
     password: process.env.PGPASSWORD,
-    database: process.env.PGDATABASE
+    database
   };
 
   if (process.env.NODE_ENV === 'production') {
@@ -25,10 +34,29 @@ const buildPoolConfig = (): PoolConfig => {
   return config;
 };
 
-const pool = new Pool(buildPoolConfig());
+const createPool = (): Pool => {
+  if (shouldUseInMemoryDatabase) {
+    return {
+      async query() {
+        throw new Error('Внутренняя in-memory БД активна: прямые SQL-запросы недоступны.');
+      },
+      async connect() {
+        throw new Error('Внутренняя in-memory БД активна: подключение к PostgreSQL отключено.');
+      },
+      on() {
+        return this;
+      },
+      async end() {
+        /* noop */
+      }
+    } as unknown as Pool;
+  }
 
-pool.on('error', (error: Error) => {
-  console.error('Пул подключения к PostgreSQL получил ошибку:', error);
-});
+  const pool = new Pool(buildPoolConfig());
+  pool.on('error', (error: Error) => {
+    console.error('Пул подключения к PostgreSQL получил ошибку:', error);
+  });
+  return pool;
+};
 
-export const postgresPool = pool;
+export const postgresPool = createPool();

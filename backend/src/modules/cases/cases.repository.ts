@@ -1,6 +1,8 @@
 import { randomUUID } from 'crypto';
 import { postgresPool } from '../../shared/database/postgres.client.js';
 import { CaseFileRecord, CaseFileUpload, CaseFolder } from './cases.types.js';
+import { shouldUseInMemoryDatabase } from '../../shared/database/environment.js';
+import { inMemoryStore } from '../../shared/database/inMemoryStore.js';
 
 interface CaseJoinedRow extends Record<string, unknown> {
   folder_id: string;
@@ -99,6 +101,9 @@ interface CaseFolderRow {
 
 export class CasesRepository {
   async listFolders(): Promise<CaseFolder[]> {
+    if (shouldUseInMemoryDatabase) {
+      return inMemoryStore.cases.list();
+    }
     const result = await postgresPool.query<CaseJoinedRow>(
       `SELECT f.id AS folder_id,
               f.name AS folder_name,
@@ -120,6 +125,9 @@ export class CasesRepository {
   }
 
   async isNameTaken(name: string, excludeId?: string): Promise<boolean> {
+    if (shouldUseInMemoryDatabase) {
+      return inMemoryStore.cases.isNameTaken(name, excludeId);
+    }
     const result = await postgresPool.query(
       `SELECT 1 FROM case_folders WHERE lower(name) = lower($1) AND ($2::uuid IS NULL OR id <> $2) LIMIT 1;`,
       [name, excludeId ?? null]
@@ -128,6 +136,9 @@ export class CasesRepository {
   }
 
   async createFolder(name: string): Promise<CaseFolder> {
+    if (shouldUseInMemoryDatabase) {
+      return inMemoryStore.cases.create(name);
+    }
     const result = await postgresPool.query(
       `INSERT INTO case_folders (id, name)
        VALUES ($1, $2)
@@ -151,6 +162,9 @@ export class CasesRepository {
     name: string,
     expectedVersion: number
   ): Promise<'version-conflict' | CaseFolder | null> {
+    if (shouldUseInMemoryDatabase) {
+      return inMemoryStore.cases.rename(id, name, expectedVersion);
+    }
     const client = await connectClient();
     try {
       await client.query('BEGIN');
@@ -185,6 +199,9 @@ export class CasesRepository {
   }
 
   async deleteFolder(id: string): Promise<boolean> {
+    if (shouldUseInMemoryDatabase) {
+      return inMemoryStore.cases.remove(id);
+    }
     const result = await postgresPool.query('DELETE FROM case_folders WHERE id = $1 RETURNING id;', [id]);
     return result.rows.length > 0;
   }
@@ -194,6 +211,9 @@ export class CasesRepository {
     files: CaseFileUpload[],
     expectedVersion: number
   ): Promise<'version-conflict' | CaseFolder | null> {
+    if (shouldUseInMemoryDatabase) {
+      return inMemoryStore.cases.addFiles(folderId, files, expectedVersion);
+    }
     const client = await connectClient();
     try {
       await client.query('BEGIN');
@@ -236,6 +256,9 @@ export class CasesRepository {
     fileId: string,
     expectedVersion: number
   ): Promise<'version-conflict' | CaseFolder | null> {
+    if (shouldUseInMemoryDatabase) {
+      return inMemoryStore.cases.removeFile(folderId, fileId, expectedVersion);
+    }
     const client = await connectClient();
     try {
       await client.query('BEGIN');
@@ -276,6 +299,9 @@ export class CasesRepository {
   }
 
   async findFolderById(id: string): Promise<CaseFolder | null> {
+    if (shouldUseInMemoryDatabase) {
+      return inMemoryStore.cases.findById(id);
+    }
     const client = await connectClient();
     try {
       const rows = await fetchFolderRows(client, id);
