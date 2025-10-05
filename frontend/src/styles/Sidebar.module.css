@@ -1,0 +1,88 @@
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  background: #0f172a;
+  color: #f8fafc;
+  padding: 32px 24px;
+  gap: 32px;
+}
+
+.logoArea {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.logoMark {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #38bdf8 0%, #818cf8 100%);
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.logoText {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.companyName {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.version {
+  font-size: 14px;
+  color: #cbd5f5;
+}
+
+.menu {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+}
+
+.menuItem,
+.activeItem {
+  border: none;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  padding: 12px 16px;
+  border-radius: 12px;
+  transition: background 0.2s ease, color 0.2s ease;
+  cursor: pointer;
+}
+
+.menuItem:hover {
+  background: rgba(148, 163, 184, 0.25);
+}
+
+.activeItem {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.25), rgba(59, 130, 246, 0.45));
+  color: #e0f2fe;
+}
+
+.logoutBlock {
+  margin-top: auto;
+}
+
+.logoutButton {
+  width: 100%;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: rgba(15, 23, 42, 0.7);
+  color: inherit;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.logoutButton:hover {
+  background: rgba(59, 130, 246, 0.4);
+}
