@@ -28,14 +28,40 @@ const buildHeaders = (input?: HeadersInit, body?: unknown) => {
   return headers;
 };
 
-const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
+const resolveApiBase = () => {
+  const explicitBase = import.meta.env.VITE_API_URL?.trim();
+  if (explicitBase) {
+    return explicitBase.replace(/\/$/, '');
+  }
+
+  if (typeof window === 'undefined') {
+    return 'http://localhost:4000';
+  }
+
+  const hostname = window.location.hostname.toLowerCase();
+
+  // В продакшене используем тот же домен, чтобы не зависеть от локальных адресов.
+  if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+    return window.location.origin;
+  }
+
+  // Для локальной разработки оставляем привычный порт API.
+  return 'http://localhost:4000';
+};
+
+const API_BASE = resolveApiBase();
+
+const buildUrl = (path: string) => {
+  const normalizedBase = API_BASE.endsWith('/') ? API_BASE : `${API_BASE}/`;
+  return new URL(path.replace(/^\//, ''), normalizedBase).toString();
+};
 
 export const apiRequest = async <T>(
   path: string,
   options: RequestOptions = {}
 ): Promise<T> => {
   const { body, headers, ...rest } = options;
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await fetch(buildUrl(path), {
     ...rest,
     headers: buildHeaders(headers, body),
     body: resolveBody(body)
