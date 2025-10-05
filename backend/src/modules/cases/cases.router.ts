@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { CasesService } from './cases.service';
+import { CasesService } from './cases.service.js';
 
 const router = Router();
 const service = new CasesService();

@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
-import { accountsService } from '../accounts/accounts.module';
-import { MailerService } from '../../shared/mailer.service';
-import { OtpService } from '../../shared/otp.service';
+import { accountsService } from '../accounts/accounts.module.js';
+import { MailerService } from '../../shared/mailer.service.js';
+import { OtpService } from '../../shared/otp.service.js';
 
 interface AccessCodeRecord {
   email: string;
