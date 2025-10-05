@@ -43,6 +43,41 @@ const createTables = async () => {
   `);
 
   await postgresPool.query(`
+    ALTER TABLE case_folders
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+  `);
+
+  await postgresPool.query(`
+    ALTER TABLE case_folders
+      ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1;
+  `);
+
+  await postgresPool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS case_folders_name_unique
+      ON case_folders (LOWER(name));
+  `);
+
+  await postgresPool.query(`
+    ALTER TABLE case_files
+      ADD COLUMN IF NOT EXISTS mime_type TEXT;
+  `);
+
+  await postgresPool.query(`
+    ALTER TABLE case_files
+      ADD COLUMN IF NOT EXISTS size BIGINT;
+  `);
+
+  await postgresPool.query(`
+    ALTER TABLE case_files
+      ADD COLUMN IF NOT EXISTS data_url TEXT;
+  `);
+
+  await postgresPool.query(`
+    ALTER TABLE case_files
+      ADD COLUMN IF NOT EXISTS uploaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+  `);
+
+  await postgresPool.query(`
     CREATE TABLE IF NOT EXISTS candidates (
       id UUID PRIMARY KEY,
       first_name TEXT NOT NULL,

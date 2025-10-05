@@ -28,8 +28,8 @@ export const AccountsScreen = () => {
     );
   }
 
-  const handleInvite = () => {
-    const result = inviteAccount(email, targetRole);
+  const handleInvite = async () => {
+    const result = await inviteAccount(email, targetRole);
     if (!result.ok) {
       const message =
         result.error === 'duplicate'
@@ -42,8 +42,8 @@ export const AccountsScreen = () => {
     setEmail('');
   };
 
-  const handleActivate = (id: string) => {
-    const result = activateAccount(id);
+  const handleActivate = async (id: string) => {
+    const result = await activateAccount(id);
     if (!result.ok) {
       setBanner({ type: 'error', text: 'Не удалось активировать аккаунт.' });
       return;
@@ -51,12 +51,12 @@ export const AccountsScreen = () => {
     setBanner({ type: 'info', text: `Аккаунт ${result.data.email} активирован.` });
   };
 
-  const handleRemove = (id: string) => {
+  const handleRemove = async (id: string) => {
     const confirmed = window.confirm('Удалить аккаунт безвозвратно?');
     if (!confirmed) {
       return;
     }
-    const result = removeAccount(id);
+    const result = await removeAccount(id);
     if (!result.ok) {
       setBanner({ type: 'error', text: 'Не удалось удалить аккаунт.' });
       return;
@@ -88,7 +88,7 @@ export const AccountsScreen = () => {
             <option value="admin">Админ</option>
             <option value="user">Пользователь</option>
           </select>
-          <button className={styles.primaryButton} onClick={handleInvite}>
+          <button className={styles.primaryButton} onClick={() => void handleInvite()}>
             Отправить приглашение
           </button>
         </div>
@@ -124,12 +124,12 @@ export const AccountsScreen = () => {
                 <td>{account.role === 'super-admin' ? 'Суперадмин' : account.role === 'admin' ? 'Админ' : 'Пользователь'}</td>
                 <td className={styles.actionsCell}>
                   {account.status === 'pending' && (
-                    <button className={styles.secondaryButton} onClick={() => handleActivate(account.id)}>
+                    <button className={styles.secondaryButton} onClick={() => void handleActivate(account.id)}>
                       Активировать
                     </button>
                   )}
                   {account.role !== 'super-admin' && (
-                    <button className={styles.dangerButton} onClick={() => handleRemove(account.id)}>
+                    <button className={styles.dangerButton} onClick={() => void handleRemove(account.id)}>
                       Удалить
                     </button>
                   )}

@@ -1,5 +1,4 @@
-import { CaseFileRecord } from '../../../shared/types/caseLibrary';
-import { generateId } from '../../../shared/ui/generateId';
+import { CaseFileUploadDto } from '../api/casesApi';
 
 const readFileAsDataUrl = (file: File) =>
   new Promise<string>((resolve, reject) => {
@@ -9,15 +8,12 @@ const readFileAsDataUrl = (file: File) =>
     reader.readAsDataURL(file);
   });
 
-export const convertFilesToRecords = async (files: File[]): Promise<CaseFileRecord[]> => {
-  const timestamp = new Date().toISOString();
+export const convertFilesToRecords = async (files: File[]): Promise<CaseFileUploadDto[]> => {
   const records = await Promise.all(
     files.map(async (file) => ({
-      id: generateId(),
       fileName: file.name,
       mimeType: file.type,
       size: file.size,
-      uploadedAt: timestamp,
       dataUrl: await readFileAsDataUrl(file)
     }))
   );

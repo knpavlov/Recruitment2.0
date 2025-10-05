@@ -64,7 +64,7 @@ export const CaseFolderCard = ({ folder, onRename, onDelete, onUpload, onRemoveF
 
   const renderFile = (file: CaseFileRecord) => (
     <li key={file.id} className={styles.fileRow}>
-      <div>
+      <div className={styles.fileInfo}>
         <p className={styles.fileName}>{file.fileName}</p>
         <p className={styles.fileMeta}>
           {Math.round(file.size / 1024)} Кб · {new Date(file.uploadedAt).toLocaleString('ru-RU')}
@@ -109,14 +109,6 @@ export const CaseFolderCard = ({ folder, onRename, onDelete, onUpload, onRemoveF
             </>
           )}
         </div>
-        <div className={styles.folderActions}>
-          <button className={styles.secondaryButton} onClick={() => setIsEditingName((prev) => !prev)}>
-            {isEditingName ? 'Отмена' : 'Переименовать'}
-          </button>
-          <button className={styles.dangerButton} onClick={onDelete}>
-            Удалить
-          </button>
-        </div>
       </header>
 
       <div
@@ -144,6 +136,15 @@ export const CaseFolderCard = ({ folder, onRename, onDelete, onUpload, onRemoveF
       ) : (
         <ul className={styles.filesList}>{folder.files.map(renderFile)}</ul>
       )}
+
+      <div className={styles.folderActionsFooter}>
+        <button className={styles.secondaryButton} onClick={() => setIsEditingName((prev) => !prev)}>
+          {isEditingName ? 'Отмена' : 'Переименовать'}
+        </button>
+        <button className={styles.dangerButton} onClick={onDelete}>
+          Удалить
+        </button>
+      </div>
 
       <footer className={styles.folderFooter}>
         <span>Обновлено: {new Date(folder.updatedAt).toLocaleString('ru-RU')}</span>

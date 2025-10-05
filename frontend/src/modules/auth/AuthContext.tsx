@@ -1,5 +1,6 @@
-import { createContext, ReactNode, useContext, useState } from 'react';
+import { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { AccountRole } from '../../shared/types/account';
+import { accountsApi } from '../accounts/api/accountsApi';
 
 interface AuthContextValue {
   role: AccountRole;
@@ -16,6 +17,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [role, setRole] = useState<AccountRole>('super-admin');
   const [email, setEmail] = useState('super.admin@company.com');
   const [rememberMe, setRememberMe] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadSuperAdmin = async () => {
+      try {
+        const accounts = await accountsApi.list();
+        const superAdmin = accounts.find((account) => account.role === 'super-admin');
+        if (!cancelled && superAdmin) {
+          setEmail(superAdmin.email);
+        }
+      } catch (error) {
+        console.error('Не удалось получить email суперадмина', error);
+      }
+    };
+    void loadSuperAdmin();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <AuthContext.Provider value={{ role, setRole, email, setEmail, rememberMe, setRememberMe }}>

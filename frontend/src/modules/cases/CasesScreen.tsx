@@ -15,8 +15,8 @@ export const CasesScreen = () => {
     [folders]
   );
 
-  const handleCreateFolder = () => {
-    const result = createFolder(newFolderName);
+  const handleCreateFolder = async () => {
+    const result = await createFolder(newFolderName);
     if (!result.ok) {
       setErrorMessage(result.error === 'duplicate' ? 'Папка с таким именем уже существует.' : 'Введите корректное название.');
       setInfoMessage(null);
@@ -28,7 +28,7 @@ export const CasesScreen = () => {
   };
 
   const handleRename = async (folderId: string, folderVersion: number, name: string) => {
-    const result = renameFolder(folderId, name, folderVersion);
+    const result = await renameFolder(folderId, name, folderVersion);
     if (!result.ok) {
       if (result.error === 'version-conflict') {
         throw new Error('Папка была изменена другим пользователем. Обновите страницу.');
@@ -42,12 +42,12 @@ export const CasesScreen = () => {
     setErrorMessage(null);
   };
 
-  const handleDelete = (folderId: string) => {
+  const handleDelete = async (folderId: string) => {
     const confirmed = window.confirm('Удалить папку и все вложенные файлы безвозвратно?');
     if (!confirmed) {
       return;
     }
-    const result = deleteFolder(folderId);
+    const result = await deleteFolder(folderId);
     if (!result.ok) {
       setErrorMessage('Не удалось удалить папку.');
       return;
@@ -58,7 +58,7 @@ export const CasesScreen = () => {
 
   const handleUpload = async (folderId: string, folderVersion: number, files: File[]) => {
     const records = await convertFilesToRecords(files);
-    const result = registerFiles(folderId, records, folderVersion);
+    const result = await registerFiles(folderId, records, folderVersion);
     if (!result.ok) {
       if (result.error === 'version-conflict') {
         throw new Error('Файлы не сохранены: папка была изменена другим пользователем.');
@@ -70,7 +70,7 @@ export const CasesScreen = () => {
   };
 
   const handleRemoveFile = async (folderId: string, folderVersion: number, fileId: string) => {
-    const result = removeFile(folderId, fileId, folderVersion);
+    const result = await removeFile(folderId, fileId, folderVersion);
     if (!result.ok) {
       if (result.error === 'version-conflict') {
         throw new Error('Файл не удалён: в папке уже есть свежие изменения.');
@@ -94,7 +94,7 @@ export const CasesScreen = () => {
             onChange={(event) => setNewFolderName(event.target.value)}
             placeholder="Название новой папки"
           />
-          <button className={styles.primaryButton} onClick={handleCreateFolder}>
+          <button className={styles.primaryButton} onClick={() => void handleCreateFolder()}>
             Создать папку
           </button>
         </div>
@@ -119,7 +119,7 @@ export const CasesScreen = () => {
                 key={folder.id}
                 folder={folder}
                 onRename={(name) => handleRename(folder.id, folder.version, name)}
-                onDelete={() => handleDelete(folder.id)}
+                onDelete={() => void handleDelete(folder.id)}
                 onUpload={(files) => handleUpload(folder.id, folder.version, files)}
                 onRemoveFile={(fileId) => handleRemoveFile(folder.id, folder.version, fileId)}
               />

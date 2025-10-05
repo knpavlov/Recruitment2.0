@@ -24,12 +24,14 @@
 .primaryButton,
 .secondaryButton,
 .dangerButton {
-  padding: 12px 20px;
-  border-radius: 12px;
+  padding: 8px 16px;
+  border-radius: 10px;
   border: none;
   cursor: pointer;
   transition: transform 0.2s ease;
   font-weight: 600;
+  font-size: 14px;
+  line-height: 1.4;
 }
 
 .primaryButton {
@@ -100,7 +102,7 @@
 
 .foldersGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
   gap: 24px;
 }
 
@@ -129,6 +131,7 @@
   display: flex;
   justify-content: space-between;
   gap: 16px;
+  align-items: flex-start;
 }
 
 .folderHeader h3 {
@@ -141,14 +144,10 @@
   font-size: 14px;
 }
 
-.folderActions {
-  display: flex;
-  gap: 12px;
-}
-
 .renameRow {
   display: flex;
-  gap: 12px;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .renameRow input {
@@ -191,11 +190,17 @@
 
 .fileRow {
   display: flex;
-  justify-content: space-between;
-  gap: 16px;
+  flex-direction: column;
+  gap: 12px;
   padding: 16px;
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.8);
+}
+
+.fileInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .fileName {
@@ -211,7 +216,15 @@
 
 .fileActions {
   display: flex;
-  gap: 12px;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.folderActionsFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .folderFooter {
