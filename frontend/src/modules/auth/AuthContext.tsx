@@ -1,5 +1,6 @@
-import { createContext, ReactNode, useContext, useState } from 'react';
+import { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { AccountRole } from '../../shared/types/account';
+import { useAccountsState } from '../../app/state/AppStateContext';
 
 interface AuthContextValue {
   role: AccountRole;
@@ -13,9 +14,26 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const { list } = useAccountsState();
   const [role, setRole] = useState<AccountRole>('super-admin');
-  const [email, setEmail] = useState('super.admin@company.com');
+  const [email, setEmailState] = useState('—');
   const [rememberMe, setRememberMe] = useState(true);
+  const [emailLocked, setEmailLocked] = useState(false);
+
+  useEffect(() => {
+    if (emailLocked) {
+      return;
+    }
+    const superAdmin = list.find((account) => account.role === 'super-admin');
+    if (superAdmin) {
+      setEmailState(superAdmin.email);
+    }
+  }, [list, emailLocked]);
+
+  const setEmail = (value: string) => {
+    setEmailState(value);
+    setEmailLocked(true);
+  };
 
   return (
     <AuthContext.Provider value={{ role, setRole, email, setEmail, rememberMe, setRememberMe }}>

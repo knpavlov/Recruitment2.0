@@ -117,6 +117,26 @@
   gap: 12px;
 }
 
+.tokenCell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tokenValue {
+  background: rgba(148, 163, 184, 0.15);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.tokenInfo {
+  color: #64748b;
+  font-size: 13px;
+}
+
 .infoBanner,
 .errorBanner {
   padding: 16px 20px;

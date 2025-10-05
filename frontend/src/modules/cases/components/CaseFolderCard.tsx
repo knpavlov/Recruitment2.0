@@ -5,7 +5,7 @@ import styles from '../../../styles/CasesScreen.module.css';
 interface CaseFolderCardProps {
   folder: CaseFolder;
   onRename: (name: string) => Promise<void>;
-  onDelete: () => void;
+  onDelete: () => Promise<void>;
   onUpload: (files: File[]) => Promise<void>;
   onRemoveFile: (fileId: string) => Promise<void>;
 }
@@ -64,13 +64,13 @@ export const CaseFolderCard = ({ folder, onRename, onDelete, onUpload, onRemoveF
 
   const renderFile = (file: CaseFileRecord) => (
     <li key={file.id} className={styles.fileRow}>
-      <div>
+      <div className={styles.fileInfo}>
         <p className={styles.fileName}>{file.fileName}</p>
         <p className={styles.fileMeta}>
           {Math.round(file.size / 1024)} Кб · {new Date(file.uploadedAt).toLocaleString('ru-RU')}
         </p>
       </div>
-      <div className={styles.fileActions}>
+      <div className={styles.fileActionsStack}>
         <a className={styles.secondaryButton} href={file.dataUrl} download={file.fileName}>
           Скачать
         </a>
@@ -95,27 +95,8 @@ export const CaseFolderCard = ({ folder, onRename, onDelete, onUpload, onRemoveF
     <div className={styles.folderCard}>
       <header className={styles.folderHeader}>
         <div>
-          {isEditingName ? (
-            <div className={styles.renameRow}>
-              <input value={draftName} onChange={(event) => setDraftName(event.target.value)} />
-              <button className={styles.primaryButton} onClick={submitRename}>
-                Сохранить
-              </button>
-            </div>
-          ) : (
-            <>
-              <h3>{folder.name}</h3>
-              <p className={styles.folderId}>ID: {folder.id}</p>
-            </>
-          )}
-        </div>
-        <div className={styles.folderActions}>
-          <button className={styles.secondaryButton} onClick={() => setIsEditingName((prev) => !prev)}>
-            {isEditingName ? 'Отмена' : 'Переименовать'}
-          </button>
-          <button className={styles.dangerButton} onClick={onDelete}>
-            Удалить
-          </button>
+          <h3>{folder.name}</h3>
+          <p className={styles.folderId}>ID: {folder.id}</p>
         </div>
       </header>
 
@@ -146,8 +127,62 @@ export const CaseFolderCard = ({ folder, onRename, onDelete, onUpload, onRemoveF
       )}
 
       <footer className={styles.folderFooter}>
-        <span>Обновлено: {new Date(folder.updatedAt).toLocaleString('ru-RU')}</span>
-        <span>Версия: {folder.version}</span>
+        <div className={styles.folderActionsSection}>
+          {isEditingName ? (
+            <div className={styles.renameRow}>
+              <input value={draftName} onChange={(event) => setDraftName(event.target.value)} />
+              <div className={styles.renameButtons}>
+                <button className={styles.primaryButton} onClick={submitRename}>
+                  Сохранить
+                </button>
+                <button
+                  className={styles.secondaryButton}
+                  onClick={() => {
+                    setIsEditingName(false);
+                    setDraftName(folder.name);
+                    setError(null);
+                  }}
+                >
+                  Отмена
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className={styles.folderActionsBar}>
+              <button
+                className={styles.secondaryButton}
+                onClick={() => {
+                  setIsEditingName(true);
+                  setDraftName(folder.name);
+                  setError(null);
+                }}
+              >
+                Переименовать
+              </button>
+              <button
+                className={styles.dangerButton}
+                onClick={async () => {
+                  const confirmed = window.confirm('Удалить папку и все вложенные файлы безвозвратно?');
+                  if (!confirmed) {
+                    return;
+                  }
+                  try {
+                    await onDelete();
+                    setError(null);
+                  } catch (deleteError) {
+                    setError((deleteError as Error).message);
+                  }
+                }}
+              >
+                Удалить
+              </button>
+            </div>
+          )}
+        </div>
+        <div className={styles.folderMeta}>
+          <span>Обновлено: {new Date(folder.updatedAt).toLocaleString('ru-RU')}</span>
+          <span>Версия: {folder.version}</span>
+        </div>
       </footer>
 
       {error && <p className={styles.error}>{error}</p>}

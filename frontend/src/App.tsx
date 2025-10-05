@@ -55,9 +55,9 @@ const AppContent = () => {
 };
 
 export const App = () => (
-  <AuthProvider>
-    <AppStateProvider>
+  <AppStateProvider>
+    <AuthProvider>
       <AppContent />
-    </AppStateProvider>
-  </AuthProvider>
+    </AuthProvider>
+  </AppStateProvider>
 );

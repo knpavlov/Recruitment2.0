@@ -15,10 +15,16 @@ export const CasesScreen = () => {
     [folders]
   );
 
-  const handleCreateFolder = () => {
-    const result = createFolder(newFolderName);
+  const handleCreateFolder = async () => {
+    const result = await createFolder(newFolderName);
     if (!result.ok) {
-      setErrorMessage(result.error === 'duplicate' ? 'Папка с таким именем уже существует.' : 'Введите корректное название.');
+      const message =
+        result.error === 'duplicate'
+          ? 'Папка с таким именем уже существует.'
+          : result.error === 'invalid-input'
+            ? 'Введите корректное название.'
+            : 'Не удалось создать папку. Попробуйте позже.';
+      setErrorMessage(message);
       setInfoMessage(null);
       return;
     }
@@ -28,7 +34,7 @@ export const CasesScreen = () => {
   };
 
   const handleRename = async (folderId: string, folderVersion: number, name: string) => {
-    const result = renameFolder(folderId, name, folderVersion);
+    const result = await renameFolder(folderId, name, folderVersion);
     if (!result.ok) {
       if (result.error === 'version-conflict') {
         throw new Error('Папка была изменена другим пользователем. Обновите страницу.');
@@ -36,21 +42,26 @@ export const CasesScreen = () => {
       if (result.error === 'duplicate') {
         throw new Error('Папка с таким названием уже существует.');
       }
+      if (result.error === 'invalid-input') {
+        throw new Error('Введите корректное название.');
+      }
+      if (result.error === 'not-found') {
+        throw new Error('Папка не найдена. Обновите страницу.');
+      }
       throw new Error('Не удалось переименовать папку.');
     }
     setInfoMessage(`Папка переименована в «${result.data.name}».`);
     setErrorMessage(null);
   };
 
-  const handleDelete = (folderId: string) => {
-    const confirmed = window.confirm('Удалить папку и все вложенные файлы безвозвратно?');
-    if (!confirmed) {
-      return;
-    }
-    const result = deleteFolder(folderId);
+  const handleDelete = async (folderId: string) => {
+    const result = await deleteFolder(folderId);
     if (!result.ok) {
       setErrorMessage('Не удалось удалить папку.');
-      return;
+      if (result.error === 'not-found') {
+        throw new Error('Папка уже была удалена.');
+      }
+      throw new Error('Не удалось удалить папку.');
     }
     setInfoMessage('Папка удалена.');
     setErrorMessage(null);
@@ -58,10 +69,16 @@ export const CasesScreen = () => {
 
   const handleUpload = async (folderId: string, folderVersion: number, files: File[]) => {
     const records = await convertFilesToRecords(files);
-    const result = registerFiles(folderId, records, folderVersion);
+    const result = await registerFiles(folderId, records, folderVersion);
     if (!result.ok) {
       if (result.error === 'version-conflict') {
         throw new Error('Файлы не сохранены: папка была изменена другим пользователем.');
+      }
+      if (result.error === 'invalid-input') {
+        throw new Error('Выберите хотя бы один файл для загрузки.');
+      }
+      if (result.error === 'not-found') {
+        throw new Error('Папка не найдена. Обновите страницу.');
       }
       throw new Error('Не удалось загрузить файлы.');
     }
@@ -70,10 +87,13 @@ export const CasesScreen = () => {
   };
 
   const handleRemoveFile = async (folderId: string, folderVersion: number, fileId: string) => {
-    const result = removeFile(folderId, fileId, folderVersion);
+    const result = await removeFile(folderId, fileId, folderVersion);
     if (!result.ok) {
       if (result.error === 'version-conflict') {
         throw new Error('Файл не удалён: в папке уже есть свежие изменения.');
+      }
+      if (result.error === 'not-found') {
+        throw new Error('Файл не найден. Обновите страницу.');
       }
       throw new Error('Не удалось удалить файл.');
     }
@@ -94,7 +114,7 @@ export const CasesScreen = () => {
             onChange={(event) => setNewFolderName(event.target.value)}
             placeholder="Название новой папки"
           />
-          <button className={styles.primaryButton} onClick={handleCreateFolder}>
+          <button className={styles.primaryButton} onClick={() => void handleCreateFolder()}>
             Создать папку
           </button>
         </div>

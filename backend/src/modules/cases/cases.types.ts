@@ -16,7 +16,7 @@ export interface CaseFolder {
   files: CaseFileRecord[];
 }
 
-export interface CaseFileUploadDto {
+export interface CaseFileUpload {
   fileName: string;
   mimeType: string;
   size: number;

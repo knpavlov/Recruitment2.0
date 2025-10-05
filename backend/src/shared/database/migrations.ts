@@ -3,6 +3,9 @@ import { postgresPool } from './postgres.client.js';
 
 const SUPER_ADMIN_EMAIL = process.env.SUPER_ADMIN_EMAIL ?? 'super.admin@company.com';
 
+const connectClient = async () =>
+  (postgresPool as unknown as { connect: () => Promise<any> }).connect();
+
 const createTables = async () => {
   await postgresPool.query(`
     CREATE TABLE IF NOT EXISTS accounts (
@@ -29,7 +32,9 @@ const createTables = async () => {
     CREATE TABLE IF NOT EXISTS case_folders (
       id UUID PRIMARY KEY,
       name TEXT NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      version INTEGER NOT NULL DEFAULT 1
     );
   `);
 
@@ -38,8 +43,26 @@ const createTables = async () => {
       id UUID PRIMARY KEY,
       folder_id UUID NOT NULL REFERENCES case_folders(id) ON DELETE CASCADE,
       file_name TEXT NOT NULL,
+      mime_type TEXT,
+      file_size INTEGER,
+      data_url TEXT,
+      uploaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+  `);
+
+  await postgresPool.query(`
+    ALTER TABLE case_folders
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1;
+  `);
+
+  await postgresPool.query(`
+    ALTER TABLE case_files
+      ADD COLUMN IF NOT EXISTS mime_type TEXT,
+      ADD COLUMN IF NOT EXISTS file_size INTEGER,
+      ADD COLUMN IF NOT EXISTS data_url TEXT,
+      ADD COLUMN IF NOT EXISTS uploaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
   `);
 
   await postgresPool.query(`
@@ -71,17 +94,71 @@ const createTables = async () => {
   `);
 };
 
-const seedSuperAdmin = async () => {
-  await postgresPool.query(
-    `INSERT INTO accounts (id, email, role, status, invitation_token, created_at, activated_at)
-     VALUES ($1, $2, 'super-admin', 'active', 'seed', NOW(), NOW())
-     ON CONFLICT (email) DO NOTHING;`,
-    [randomUUID(), SUPER_ADMIN_EMAIL]
-  );
+const syncSuperAdmin = async () => {
+  const client = await connectClient();
+  try {
+    await client.query('BEGIN');
+    const existing = await client.query(
+      `SELECT id, email FROM accounts WHERE role = 'super-admin' ORDER BY created_at ASC LIMIT 1;`
+    );
+
+    if (existing.rowCount === 0) {
+      await client.query(
+        `INSERT INTO accounts (id, email, role, status, invitation_token, created_at, activated_at)
+         VALUES ($1, $2, 'super-admin', 'active', 'seed', NOW(), NOW());`,
+        [randomUUID(), SUPER_ADMIN_EMAIL]
+      );
+      await client.query('COMMIT');
+      return;
+    }
+
+    const current = existing.rows[0] as { id: string; email: string };
+    if (current.email === SUPER_ADMIN_EMAIL) {
+      await client.query(
+        `UPDATE accounts
+            SET status = 'active',
+                invitation_token = 'seed',
+                activated_at = COALESCE(activated_at, NOW())
+          WHERE id = $1;`,
+        [current.id]
+      );
+      await client.query('COMMIT');
+      return;
+    }
+
+    const conflict = await client.query(
+      `SELECT 1 FROM accounts WHERE email = $1 AND role <> 'super-admin' LIMIT 1;`,
+      [SUPER_ADMIN_EMAIL]
+    );
+
+    if (conflict.rowCount > 0) {
+      console.warn(
+        `Невозможно обновить email суперадмина: адрес ${SUPER_ADMIN_EMAIL} уже занят другим аккаунтом.`
+      );
+      await client.query('ROLLBACK');
+      return;
+    }
+
+    await client.query(
+      `UPDATE accounts
+          SET email = $1,
+              status = 'active',
+              invitation_token = 'seed',
+              activated_at = COALESCE(activated_at, NOW())
+        WHERE id = $2;`,
+      [SUPER_ADMIN_EMAIL, current.id]
+    );
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 };
 
 export const runMigrations = async () => {
   // В простом варианте выполняем миграции последовательно при старте сервера
   await createTables();
-  await seedSuperAdmin();
+  await syncSuperAdmin();
 };

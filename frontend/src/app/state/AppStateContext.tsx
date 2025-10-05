@@ -1,28 +1,29 @@
-import { createContext, ReactNode, useContext, useMemo, useState } from 'react';
-import { CaseFolder, CaseFileRecord } from '../../shared/types/caseLibrary';
+import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { CaseFolder, CaseFileUploadDto } from '../../shared/types/caseLibrary';
 import { CandidateProfile } from '../../shared/types/candidate';
 import { EvaluationConfig } from '../../shared/types/evaluation';
 import { AccountRecord, AccountRole } from '../../shared/types/account';
 import { DomainResult } from '../../shared/types/results';
-import { generateId } from '../../shared/ui/generateId';
-import { slugify } from '../../shared/utils/slugify';
+import { casesApi } from '../../modules/cases/services/casesApi';
+import { accountsApi } from '../../modules/accounts/services/accountsApi';
+import { ApiError } from '../../shared/api/httpClient';
 
 interface AppStateContextValue {
   cases: {
     folders: CaseFolder[];
-    createFolder: (name: string) => DomainResult<CaseFolder>;
-    renameFolder: (id: string, name: string, expectedVersion: number) => DomainResult<CaseFolder>;
-    deleteFolder: (id: string) => DomainResult<string>;
+    createFolder: (name: string) => Promise<DomainResult<CaseFolder>>;
+    renameFolder: (id: string, name: string, expectedVersion: number) => Promise<DomainResult<CaseFolder>>;
+    deleteFolder: (id: string) => Promise<DomainResult<string>>;
     registerFiles: (
       id: string,
-      files: CaseFileRecord[],
+      files: CaseFileUploadDto[],
       expectedVersion: number
-    ) => DomainResult<CaseFolder>;
+    ) => Promise<DomainResult<CaseFolder>>;
     removeFile: (
       folderId: string,
       fileId: string,
       expectedVersion: number
-    ) => DomainResult<CaseFolder>;
+    ) => Promise<DomainResult<CaseFolder>>;
   };
   candidates: {
     list: CandidateProfile[];
@@ -36,41 +37,15 @@ interface AppStateContextValue {
   };
   accounts: {
     list: AccountRecord[];
-    inviteAccount: (email: string, role: AccountRole) => DomainResult<AccountRecord>;
-    activateAccount: (id: string) => DomainResult<AccountRecord>;
-    removeAccount: (id: string) => DomainResult<string>;
+    inviteAccount: (email: string, role: AccountRole) => Promise<DomainResult<AccountRecord>>;
+    activateAccount: (id: string) => Promise<DomainResult<AccountRecord>>;
+    removeAccount: (id: string) => Promise<DomainResult<string>>;
   };
 }
 
 const AppStateContext = createContext<AppStateContextValue | null>(null);
 
-const buildFolderId = (name: string, used: Set<string>) => {
-  const base = slugify(name) || `papka-${used.size + 1}`;
-  let candidate = base;
-  let index = 1;
-  while (used.has(candidate)) {
-    candidate = `${base}-${index}`;
-    index += 1;
-  }
-  return candidate;
-};
-
 const nowIso = () => new Date().toISOString();
-
-const createEmptyFolder = (name: string, used: Set<string>): CaseFolder => ({
-  id: buildFolderId(name, used),
-  name,
-  version: 1,
-  createdAt: nowIso(),
-  updatedAt: nowIso(),
-  files: []
-});
-
-const touchFolder = (folder: CaseFolder): CaseFolder => ({
-  ...folder,
-  version: folder.version + 1,
-  updatedAt: nowIso()
-});
 
 const touchCandidate = (profile: CandidateProfile, shouldIncrement = true): CandidateProfile => ({
   ...profile,
@@ -88,96 +63,158 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [folders, setFolders] = useState<CaseFolder[]>([]);
   const [candidates, setCandidates] = useState<CandidateProfile[]>([]);
   const [evaluations, setEvaluations] = useState<EvaluationConfig[]>([]);
-  const [accounts, setAccounts] = useState<AccountRecord[]>([
-    {
-      id: generateId(),
-      email: 'super.admin@company.com',
-      role: 'super-admin',
-      status: 'active',
-      invitedAt: nowIso(),
-      activatedAt: nowIso()
+  const [accounts, setAccounts] = useState<AccountRecord[]>([]);
+
+  const syncFolders = useCallback(async (): Promise<CaseFolder[] | null> => {
+    try {
+      const remote = await casesApi.list();
+      setFolders(remote);
+      return remote;
+    } catch (error) {
+      console.error('Не удалось загрузить папки кейсов:', error);
+      return null;
     }
-  ]);
+  }, []);
+
+  useEffect(() => {
+    void syncFolders();
+  }, [syncFolders]);
+
+  useEffect(() => {
+    const loadAccounts = async () => {
+      try {
+        const remote = await accountsApi.list();
+        setAccounts(remote);
+      } catch (error) {
+        console.error('Не удалось загрузить аккаунты:', error);
+      }
+    };
+    void loadAccounts();
+  }, []);
 
   const value = useMemo<AppStateContextValue>(() => ({
     cases: {
       folders,
-      createFolder: (name) => {
-        if (!name.trim()) {
+      createFolder: async (name) => {
+        const trimmed = name.trim();
+        if (!trimmed) {
           return { ok: false, error: 'invalid-input' };
         }
-        const trimmed = name.trim();
-        const duplicate = folders.some((item) => item.name.toLowerCase() === trimmed.toLowerCase());
-        if (duplicate) {
-          return { ok: false, error: 'duplicate' };
+        try {
+          const folder = await casesApi.create(trimmed);
+          await syncFolders();
+          return { ok: true, data: folder };
+        } catch (error) {
+          if (error instanceof ApiError) {
+            if (error.code === 'duplicate') {
+              return { ok: false, error: 'duplicate' };
+            }
+            if (error.code === 'invalid-input') {
+              return { ok: false, error: 'invalid-input' };
+            }
+          }
+          console.error('Не удалось создать папку:', error);
+          return { ok: false, error: 'unknown' };
         }
-        const used = new Set(folders.map((item) => item.id));
-        const folder = createEmptyFolder(trimmed, used);
-        setFolders((prev) => [...prev, folder]);
-        return { ok: true, data: folder };
       },
-      renameFolder: (id, name, expectedVersion) => {
+      renameFolder: async (id, name, expectedVersion) => {
         const current = folders.find((item) => item.id === id);
         if (!current) {
           return { ok: false, error: 'not-found' };
-        }
-        if (current.version !== expectedVersion) {
-          return { ok: false, error: 'version-conflict' };
         }
         const trimmed = name.trim();
         if (!trimmed) {
           return { ok: false, error: 'invalid-input' };
         }
-        const duplicate = folders.some(
-          (item) => item.id !== id && item.name.toLowerCase() === trimmed.toLowerCase()
-        );
-        if (duplicate) {
-          return { ok: false, error: 'duplicate' };
+        try {
+          const folder = await casesApi.rename(id, trimmed, expectedVersion);
+          await syncFolders();
+          return { ok: true, data: folder };
+        } catch (error) {
+          if (error instanceof ApiError) {
+            if (error.code === 'duplicate') {
+              return { ok: false, error: 'duplicate' };
+            }
+            if (error.code === 'version-conflict') {
+              return { ok: false, error: 'version-conflict' };
+            }
+            if (error.code === 'invalid-input') {
+              return { ok: false, error: 'invalid-input' };
+            }
+            if (error.code === 'not-found' || error.status === 404) {
+              return { ok: false, error: 'not-found' };
+            }
+          }
+          console.error('Не удалось переименовать папку:', error);
+          return { ok: false, error: 'unknown' };
         }
-        const renamed: CaseFolder = {
-          ...touchFolder(current),
-          name: trimmed
-        };
-        setFolders((prev) => prev.map((item) => (item.id === id ? renamed : item)));
-        return { ok: true, data: renamed };
       },
-      deleteFolder: (id) => {
+      deleteFolder: async (id) => {
         const exists = folders.some((item) => item.id === id);
         if (!exists) {
           return { ok: false, error: 'not-found' };
         }
-        setFolders((prev) => prev.filter((item) => item.id !== id));
-        return { ok: true, data: id };
+        try {
+          await casesApi.remove(id);
+          await syncFolders();
+          return { ok: true, data: id };
+        } catch (error) {
+          if (error instanceof ApiError && (error.code === 'not-found' || error.status === 404)) {
+            return { ok: false, error: 'not-found' };
+          }
+          console.error('Не удалось удалить папку:', error);
+          return { ok: false, error: 'unknown' };
+        }
       },
-      registerFiles: (id, files, expectedVersion) => {
+      registerFiles: async (id, files, expectedVersion) => {
+        if (!files.length) {
+          return { ok: false, error: 'invalid-input' };
+        }
         const current = folders.find((item) => item.id === id);
         if (!current) {
           return { ok: false, error: 'not-found' };
         }
-        if (current.version !== expectedVersion) {
-          return { ok: false, error: 'version-conflict' };
+        try {
+          const folder = await casesApi.uploadFiles(id, files, expectedVersion);
+          await syncFolders();
+          return { ok: true, data: folder };
+        } catch (error) {
+          if (error instanceof ApiError) {
+            if (error.code === 'version-conflict') {
+              return { ok: false, error: 'version-conflict' };
+            }
+            if (error.code === 'invalid-input') {
+              return { ok: false, error: 'invalid-input' };
+            }
+            if (error.code === 'not-found' || error.status === 404) {
+              return { ok: false, error: 'not-found' };
+            }
+          }
+          console.error('Не удалось загрузить файлы в папку:', error);
+          return { ok: false, error: 'unknown' };
         }
-        const updated: CaseFolder = {
-          ...touchFolder(current),
-          files: [...current.files, ...files]
-        };
-        setFolders((prev) => prev.map((item) => (item.id === id ? updated : item)));
-        return { ok: true, data: updated };
       },
-      removeFile: (folderId, fileId, expectedVersion) => {
+      removeFile: async (folderId, fileId, expectedVersion) => {
         const current = folders.find((item) => item.id === folderId);
         if (!current) {
           return { ok: false, error: 'not-found' };
         }
-        if (current.version !== expectedVersion) {
-          return { ok: false, error: 'version-conflict' };
+        try {
+          const folder = await casesApi.removeFile(folderId, fileId, expectedVersion);
+          await syncFolders();
+          return { ok: true, data: folder };
+        } catch (error) {
+          if (error instanceof ApiError) {
+            if (error.code === 'version-conflict') {
+              return { ok: false, error: 'version-conflict' };
+            }
+            if (error.code === 'not-found' || error.status === 404) {
+              return { ok: false, error: 'not-found' };
+            }
+          }
+          console.error('Не удалось удалить файл из папки:', error);
+          return { ok: false, error: 'unknown' };
         }
-        const updated: CaseFolder = {
-          ...touchFolder(current),
-          files: current.files.filter((file) => file.id !== fileId)
-        };
-        setFolders((prev) => prev.map((item) => (item.id === folderId ? updated : item)));
-        return { ok: true, data: updated };
       }
     },
     candidates: {
@@ -249,48 +286,69 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     },
     accounts: {
       list: accounts,
-      inviteAccount: (email, role) => {
+      inviteAccount: async (email, role) => {
         const trimmed = email.trim().toLowerCase();
         if (!trimmed) {
           return { ok: false, error: 'invalid-input' };
         }
-        const duplicate = accounts.some((account) => account.email === trimmed);
-        if (duplicate) {
-          return { ok: false, error: 'duplicate' };
+        try {
+          const account = await accountsApi.invite(trimmed, role);
+          setAccounts((prev) => [...prev, account]);
+          return { ok: true, data: account };
+        } catch (error) {
+          if (error instanceof ApiError) {
+            if (error.code === 'duplicate' || error.status === 409) {
+              return { ok: false, error: 'duplicate' };
+            }
+            if (error.code === 'invalid-input' || error.status === 400) {
+              return { ok: false, error: 'invalid-input' };
+            }
+          }
+          console.error('Не удалось отправить приглашение:', error);
+          return { ok: false, error: 'unknown' };
         }
-        const next: AccountRecord = {
-          id: generateId(),
-          email: trimmed,
-          role,
-          status: 'pending',
-          invitedAt: nowIso()
-        };
-        setAccounts((prev) => [...prev, next]);
-        return { ok: true, data: next };
       },
-      activateAccount: (id) => {
+      activateAccount: async (id) => {
         const current = accounts.find((item) => item.id === id);
         if (!current) {
           return { ok: false, error: 'not-found' };
         }
-        const updated: AccountRecord = {
-          ...current,
-          status: 'active',
-          activatedAt: nowIso()
-        };
-        setAccounts((prev) => prev.map((item) => (item.id === id ? updated : item)));
-        return { ok: true, data: updated };
+        try {
+          const updated = await accountsApi.activate(id);
+          setAccounts((prev) => prev.map((item) => (item.id === id ? updated : item)));
+          return { ok: true, data: updated };
+        } catch (error) {
+          if (error instanceof ApiError && (error.code === 'not-found' || error.status === 404)) {
+            return { ok: false, error: 'not-found' };
+          }
+          console.error('Не удалось активировать аккаунт:', error);
+          return { ok: false, error: 'unknown' };
+        }
       },
-      removeAccount: (id) => {
+      removeAccount: async (id) => {
         const exists = accounts.some((item) => item.id === id);
         if (!exists) {
           return { ok: false, error: 'not-found' };
         }
-        setAccounts((prev) => prev.filter((item) => item.id !== id));
-        return { ok: true, data: id };
+        try {
+          await accountsApi.remove(id);
+          setAccounts((prev) => prev.filter((item) => item.id !== id));
+          return { ok: true, data: id };
+        } catch (error) {
+          if (error instanceof ApiError) {
+            if (error.code === 'not-found' || error.status === 404) {
+              return { ok: false, error: 'not-found' };
+            }
+            if (error.status === 403) {
+              return { ok: false, error: 'invalid-input' };
+            }
+          }
+          console.error('Не удалось удалить аккаунт:', error);
+          return { ok: false, error: 'unknown' };
+        }
       }
     }
-  }), [folders, candidates, evaluations, accounts]);
+  }), [folders, candidates, evaluations, accounts, syncFolders]);
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;
 };

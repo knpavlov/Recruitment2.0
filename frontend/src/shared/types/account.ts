@@ -8,4 +8,5 @@ export interface AccountRecord {
   status: AccountStatus;
   invitedAt: string;
   activatedAt?: string;
+  invitationToken: string;
 }

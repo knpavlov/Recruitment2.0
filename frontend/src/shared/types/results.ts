@@ -1,4 +1,9 @@
-export type DomainErrorCode = 'not-found' | 'version-conflict' | 'duplicate' | 'invalid-input';
+export type DomainErrorCode =
+  | 'not-found'
+  | 'version-conflict'
+  | 'duplicate'
+  | 'invalid-input'
+  | 'unknown';
 
 export interface DomainFailure {
   ok: false;

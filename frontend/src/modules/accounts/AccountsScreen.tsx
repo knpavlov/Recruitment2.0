@@ -28,13 +28,15 @@ export const AccountsScreen = () => {
     );
   }
 
-  const handleInvite = () => {
-    const result = inviteAccount(email, targetRole);
+  const handleInvite = async () => {
+    const result = await inviteAccount(email, targetRole);
     if (!result.ok) {
       const message =
         result.error === 'duplicate'
           ? 'Такой пользователь уже приглашён.'
-          : 'Введите корректный email.';
+          : result.error === 'invalid-input'
+            ? 'Введите корректный email.'
+            : 'Не удалось отправить приглашение. Попробуйте позже.';
       setBanner({ type: 'error', text: message });
       return;
     }
@@ -42,23 +44,41 @@ export const AccountsScreen = () => {
     setEmail('');
   };
 
-  const handleActivate = (id: string) => {
-    const result = activateAccount(id);
+  const handleCopyToken = async (token: string) => {
+    try {
+      await navigator.clipboard.writeText(token);
+      setBanner({ type: 'info', text: 'Токен приглашения скопирован.' });
+    } catch (error) {
+      console.error('Не удалось скопировать токен приглашения:', error);
+      setBanner({ type: 'error', text: 'Не удалось скопировать токен. Скопируйте его вручную.' });
+    }
+  };
+
+  const handleActivate = async (id: string) => {
+    const result = await activateAccount(id);
     if (!result.ok) {
-      setBanner({ type: 'error', text: 'Не удалось активировать аккаунт.' });
+      const message =
+        result.error === 'not-found' ? 'Аккаунт не найден.' : 'Не удалось активировать аккаунт.';
+      setBanner({ type: 'error', text: message });
       return;
     }
     setBanner({ type: 'info', text: `Аккаунт ${result.data.email} активирован.` });
   };
 
-  const handleRemove = (id: string) => {
+  const handleRemove = async (id: string) => {
     const confirmed = window.confirm('Удалить аккаунт безвозвратно?');
     if (!confirmed) {
       return;
     }
-    const result = removeAccount(id);
+    const result = await removeAccount(id);
     if (!result.ok) {
-      setBanner({ type: 'error', text: 'Не удалось удалить аккаунт.' });
+      const message =
+        result.error === 'not-found'
+          ? 'Аккаунт не найден.'
+          : result.error === 'invalid-input'
+            ? 'Нельзя удалить суперадмина.'
+            : 'Не удалось удалить аккаунт.';
+      setBanner({ type: 'error', text: message });
       return;
     }
     setBanner({ type: 'info', text: 'Аккаунт удалён.' });
@@ -88,7 +108,7 @@ export const AccountsScreen = () => {
             <option value="admin">Админ</option>
             <option value="user">Пользователь</option>
           </select>
-          <button className={styles.primaryButton} onClick={handleInvite}>
+          <button className={styles.primaryButton} onClick={() => void handleInvite()}>
             Отправить приглашение
           </button>
         </div>
@@ -105,6 +125,7 @@ export const AccountsScreen = () => {
               <th>Email</th>
               <th>Статус</th>
               <th>Роль</th>
+              <th>Приглашение</th>
               <th>Действия</th>
             </tr>
           </thead>
@@ -122,14 +143,35 @@ export const AccountsScreen = () => {
                   </span>
                 </td>
                 <td>{account.role === 'super-admin' ? 'Суперадмин' : account.role === 'admin' ? 'Админ' : 'Пользователь'}</td>
+                <td>
+                  {account.status === 'pending' ? (
+                    <div className={styles.tokenCell}>
+                      <code className={styles.tokenValue}>{account.invitationToken}</code>
+                      <button
+                        className={styles.secondaryButton}
+                        onClick={() => void handleCopyToken(account.invitationToken)}
+                      >
+                        Скопировать
+                      </button>
+                    </div>
+                  ) : (
+                    <span className={styles.tokenInfo}>Аккаунт активен</span>
+                  )}
+                </td>
                 <td className={styles.actionsCell}>
                   {account.status === 'pending' && (
-                    <button className={styles.secondaryButton} onClick={() => handleActivate(account.id)}>
+                    <button
+                      className={styles.secondaryButton}
+                      onClick={() => void handleActivate(account.id)}
+                    >
                       Активировать
                     </button>
                   )}
                   {account.role !== 'super-admin' && (
-                    <button className={styles.dangerButton} onClick={() => handleRemove(account.id)}>
+                    <button
+                      className={styles.dangerButton}
+                      onClick={() => void handleRemove(account.id)}
+                    >
                       Удалить
                     </button>
                   )}
