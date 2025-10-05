@@ -17,8 +17,11 @@ export class AuthService {
     if (!account) {
       throw new Error('ACCOUNT_NOT_FOUND');
     }
+    if (account.role !== 'admin' && account.role !== 'super-admin') {
+      throw new Error('ACCESS_DENIED');
+    }
     const code = this.otp.generateCode();
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
     await this.codesRepository.saveCode({
       email: account.email,
       code,

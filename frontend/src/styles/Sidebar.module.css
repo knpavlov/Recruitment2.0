@@ -70,6 +70,16 @@
 
 .logoutBlock {
   margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sessionInfo {
+  margin: 0;
+  font-size: 13px;
+  color: rgba(226, 232, 240, 0.75);
+  word-break: break-all;
 }
 
 .logoutButton {

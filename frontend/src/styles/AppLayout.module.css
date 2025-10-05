@@ -15,7 +15,7 @@
 
 .topbar {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
   gap: 24px;
   background: rgba(255, 255, 255, 0.85);
@@ -38,21 +38,18 @@
   color: #475569;
 }
 
-.roleSelector {
-  display: flex;
-  flex-direction: column;
+.roleBadge {
+  display: inline-flex;
+  align-items: center;
   gap: 8px;
+  border-radius: 999px;
+  padding: 10px 18px;
   font-size: 14px;
-  color: #334155;
-}
-
-.roleSelector select {
-  border: 1px solid rgba(148, 163, 184, 0.6);
-  border-radius: 12px;
-  padding: 8px 12px;
-  font-size: 14px;
-  background: #ffffff;
-  color: #0f172a;
+  font-weight: 600;
+  color: #1d4ed8;
+  background: rgba(59, 130, 246, 0.16);
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  text-transform: capitalize;
 }
 
 .pageContainer {

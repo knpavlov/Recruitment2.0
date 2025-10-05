@@ -213,10 +213,19 @@ export class MailerService {
   async sendInvitation(email: string, token: string) {
     const subject = 'Invitation to the case management system';
     const inviteUrl = process.env.INVITE_URL?.trim();
+    const separator = inviteUrl && inviteUrl.includes('?') ? '&' : '?';
+    const activationLink = inviteUrl
+      ? `${inviteUrl}${separator}email=${encodeURIComponent(email)}&invitation=${encodeURIComponent(token)}`
+      : null;
     const bodyLines = [
       'You have been invited to the case management system.',
-      inviteUrl ? `Activation link: ${inviteUrl}` : null,
-      `Invitation token: ${token}`
+      activationLink
+        ? `Open this link to activate your access: ${activationLink}`
+        : inviteUrl
+          ? `Open this link to activate your access: ${inviteUrl}`
+          : null,
+      `If the link is unavailable, use this invitation token: ${token}`,
+      'Once activated, return to the login page and request a one-time access code.'
     ].filter((line): line is string => Boolean(line));
     await this.deliver(email, subject, bodyLines.join('\n\n'));
   }

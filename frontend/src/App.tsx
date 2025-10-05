@@ -8,14 +8,25 @@ import { AccountsScreen } from './modules/accounts/AccountsScreen';
 import { PlaceholderScreen } from './shared/ui/PlaceholderScreen';
 import { AuthProvider, useAuth } from './modules/auth/AuthContext';
 import { AppStateProvider } from './app/state/AppStateContext';
+import { LoginScreen } from './modules/auth/LoginScreen';
 
 const AppContent = () => {
-  const { role } = useAuth();
+  const { session } = useAuth();
   const [activePage, setActivePage] = useState<NavigationKey>('cases');
 
+  useEffect(() => {
+    if (!session) {
+      setActivePage('cases');
+    }
+  }, [session]);
+
+  if (!session) {
+    return <LoginScreen />;
+  }
+
   const accessibleItems = useMemo(
-    () => navigationItems.filter((item) => item.roleAccess.includes(role)),
-    [role]
+    () => navigationItems.filter((item) => item.roleAccess.includes(session.role)),
+    [session.role]
   );
 
   useEffect(() => {
@@ -65,9 +76,9 @@ const AppContent = () => {
 };
 
 export const App = () => (
-  <AppStateProvider>
-    <AuthProvider>
+  <AuthProvider>
+    <AppStateProvider>
       <AppContent />
-    </AuthProvider>
-  </AppStateProvider>
+    </AppStateProvider>
+  </AuthProvider>
 );

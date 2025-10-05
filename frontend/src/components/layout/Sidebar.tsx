@@ -9,7 +9,7 @@ interface SidebarProps {
 }
 
 export const Sidebar = ({ navigationItems, activeItem, onNavigate }: SidebarProps) => {
-  const { setRole } = useAuth();
+  const { session, logout } = useAuth();
 
   return (
     <aside className={styles.sidebar}>
@@ -32,12 +32,10 @@ export const Sidebar = ({ navigationItems, activeItem, onNavigate }: SidebarProp
         ))}
       </nav>
       <div className={styles.logoutBlock}>
+        {session && <p className={styles.sessionInfo}>{session.email}</p>}
         <button
           className={styles.logoutButton}
-          onClick={() => {
-            // Placeholder for future backend integration
-            setRole('user');
-          }}
+          onClick={() => logout()}
         >
           Sign out
         </button>

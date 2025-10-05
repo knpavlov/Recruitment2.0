@@ -7,6 +7,7 @@ import { DomainResult } from '../../shared/types/results';
 import { casesApi } from '../../modules/cases/services/casesApi';
 import { accountsApi } from '../../modules/accounts/services/accountsApi';
 import { ApiError } from '../../shared/api/httpClient';
+import { useAuth } from '../../modules/auth/AuthContext';
 
 interface AppStateContextValue {
   cases: {
@@ -64,6 +65,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [candidates, setCandidates] = useState<CandidateProfile[]>([]);
   const [evaluations, setEvaluations] = useState<EvaluationConfig[]>([]);
   const [accounts, setAccounts] = useState<AccountRecord[]>([]);
+  const { session } = useAuth();
 
   const syncFolders = useCallback(async (): Promise<CaseFolder[] | null> => {
     try {
@@ -77,10 +79,18 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(() => {
+    if (!session) {
+      setFolders([]);
+      return;
+    }
     void syncFolders();
-  }, [syncFolders]);
+  }, [session, syncFolders]);
 
   useEffect(() => {
+    if (!session) {
+      setAccounts([]);
+      return;
+    }
     const loadAccounts = async () => {
       try {
         const remote = await accountsApi.list();
@@ -90,7 +100,14 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       }
     };
     void loadAccounts();
-  }, []);
+  }, [session]);
+
+  useEffect(() => {
+    if (!session) {
+      setCandidates([]);
+      setEvaluations([]);
+    }
+  }, [session]);
 
   const value = useMemo<AppStateContextValue>(() => ({
     cases: {
