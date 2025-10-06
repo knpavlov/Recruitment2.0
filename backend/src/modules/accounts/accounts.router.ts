@@ -18,6 +18,12 @@ router.post('/invite', async (req, res) => {
       res.status(409).json({ code: 'duplicate', message: 'The specified user has already been invited.' });
       return;
     }
+    if (error instanceof Error && error.message === 'MAILER_UNAVAILABLE') {
+      res
+        .status(503)
+        .json({ code: 'mailer-unavailable', message: 'Email delivery is not configured. Configure SMTP and retry.' });
+      return;
+    }
     res.status(400).json({ code: 'invalid-input', message: 'Failed to send the invitation.' });
   }
 });

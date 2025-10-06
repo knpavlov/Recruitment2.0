@@ -9,7 +9,7 @@ import {
 } from 'react';
 import { AccountRole } from '../../shared/types/account';
 import { ApiError } from '../../shared/api/httpClient';
-import { authApi } from './services/authApi';
+import { authApi, AuthSessionResponse, RequestCodeResponse } from './services/authApi';
 
 export interface AuthSession {
   token: string;
@@ -18,12 +18,22 @@ export interface AuthSession {
   expiresAt: number;
 }
 
-export type RequestCodeError = 'not-found' | 'forbidden' | 'unknown';
-export type VerifyCodeError = 'invalid' | 'expired' | 'unknown';
+export type RequestCodeError = 'not-found' | 'forbidden' | 'mailer-unavailable' | 'unknown';
+export type VerifyCodeError = 'invalid' | 'expired' | 'disabled' | 'unknown';
 
-interface RequestCodeSuccess {
+interface RequestCodeSuccessBase {
   ok: true;
   email: string;
+  mode: RequestCodeResponse['mode'];
+}
+
+interface RequestCodeSuccessCode extends RequestCodeSuccessBase {
+  mode: 'code';
+}
+
+interface RequestCodeSuccessDirect extends RequestCodeSuccessBase {
+  mode: 'direct';
+  session: AuthSession;
 }
 
 interface RequestCodeFailure {
@@ -31,7 +41,7 @@ interface RequestCodeFailure {
   error: RequestCodeError;
 }
 
-export type RequestCodeResult = RequestCodeSuccess | RequestCodeFailure;
+export type RequestCodeResult = RequestCodeSuccessCode | RequestCodeSuccessDirect | RequestCodeFailure;
 
 interface VerifyCodeSuccess {
   ok: true;
@@ -115,6 +125,17 @@ const persistSession = (session: AuthSession, remember: boolean) => {
   secondary.removeItem(SESSION_STORAGE_KEY);
 };
 
+const buildSessionFromResponse = (payload: AuthSessionResponse, remember: boolean): AuthSession => {
+  // Считаем срок действия токена на клиенте, пока не появится серверная сессия
+  const expiresAt = Date.now() + (remember ? LONG_SESSION_MS : SHORT_SESSION_MS);
+  return {
+    token: payload.token,
+    email: payload.email,
+    role: payload.role,
+    expiresAt
+  };
+};
+
 const clearStoredSession = () => {
   if (!isBrowserEnvironment()) {
     return;
@@ -158,8 +179,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const normalized = email.trim().toLowerCase();
       try {
         const response = await authApi.requestCode(normalized);
+        if (response.mode === 'direct') {
+          const session = buildSessionFromResponse(response.session, true);
+          setSession(session);
+          persistSession(session, true);
+          rememberEmail(response.session.email);
+          return { ok: true, email: response.session.email, mode: 'direct', session };
+        }
         rememberEmail(response.email);
-        return { ok: true, email: response.email };
+        return { ok: true, email: response.email, mode: 'code' };
       } catch (error) {
         if (error instanceof ApiError) {
           if (error.status === 404) {
@@ -167,6 +195,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
           if (error.status === 403) {
             return { ok: false, error: 'forbidden' };
+          }
+          if (error.status === 503) {
+            return { ok: false, error: 'mailer-unavailable' };
           }
         }
         console.error('Failed to request access code:', error);
@@ -183,19 +214,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       try {
         const response = await authApi.verifyCode(normalizedEmail, trimmedCode);
-        const expiresAt = Date.now() + (remember ? LONG_SESSION_MS : SHORT_SESSION_MS);
-        const nextSession: AuthSession = {
-          token: response.token,
-          email: response.email,
-          role: response.role,
-          expiresAt
-        };
+        const nextSession = buildSessionFromResponse(response, remember);
         setSession(nextSession);
         persistSession(nextSession, remember);
         rememberEmail(response.email);
         return { ok: true, session: nextSession };
       } catch (error) {
         if (error instanceof ApiError) {
+          if (error.status === 503) {
+            return { ok: false, error: 'disabled' };
+          }
           if (error.status === 410) {
             return { ok: false, error: 'expired' };
           }

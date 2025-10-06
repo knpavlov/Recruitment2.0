@@ -6,6 +6,10 @@ const router = Router();
 router.post('/request-code', async (req, res) => {
   try {
     const result = await authService.requestAccessCode(String(req.body.email ?? ''));
+    if (result.mode === 'direct') {
+      res.status(200).json(result);
+      return;
+    }
     res.status(201).json(result);
   } catch (error) {
     if (error instanceof Error) {
@@ -15,6 +19,12 @@ router.post('/request-code', async (req, res) => {
       }
       if (error.message === 'ACCESS_DENIED') {
         res.status(403).json({ message: 'Access denied for this account.' });
+        return;
+      }
+      if (error.message === 'MAILER_UNAVAILABLE') {
+        res
+          .status(503)
+          .json({ message: 'Email delivery is temporarily unavailable. Configure SMTP and try again.' });
         return;
       }
     }
@@ -33,6 +43,10 @@ router.post('/verify-code', async (req, res) => {
     res.json(session);
   } catch (error) {
     if (error instanceof Error) {
+      if (error.message === 'CODE_FLOW_DISABLED') {
+        res.status(503).json({ message: 'Email login is temporarily disabled.' });
+        return;
+      }
       if (error.message === 'CODE_EXPIRED') {
         res.status(410).json({ message: 'Code expired. Request a new one.' });
         return;
