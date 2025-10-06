@@ -3,13 +3,12 @@ import { NavigationItem, NavigationKey } from './navigation';
 import { Sidebar } from '../components/layout/Sidebar';
 import styles from '../styles/AppLayout.module.css';
 import { useAuth } from '../modules/auth/AuthContext';
-import { AccountRole } from '../shared/types/account';
 
-const roleLabels: Record<AccountRole, string> = {
+const roleLabels = {
   'super-admin': 'Super admin',
   admin: 'Admin',
   user: 'User'
-};
+} as const;
 
 interface AppLayoutProps {
   navigationItems: NavigationItem[];
@@ -19,7 +18,11 @@ interface AppLayoutProps {
 }
 
 export const AppLayout = ({ navigationItems, activeItem, onNavigate, children }: AppLayoutProps) => {
-  const { role, setRole, email } = useAuth();
+  const { session } = useAuth();
+
+  if (!session) {
+    return null;
+  }
 
   return (
     <div className={styles.container}>
@@ -31,17 +34,12 @@ export const AppLayout = ({ navigationItems, activeItem, onNavigate, children }:
       <main className={styles.content}>
         <div className={styles.topbar}>
           <div>
-            <p className={styles.topbarGreeting}>Welcome, {email}</p>
-            <p className={styles.topbarHint}>Choose a role to test access segregation.</p>
+            <p className={styles.topbarGreeting}>Welcome, {session.email}</p>
+            <p className={styles.topbarHint}>Role: {roleLabels[session.role]}</p>
           </div>
-          <label className={styles.roleSelector}>
-            <span>Current role</span>
-            <select value={role} onChange={(event) => setRole(event.target.value as typeof role)}>
-              <option value="super-admin">{roleLabels['super-admin']}</option>
-              <option value="admin">{roleLabels.admin}</option>
-              <option value="user">{roleLabels.user}</option>
-            </select>
-          </label>
+          <div className={styles.topbarHintBlock}>
+            <p className={styles.topbarHintSecondary}>Use the sidebar to move between sections.</p>
+          </div>
         </div>
         <div className={styles.pageContainer}>{children}</div>
       </main>

@@ -38,21 +38,18 @@
   color: #475569;
 }
 
-.roleSelector {
+.topbarHintBlock {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  font-size: 14px;
-  color: #334155;
+  align-items: flex-end;
+  justify-content: flex-end;
+  text-align: right;
+  flex: 1;
 }
 
-.roleSelector select {
-  border: 1px solid rgba(148, 163, 184, 0.6);
-  border-radius: 12px;
-  padding: 8px 12px;
-  font-size: 14px;
-  background: #ffffff;
-  color: #0f172a;
+.topbarHintSecondary {
+  margin: 0;
+  font-size: 13px;
+  color: #64748b;
 }
 
 .pageContainer {

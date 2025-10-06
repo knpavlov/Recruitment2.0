@@ -7,15 +7,19 @@ import { EvaluationScreen } from './modules/evaluation/EvaluationScreen';
 import { AccountsScreen } from './modules/accounts/AccountsScreen';
 import { PlaceholderScreen } from './shared/ui/PlaceholderScreen';
 import { AuthProvider, useAuth } from './modules/auth/AuthContext';
+import { LoginScreen } from './modules/auth/LoginScreen';
 import { AppStateProvider } from './app/state/AppStateContext';
 
 const AppContent = () => {
-  const { role } = useAuth();
+  const { session, loading } = useAuth();
   const [activePage, setActivePage] = useState<NavigationKey>('cases');
 
   const accessibleItems = useMemo(
-    () => navigationItems.filter((item) => item.roleAccess.includes(role)),
-    [role]
+    () =>
+      session
+        ? navigationItems.filter((item) => item.roleAccess.includes(session.role))
+        : [],
+    [session]
   );
 
   useEffect(() => {
@@ -23,6 +27,18 @@ const AppContent = () => {
       setActivePage(accessibleItems[0]?.key ?? 'evaluation');
     }
   }, [accessibleItems, activePage]);
+
+  if (loading) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: '#0f172a' }}>
+        <p style={{ color: '#f8fafc', fontSize: '16px' }}>Loading the dashboard…</p>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return <LoginScreen />;
+  }
 
   const renderContent = () => {
     switch (activePage) {
@@ -65,9 +81,9 @@ const AppContent = () => {
 };
 
 export const App = () => (
-  <AppStateProvider>
-    <AuthProvider>
+  <AuthProvider>
+    <AppStateProvider>
       <AppContent />
-    </AuthProvider>
-  </AppStateProvider>
+    </AppStateProvider>
+  </AuthProvider>
 );

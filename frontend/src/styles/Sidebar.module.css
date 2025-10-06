@@ -40,6 +40,30 @@
   color: #cbd5f5;
 }
 
+.userSummary {
+  background: rgba(15, 23, 42, 0.45);
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.userEmail {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #e0f2fe;
+  word-break: break-word;
+}
+
+.userRole {
+  margin: 0;
+  font-size: 13px;
+  color: rgba(203, 213, 225, 0.8);
+  text-transform: capitalize;
+}
+
 .menu {
   display: flex;
   flex-direction: column;

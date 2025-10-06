@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
-import cors from 'cors';
+import cors, { type CorsOptions } from 'cors';
 import { registerAppRoutes } from './setupRoutes.js';
 import { runMigrations } from '../shared/database/migrations.js';
 
@@ -9,7 +9,37 @@ const bootstrap = async () => {
   await runMigrations();
 
   const app = express();
-  app.use(cors());
+
+  const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  const corsOptions: CorsOptions = {
+    credentials: true,
+    origin: (origin: string | undefined, callback: (err: Error | null, allow?: string | boolean) => void) => {
+      // Разрешаем запросы без Origin (например, от curl)
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+
+      // Если список доменов пуст, отражаем Origin клиента, чтобы не отдавать '*'
+      if (allowedOrigins.length === 0) {
+        callback(null, origin);
+        return;
+      }
+
+      if (allowedOrigins.includes(origin)) {
+        callback(null, origin);
+        return;
+      }
+
+      callback(new Error('Origin not allowed by CORS policy'));
+    }
+  };
+
+  app.use(cors(corsOptions));
   app.use(express.json({ limit: '10mb' }));
 
   registerAppRoutes(app);

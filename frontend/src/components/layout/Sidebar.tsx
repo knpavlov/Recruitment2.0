@@ -9,7 +9,7 @@ interface SidebarProps {
 }
 
 export const Sidebar = ({ navigationItems, activeItem, onNavigate }: SidebarProps) => {
-  const { setRole } = useAuth();
+  const { session, logout } = useAuth();
 
   return (
     <aside className={styles.sidebar}>
@@ -20,6 +20,12 @@ export const Sidebar = ({ navigationItems, activeItem, onNavigate }: SidebarProp
           <span className={styles.version}>2.0</span>
         </div>
       </div>
+      {session && (
+        <div className={styles.userSummary}>
+          <p className={styles.userEmail}>{session.email}</p>
+          <p className={styles.userRole}>{session.role === 'super-admin' ? 'Super admin' : session.role === 'admin' ? 'Admin' : 'User'}</p>
+        </div>
+      )}
       <nav className={styles.menu}>
         {navigationItems.map((item) => (
           <button
@@ -35,8 +41,7 @@ export const Sidebar = ({ navigationItems, activeItem, onNavigate }: SidebarProp
         <button
           className={styles.logoutButton}
           onClick={() => {
-            // Placeholder for future backend integration
-            setRole('user');
+            void logout();
           }}
         >
           Sign out

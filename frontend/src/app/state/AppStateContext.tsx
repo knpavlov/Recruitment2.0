@@ -7,6 +7,7 @@ import { DomainResult } from '../../shared/types/results';
 import { casesApi } from '../../modules/cases/services/casesApi';
 import { accountsApi } from '../../modules/accounts/services/accountsApi';
 import { ApiError } from '../../shared/api/httpClient';
+import { useAuth } from '../../modules/auth/AuthContext';
 
 interface AppStateContextValue {
   cases: {
@@ -60,12 +61,17 @@ const touchEvaluation = (config: EvaluationConfig, shouldIncrement = true): Eval
 });
 
 export const AppStateProvider = ({ children }: { children: ReactNode }) => {
+  const { session } = useAuth();
   const [folders, setFolders] = useState<CaseFolder[]>([]);
   const [candidates, setCandidates] = useState<CandidateProfile[]>([]);
   const [evaluations, setEvaluations] = useState<EvaluationConfig[]>([]);
   const [accounts, setAccounts] = useState<AccountRecord[]>([]);
 
   const syncFolders = useCallback(async (): Promise<CaseFolder[] | null> => {
+    if (!session) {
+      setFolders([]);
+      return null;
+    }
     try {
       const remote = await casesApi.list();
       setFolders(remote);
@@ -74,14 +80,24 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       console.error('Failed to load case folders:', error);
       return null;
     }
-  }, []);
+  }, [session]);
 
   useEffect(() => {
+    if (!session) {
+      setFolders([]);
+      return;
+    }
     void syncFolders();
-  }, [syncFolders]);
+  }, [session, syncFolders]);
 
   useEffect(() => {
     const loadAccounts = async () => {
+      if (!session) {
+        setAccounts([]);
+        setCandidates([]);
+        setEvaluations([]);
+        return;
+      }
       try {
         const remote = await accountsApi.list();
         setAccounts(remote);
@@ -90,12 +106,15 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       }
     };
     void loadAccounts();
-  }, []);
+  }, [session]);
 
   const value = useMemo<AppStateContextValue>(() => ({
     cases: {
       folders,
       createFolder: async (name) => {
+        if (!session) {
+          return { ok: false, error: 'unauthorized' };
+        }
         const trimmed = name.trim();
         if (!trimmed) {
           return { ok: false, error: 'invalid-input' };
@@ -118,6 +137,9 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
         }
       },
       renameFolder: async (id, name, expectedVersion) => {
+        if (!session) {
+          return { ok: false, error: 'unauthorized' };
+        }
         const current = folders.find((item) => item.id === id);
         if (!current) {
           return { ok: false, error: 'not-found' };
@@ -150,6 +172,9 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
         }
       },
       deleteFolder: async (id) => {
+        if (!session) {
+          return { ok: false, error: 'unauthorized' };
+        }
         const exists = folders.some((item) => item.id === id);
         if (!exists) {
           return { ok: false, error: 'not-found' };
@@ -167,6 +192,9 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
         }
       },
       registerFiles: async (id, files, expectedVersion) => {
+        if (!session) {
+          return { ok: false, error: 'unauthorized' };
+        }
         if (!files.length) {
           return { ok: false, error: 'invalid-input' };
         }
@@ -195,6 +223,9 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
         }
       },
       removeFile: async (folderId, fileId, expectedVersion) => {
+        if (!session) {
+          return { ok: false, error: 'unauthorized' };
+        }
         const current = folders.find((item) => item.id === folderId);
         if (!current) {
           return { ok: false, error: 'not-found' };
@@ -220,6 +251,9 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     candidates: {
       list: candidates,
       saveProfile: (profile, expectedVersion) => {
+        if (!session) {
+          return { ok: false, error: 'unauthorized' };
+        }
         if (!profile.firstName.trim() || !profile.lastName.trim()) {
           return { ok: false, error: 'invalid-input' };
         }
@@ -243,6 +277,9 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
         return { ok: true, data: next };
       },
       removeProfile: (id) => {
+        if (!session) {
+          return { ok: false, error: 'unauthorized' };
+        }
         const exists = candidates.some((item) => item.id === id);
         if (!exists) {
           return { ok: false, error: 'not-found' };
@@ -254,6 +291,9 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     evaluations: {
       list: evaluations,
       saveEvaluation: (config, expectedVersion) => {
+        if (!session) {
+          return { ok: false, error: 'unauthorized' };
+        }
         if (!config.candidateId) {
           return { ok: false, error: 'invalid-input' };
         }
@@ -276,6 +316,9 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
         return { ok: true, data: next };
       },
       removeEvaluation: (id) => {
+        if (!session) {
+          return { ok: false, error: 'unauthorized' };
+        }
         const exists = evaluations.some((item) => item.id === id);
         if (!exists) {
           return { ok: false, error: 'not-found' };
@@ -287,6 +330,9 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     accounts: {
       list: accounts,
       inviteAccount: async (email, role) => {
+        if (!session) {
+          return { ok: false, error: 'unauthorized' };
+        }
         const trimmed = email.trim().toLowerCase();
         if (!trimmed) {
           return { ok: false, error: 'invalid-input' };
@@ -309,6 +355,9 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
         }
       },
       activateAccount: async (id) => {
+        if (!session) {
+          return { ok: false, error: 'unauthorized' };
+        }
         const current = accounts.find((item) => item.id === id);
         if (!current) {
           return { ok: false, error: 'not-found' };
@@ -326,6 +375,9 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
         }
       },
       removeAccount: async (id) => {
+        if (!session) {
+          return { ok: false, error: 'unauthorized' };
+        }
         const exists = accounts.some((item) => item.id === id);
         if (!exists) {
           return { ok: false, error: 'not-found' };
@@ -348,7 +400,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
         }
       }
     }
-  }), [folders, candidates, evaluations, accounts, syncFolders]);
+  }), [folders, candidates, evaluations, accounts, session, syncFolders]);
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;
 };

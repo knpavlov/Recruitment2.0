@@ -29,6 +29,16 @@ const createTables = async () => {
   `);
 
   await postgresPool.query(`
+    CREATE TABLE IF NOT EXISTS sessions (
+      token UUID PRIMARY KEY,
+      account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+      expires_at TIMESTAMPTZ NOT NULL,
+      remember_me BOOLEAN NOT NULL DEFAULT FALSE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  await postgresPool.query(`
     CREATE TABLE IF NOT EXISTS case_folders (
       id UUID PRIMARY KEY,
       name TEXT NOT NULL,
