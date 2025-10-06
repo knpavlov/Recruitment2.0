@@ -1,6 +1,6 @@
 import { postgresPool } from '../../shared/database/postgres.client.js';
 
-interface SessionRow {
+interface SessionRow extends Record<string, unknown> {
   token: string;
   account_id: string;
   expires_at: string;

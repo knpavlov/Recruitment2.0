@@ -2,8 +2,13 @@ declare module 'cors' {
   import type { RequestHandler } from 'express';
 
   // Lightweight type declaration for cors so the build works without @types/cors
+  type OriginCallback = (
+    origin: string | undefined,
+    callback: (err: Error | null, allow?: boolean | string | RegExp | (string | RegExp)[]) => void
+  ) => void;
+
   export interface CorsOptions {
-    origin?: boolean | string | RegExp | (string | RegExp)[];
+    origin?: boolean | string | RegExp | (string | RegExp)[] | OriginCallback;
     methods?: string | string[];
     allowedHeaders?: string | string[];
     exposedHeaders?: string | string[];

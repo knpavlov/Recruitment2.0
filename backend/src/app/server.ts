@@ -17,16 +17,24 @@ const bootstrap = async () => {
 
   const corsOptions: CorsOptions = {
     credentials: true,
-    origin: (origin, callback) => {
-      // Разрешаем запросы без Origin (например, от curl) и любые домены, если список пустой
-      if (!origin || allowedOrigins.length === 0) {
+    origin: (origin: string | undefined, callback: (err: Error | null, allow?: string | boolean) => void) => {
+      // Разрешаем запросы без Origin (например, от curl)
+      if (!origin) {
         callback(null, true);
         return;
       }
+
+      // Если список доменов пуст, отражаем Origin клиента, чтобы не отдавать '*'
+      if (allowedOrigins.length === 0) {
+        callback(null, origin);
+        return;
+      }
+
       if (allowedOrigins.includes(origin)) {
-        callback(null, true);
+        callback(null, origin);
         return;
       }
+
       callback(new Error('Origin not allowed by CORS policy'));
     }
   };

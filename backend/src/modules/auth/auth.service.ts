@@ -20,7 +20,7 @@ export class AuthService {
 
   async requestAccessCode(email: string) {
     const account = await this.accountsService.findByEmail(email.trim().toLowerCase());
-    if (!account || (account.role !== 'admin' && account.role !== 'super-admin')) {
+    if (!account) {
       throw new Error('ACCOUNT_NOT_FOUND');
     }
     const code = this.otp.generateCode();
@@ -46,7 +46,7 @@ export class AuthService {
     }
 
     const account = await this.accountsService.findByEmail(normalized);
-    if (!account || (account.role !== 'admin' && account.role !== 'super-admin')) {
+    if (!account) {
       await this.codesRepository.deleteCode(normalized);
       throw new Error('ACCOUNT_NOT_FOUND');
     }
