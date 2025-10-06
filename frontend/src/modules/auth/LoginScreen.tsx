@@ -14,6 +14,8 @@ const mapRequestError = (error: RequestCodeError) => {
       return 'We could not find an admin account with this email.';
     case 'forbidden':
       return 'Only admin accounts can access this platform.';
+    case 'mailer-unavailable':
+      return 'Email delivery is not configured. Contact your system administrator to set up SMTP.';
     default:
       return 'Unable to send the access code. Try again in a moment.';
   }
@@ -130,9 +132,14 @@ export const LoginScreen = () => {
   return (
     <section className={styles.wrapper}>
       <div className={styles.card}>
-        <div className={styles.brandMark}>R2</div>
-        <h1 className={styles.title}>Sign in with a one-time code</h1>
-        <p className={styles.subtitle}>Use the email that received your invitation to access the platform.</p>
+        <div className={styles.cardHeader}>
+          <div className={styles.brandMark}>R2</div>
+          <div>
+            <h1 className={styles.title}>Recruitment 2.0</h1>
+            <p className={styles.subtitle}>Secure sign in for admin accounts.</p>
+          </div>
+        </div>
+        <p className={styles.description}>Request a one-time code using the email that received your invitation.</p>
 
         {banner && (
           <div className={banner.type === 'info' ? styles.infoBanner : styles.errorBanner}>{banner.text}</div>
@@ -151,7 +158,7 @@ export const LoginScreen = () => {
               autoComplete="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              placeholder="email@company.com"
+              placeholder="admin@company.com"
               disabled={step === 'verify'}
             />
           </label>
@@ -189,7 +196,13 @@ export const LoginScreen = () => {
             type="submit"
             disabled={step === 'request' ? isRequesting : isVerifying || isRequesting}
           >
-            {step === 'request' ? (isRequesting ? 'Sending...' : 'Send access code') : isVerifying ? 'Signing in...' : 'Sign in'}
+            {step === 'request'
+              ? isRequesting
+                ? 'Sending...'
+                : 'Send access code'
+              : isVerifying
+                ? 'Signing in...'
+                : 'Sign in'}
           </button>
         </form>
 
@@ -203,6 +216,8 @@ export const LoginScreen = () => {
             </button>
           </div>
         )}
+
+        <p className={styles.helper}>You will receive a six-digit code in the inbox.</p>
       </div>
     </section>
   );

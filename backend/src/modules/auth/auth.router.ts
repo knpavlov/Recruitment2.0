@@ -17,6 +17,12 @@ router.post('/request-code', async (req, res) => {
         res.status(403).json({ message: 'Access denied for this account.' });
         return;
       }
+      if (error.message === 'MAILER_UNAVAILABLE') {
+        res
+          .status(503)
+          .json({ message: 'Email delivery is temporarily unavailable. Configure SMTP and try again.' });
+        return;
+      }
     }
     res.status(500).json({ message: 'Failed to request an access code.' });
   }
