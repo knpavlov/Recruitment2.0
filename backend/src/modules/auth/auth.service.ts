@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import type { AccountsService } from '../accounts/accounts.service.js';
-import { MailerService } from '../../shared/mailer.service.js';
+import { MailerService, MAILER_NOT_CONFIGURED } from '../../shared/mailer.service.js';
 import { OtpService } from '../../shared/otp.service.js';
 import { AccessCodesRepository } from './accessCodes.repository.js';
 
@@ -27,7 +27,15 @@ export class AuthService {
       code,
       expiresAt
     });
-    await this.mailer.sendAccessCode(account.email, code);
+    try {
+      await this.mailer.sendAccessCode(account.email, code);
+    } catch (error) {
+      await this.codesRepository.deleteCode(account.email);
+      if (error instanceof Error && error.message === MAILER_NOT_CONFIGURED) {
+        throw new Error('MAILER_UNAVAILABLE');
+      }
+      throw error;
+    }
     return { email: account.email };
   }
 
