@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { MailerService } from '../../shared/mailer.service.js';
+import { MailerService, MAILER_NOT_CONFIGURED } from '../../shared/mailer.service.js';
 import { AccountsRepository } from './accounts.repository.js';
 
 export type AccountRole = 'super-admin' | 'admin' | 'user';
@@ -45,7 +45,15 @@ export class AccountsService {
       createdAt: new Date()
     };
     const saved = await this.repository.insertAccount(record);
-    await this.mailer.sendInvitation(normalized, invitationToken);
+    try {
+      await this.mailer.sendInvitation(normalized, invitationToken);
+    } catch (error) {
+      await this.repository.removeAccount(record.id);
+      if (error instanceof Error && error.message === MAILER_NOT_CONFIGURED) {
+        throw new Error('MAILER_UNAVAILABLE');
+      }
+      throw error;
+    }
     return saved;
   }
 
