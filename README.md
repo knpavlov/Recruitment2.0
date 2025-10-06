@@ -46,6 +46,24 @@ The backend uses PostgreSQL. Both the connection string `DATABASE_URL` and indiv
 
 > ⚙️ For Railway deployment the repository contains `.nixpacks.toml`. It explicitly runs `npm install` in `backend/`, so new dependencies are installed even without a pre-generated `package-lock.json`.
 
+### Email delivery configuration
+
+Configure SMTP so that invitations and one-time codes reach inboxes instead of being logged to the console.
+
+1. Provide credentials in `backend/.env`:
+   ```dotenv
+   SMTP_HOST=smtp.mailprovider.com
+   SMTP_PORT=587
+   SMTP_SECURE=false
+   SMTP_USER=notifications@company.com
+   SMTP_PASSWORD=super-secret
+   SMTP_FROM=Recruitment 2.0 <notifications@company.com>
+   ```
+2. Restart the backend — the service now uses authenticated SMTP (LOGIN mechanism). If these variables are absent the API will return HTTP 503 and explain that email delivery is not configured.
+3. All outgoing emails are sent from the `SMTP_FROM` address. If it is omitted, the backend falls back to `SMTP_USER`.
+
+> ℹ️ Until SMTP is configured the backend refuses to send invitations and access codes, keeping the database clean and avoiding misleading success messages.
+
 ## Current functionality
 
 - Case management: creation, renaming, drag & drop files, and version conflict detection.

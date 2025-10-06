@@ -13,6 +13,8 @@ interface MailerConfig {
   from: string;
 }
 
+export const MAILER_NOT_CONFIGURED = 'MAILER_NOT_CONFIGURED';
+
 const resolveConfig = (): MailerConfig | null => {
   const host = process.env.SMTP_HOST;
   const user = process.env.SMTP_USER;
@@ -155,23 +157,27 @@ export class MailerService {
   private readonly config = resolveConfig();
   private warned = false;
 
-  // If SMTP is not configured, record a notification in the logs
-  private ensureConfig(): MailerConfig | null {
+  // Если SMTP не настроен, предупреждаем и выкидываем контролируемую ошибку
+  private ensureConfig(): MailerConfig {
     if (!this.config) {
       if (!this.warned) {
         console.warn('SMTP is not configured. Emails will not be sent.');
         this.warned = true;
       }
-      return null;
+      throw new Error(MAILER_NOT_CONFIGURED);
     }
     return this.config;
   }
 
   private async deliver(to: string, subject: string, text: string) {
-    const config = this.ensureConfig();
-    if (!config) {
-      console.info(`[mailer] Email for ${to}: ${subject} — ${text}`);
-      return;
+    let config: MailerConfig;
+    try {
+      config = this.ensureConfig();
+    } catch (error) {
+      if (error instanceof Error && error.message === MAILER_NOT_CONFIGURED) {
+        console.info(`[mailer] Email for ${to}: ${subject} — ${text}`);
+      }
+      throw error;
     }
 
     const { socket, wait } = await createSocket(config);
