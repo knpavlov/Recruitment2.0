@@ -6,7 +6,7 @@ Monorepo for the recruiting team portal. The structure is split into the fronten
 
 - `frontend/` — SPA with a modern interface, left navigation menu, and screens for cases, candidates, evaluations, and account management.
 - `backend/` — Express API layer with modular domains.
-- `docs/` — documentation about architecture and next steps.
+- `docs/` — documentation about architecture and next steps. See [`docs/authentication-setup.md`](docs/authentication-setup.md) for the email + login checklist.
 
 ## Getting started
 
