@@ -38,7 +38,11 @@ Set the API base URL for the frontend build so the SPA can call the backend:
 VITE_API_URL=https://api.nboard.au
 ```
 
-Adjust the value to the real backend origin. When both services are deployed on Railway you can keep relying on automatic host derivation; for custom domains the explicit variable avoids mixed-content issues.
+Adjust the value to the real backend origin. Если фронтенд и бэкенд работают на Railway и используют домены вида
+`https://<project>-frontend.up.railway.app` и `https://<project>-backend.up.railway.app`, можно оставить переменную
+неуказанной — приложение автоматически подставит второй домен. Если имена сервисов отличаются от шаблона
+«frontend/backend» или вы переключитесь на собственный домен, задайте явный адрес API, например
+`https://your-backend-service.up.railway.app`.
 
 ## 4. DNS and domain checklist
 
