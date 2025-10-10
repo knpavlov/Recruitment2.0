@@ -18,7 +18,7 @@ export interface AuthSession {
   expiresAt: number;
 }
 
-export type RequestCodeError = 'not-found' | 'forbidden' | 'unknown';
+export type RequestCodeError = 'not-found' | 'forbidden' | 'mailer-unavailable' | 'unknown';
 export type VerifyCodeError = 'invalid' | 'expired' | 'unknown';
 
 interface RequestCodeSuccess {
@@ -167,6 +167,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
           if (error.status === 403) {
             return { ok: false, error: 'forbidden' };
+          }
+          if (error.status === 503) {
+            return { ok: false, error: 'mailer-unavailable' };
           }
         }
         console.error('Failed to request access code:', error);
