@@ -8,7 +8,23 @@ router.post('/request-code', async (req, res) => {
     const result = await authService.requestAccessCode(String(req.body.email ?? ''));
     res.status(201).json(result);
   } catch (error) {
-    res.status(404).json({ message: 'Account not found or access denied.' });
+    if (error instanceof Error) {
+      if (error.message === 'ACCOUNT_NOT_FOUND') {
+        res.status(404).json({ message: 'Account not found.' });
+        return;
+      }
+      if (error.message === 'ACCESS_DENIED') {
+        res.status(403).json({ message: 'Access denied for this account.' });
+        return;
+      }
+      if (error.message === 'MAILER_UNAVAILABLE') {
+        res
+          .status(503)
+          .json({ message: 'Email delivery is temporarily unavailable. Configure SMTP and try again.' });
+        return;
+      }
+    }
+    res.status(500).json({ message: 'Failed to request an access code.' });
   }
 });
 
@@ -22,9 +38,15 @@ router.post('/verify-code', async (req, res) => {
     const session = await authService.verifyAccessCode(email, code);
     res.json(session);
   } catch (error) {
-    if (error instanceof Error && error.message === 'CODE_EXPIRED') {
-      res.status(410).json({ message: 'Code expired. Request a new one.' });
-      return;
+    if (error instanceof Error) {
+      if (error.message === 'CODE_EXPIRED') {
+        res.status(410).json({ message: 'Code expired. Request a new one.' });
+        return;
+      }
+      if (error.message === 'ACCOUNT_NOT_FOUND') {
+        res.status(404).json({ message: 'Account not found.' });
+        return;
+      }
     }
     res.status(401).json({ message: 'Invalid code.' });
   }

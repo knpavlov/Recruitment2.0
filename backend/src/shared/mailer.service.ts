@@ -1,19 +1,44 @@
 import { randomUUID } from 'crypto';
 import { connect as createNetConnection, type Socket } from 'net';
 import { connect as createTlsConnection, type TLSSocket } from 'tls';
+import { sendWithResend } from './resend.client.js';
 
 type SmtpSocket = Socket | TLSSocket;
 
-interface MailerConfig {
+type BaseMailerConfig = {
+  from: string;
+};
+
+type SmtpMailerConfig = BaseMailerConfig & {
+  kind: 'smtp';
   host: string;
   port: number;
   secure: boolean;
   user: string;
   password: string;
-  from: string;
-}
+};
+
+type ResendMailerConfig = BaseMailerConfig & {
+  kind: 'resend';
+  apiKey: string;
+};
+
+type MailerConfig = SmtpMailerConfig | ResendMailerConfig;
+
+export const MAILER_NOT_CONFIGURED = 'MAILER_NOT_CONFIGURED';
 
 const resolveConfig = (): MailerConfig | null => {
+  const resendApiKey = process.env.RESEND_API_KEY?.trim();
+  const resendFrom = process.env.RESEND_FROM?.trim() ?? process.env.SMTP_FROM ?? process.env.SMTP_USER;
+
+  if (resendApiKey && resendFrom) {
+    return {
+      kind: 'resend',
+      apiKey: resendApiKey,
+      from: resendFrom
+    } satisfies ResendMailerConfig;
+  }
+
   const host = process.env.SMTP_HOST;
   const user = process.env.SMTP_USER;
   const password = process.env.SMTP_PASSWORD;
@@ -25,13 +50,14 @@ const resolveConfig = (): MailerConfig | null => {
   }
 
   return {
+    kind: 'smtp',
     host,
     port,
     secure: process.env.SMTP_SECURE === 'true',
     user,
     password,
     from
-  };
+  } satisfies SmtpMailerConfig;
 };
 
 const createResponseReader = (socket: SmtpSocket) => {
@@ -105,7 +131,9 @@ const createResponseReader = (socket: SmtpSocket) => {
     });
 };
 
-const createSocket = async (config: MailerConfig): Promise<{ socket: SmtpSocket; wait: () => Promise<string> }> => {
+const createSocket = async (
+  config: SmtpMailerConfig
+): Promise<{ socket: SmtpSocket; wait: () => Promise<string> }> => {
   const socket: SmtpSocket = config.secure
     ? createTlsConnection({ host: config.host, port: config.port })
     : createNetConnection({ host: config.host, port: config.port });
@@ -151,72 +179,100 @@ const formatBody = (text: string) =>
     .replace(/\r?\n/g, '\r\n')
     .replace(/\r\n\./g, '\r\n..');
 
+const sendViaSmtp = async (config: SmtpMailerConfig, to: string, subject: string, text: string) => {
+  const { socket, wait } = await createSocket(config);
+  try {
+    await sendCommand(socket, wait, `EHLO ${config.host}`, 250);
+    await sendCommand(socket, wait, 'AUTH LOGIN', 334);
+    await sendCommand(socket, wait, Buffer.from(config.user).toString('base64'), 334);
+    await sendCommand(socket, wait, Buffer.from(config.password).toString('base64'), 235);
+    await sendCommand(socket, wait, `MAIL FROM:<${config.from}>`, 250);
+    await sendCommand(socket, wait, `RCPT TO:<${to}>`, [250, 251]);
+    await sendCommand(socket, wait, 'DATA', 354);
+
+    const messageId = `<${randomUUID()}@${config.host}>`;
+    const now = new Date().toUTCString();
+    const payload = [
+      `Message-ID: ${messageId}`,
+      `Date: ${now}`,
+      `From: ${config.from}`,
+      `To: ${to}`,
+      `Subject: ${subject}`,
+      'Content-Type: text/plain; charset=UTF-8',
+      'Content-Transfer-Encoding: 8bit',
+      '',
+      formatBody(text),
+      ''
+    ].join('\r\n');
+
+    socket.write(`${payload}\r\n.\r\n`);
+    const dataResponse = await wait();
+    if (!dataResponse.startsWith('250')) {
+      throw new Error(`SMTP did not confirm message delivery: ${dataResponse}`);
+    }
+    await sendCommand(socket, wait, 'QUIT', 221);
+  } finally {
+    socket.end();
+  }
+};
+
+// Если SMTP не настроен, предупреждаем и выкидываем контролируемую ошибку
 export class MailerService {
   private readonly config = resolveConfig();
   private warned = false;
 
-  // If SMTP is not configured, record a notification in the logs
-  private ensureConfig(): MailerConfig | null {
+  private ensureConfig(): MailerConfig {
     if (!this.config) {
       if (!this.warned) {
-        console.warn('SMTP is not configured. Emails will not be sent.');
+        console.warn('SMTP/Resend is not configured. Emails will not be sent.');
         this.warned = true;
       }
-      return null;
+      throw new Error(MAILER_NOT_CONFIGURED);
     }
     return this.config;
   }
 
   private async deliver(to: string, subject: string, text: string) {
-    const config = this.ensureConfig();
-    if (!config) {
-      console.info(`[mailer] Email for ${to}: ${subject} — ${text}`);
+    let config: MailerConfig;
+    try {
+      config = this.ensureConfig();
+    } catch (error) {
+      if (error instanceof Error && error.message === MAILER_NOT_CONFIGURED) {
+        console.info(`[mailer] Email for ${to}: ${subject} — ${text}`);
+      }
+      throw error;
+    }
+
+    if (config.kind === 'resend') {
+      await sendWithResend({
+        apiKey: config.apiKey,
+        from: config.from,
+        to,
+        subject,
+        text
+      });
       return;
     }
 
-    const { socket, wait } = await createSocket(config);
-    try {
-      await sendCommand(socket, wait, `EHLO ${config.host}`, 250);
-      await sendCommand(socket, wait, 'AUTH LOGIN', 334);
-      await sendCommand(socket, wait, Buffer.from(config.user).toString('base64'), 334);
-      await sendCommand(socket, wait, Buffer.from(config.password).toString('base64'), 235);
-      await sendCommand(socket, wait, `MAIL FROM:<${config.from}>`, 250);
-      await sendCommand(socket, wait, `RCPT TO:<${to}>`, [250, 251]);
-      await sendCommand(socket, wait, 'DATA', 354);
-
-      const messageId = `<${randomUUID()}@${config.host}>`;
-      const now = new Date().toUTCString();
-      const payload = [
-        `Message-ID: ${messageId}`,
-        `Date: ${now}`,
-        `From: ${config.from}`,
-        `To: ${to}`,
-        `Subject: ${subject}`,
-        'Content-Type: text/plain; charset=UTF-8',
-        'Content-Transfer-Encoding: 8bit',
-        '',
-        formatBody(text),
-        ''
-      ].join('\r\n');
-
-      socket.write(`${payload}\r\n.\r\n`);
-      const dataResponse = await wait();
-      if (!dataResponse.startsWith('250')) {
-        throw new Error(`SMTP did not confirm message delivery: ${dataResponse}`);
-      }
-      await sendCommand(socket, wait, 'QUIT', 221);
-    } finally {
-      socket.end();
-    }
+    await sendViaSmtp(config, to, subject, text);
   }
 
   async sendInvitation(email: string, token: string) {
     const subject = 'Invitation to the case management system';
     const inviteUrl = process.env.INVITE_URL?.trim();
+    const separator = inviteUrl && inviteUrl.includes('?') ? '&' : '?';
+    const activationLink = inviteUrl
+      ? `${inviteUrl}${separator}email=${encodeURIComponent(email)}&invitation=${encodeURIComponent(token)}`
+      : null;
     const bodyLines = [
       'You have been invited to the case management system.',
-      inviteUrl ? `Activation link: ${inviteUrl}` : null,
-      `Invitation token: ${token}`
+      activationLink
+        ? `Open this link to activate your access: ${activationLink}`
+        : inviteUrl
+          ? `Open this link to activate your access: ${inviteUrl}`
+          : null,
+      `If the link is unavailable, use this invitation token: ${token}`,
+      'Once activated, return to the login page and request a one-time access code.'
     ].filter((line): line is string => Boolean(line));
     await this.deliver(email, subject, bodyLines.join('\n\n'));
   }

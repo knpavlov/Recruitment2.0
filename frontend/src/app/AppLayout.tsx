@@ -19,7 +19,11 @@ interface AppLayoutProps {
 }
 
 export const AppLayout = ({ navigationItems, activeItem, onNavigate, children }: AppLayoutProps) => {
-  const { role, setRole, email } = useAuth();
+  const { session } = useAuth();
+
+  if (!session) {
+    return null;
+  }
 
   return (
     <div className={styles.container}>
@@ -31,17 +35,10 @@ export const AppLayout = ({ navigationItems, activeItem, onNavigate, children }:
       <main className={styles.content}>
         <div className={styles.topbar}>
           <div>
-            <p className={styles.topbarGreeting}>Welcome, {email}</p>
-            <p className={styles.topbarHint}>Choose a role to test access segregation.</p>
+            <p className={styles.topbarGreeting}>Welcome back</p>
+            <p className={styles.topbarHint}>Signed in as {session.email}</p>
           </div>
-          <label className={styles.roleSelector}>
-            <span>Current role</span>
-            <select value={role} onChange={(event) => setRole(event.target.value as typeof role)}>
-              <option value="super-admin">{roleLabels['super-admin']}</option>
-              <option value="admin">{roleLabels.admin}</option>
-              <option value="user">{roleLabels.user}</option>
-            </select>
-          </label>
+          <span className={styles.roleBadge}>{roleLabels[session.role]}</span>
         </div>
         <div className={styles.pageContainer}>{children}</div>
       </main>

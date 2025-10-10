@@ -6,7 +6,8 @@ import { useAuth } from '../auth/AuthContext';
 type Banner = { type: 'info' | 'error'; text: string } | null;
 
 export const AccountsScreen = () => {
-  const { role } = useAuth();
+  const { session } = useAuth();
+  const role = session?.role ?? 'user';
   const { list, inviteAccount, activateAccount, removeAccount } = useAccountsState();
   const [email, setEmail] = useState('');
   const [targetRole, setTargetRole] = useState<'admin' | 'user'>('admin');
@@ -40,7 +41,7 @@ export const AccountsScreen = () => {
       setBanner({ type: 'error', text: message });
       return;
     }
-    setBanner({ type: 'info', text: `Invitation sent to ${result.data.email}.` });
+    setBanner({ type: 'info', text: `Invitation email sent to ${result.data.email}.` });
     setEmail('');
   };
 
