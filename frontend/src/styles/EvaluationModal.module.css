@@ -247,6 +247,14 @@
   color: #64748b;
 }
 
+.statusScores {
+  margin-top: 8px;
+  display: flex;
+  gap: 16px;
+  font-size: 14px;
+  color: #0f172a;
+}
+
 .statusNotes {
   margin: 8px 0 0;
   font-size: 14px;
