@@ -1,48 +1,107 @@
 import { apiRequest } from '../../../shared/api/httpClient';
 import { AccountRecord, AccountRole } from '../../../shared/types/account';
 
-interface AccountApiModel {
-  id: string;
-  email: string;
-  role: AccountRole;
-  status: 'pending' | 'active';
-  createdAt: string;
-  activatedAt?: string;
-  invitationToken: string;
-}
+type AccountStatus = 'pending' | 'active';
 
-const mapAccount = (record: AccountApiModel): AccountRecord => ({
-  id: record.id,
-  email: record.email,
-  role: record.role,
-  status: record.status,
-  invitedAt: record.createdAt,
-  activatedAt: record.activatedAt,
-  invitationToken: record.invitationToken
-});
+type AccountPayload = Partial<AccountRecord> & {
+  id?: unknown;
+  email?: unknown;
+  role?: unknown;
+  status?: unknown;
+  invitedAt?: unknown;
+  activatedAt?: unknown;
+  invitationToken?: unknown;
+  createdAt?: unknown;
+};
+
+const isRole = (value: unknown): value is AccountRole =>
+  value === 'super-admin' || value === 'admin' || value === 'user';
+
+const isStatus = (value: unknown): value is AccountStatus => value === 'pending' || value === 'active';
+
+const asIsoString = (value: unknown): string | undefined => {
+  if (!value) {
+    return undefined;
+  }
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return undefined;
+    }
+    const parsed = new Date(trimmed);
+    return Number.isNaN(parsed.getTime()) ? trimmed : parsed.toISOString();
+  }
+  return undefined;
+};
+
+const normalizeAccount = (payload: unknown): AccountRecord | null => {
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
+  const record = payload as AccountPayload;
+  const id = typeof record.id === 'string' && record.id.trim() ? record.id : null;
+  const email = typeof record.email === 'string' && record.email.trim() ? record.email : null;
+  const role = isRole(record.role) ? record.role : null;
+  const status = isStatus(record.status) ? record.status : null;
+  const invitationToken = typeof record.invitationToken === 'string' ? record.invitationToken : null;
+
+  if (!id || !email || !role || !status || !invitationToken) {
+    return null;
+  }
+
+  const invitedAt = asIsoString(record.invitedAt ?? record.createdAt);
+  const activatedAt = asIsoString(record.activatedAt);
+
+  return {
+    id,
+    email,
+    role,
+    status,
+    invitedAt: invitedAt ?? new Date(0).toISOString(),
+    activatedAt,
+    invitationToken
+  };
+};
+
+const ensureAccount = (payload: unknown): AccountRecord => {
+  const account = normalizeAccount(payload);
+  if (!account) {
+    throw new Error('Failed to parse the account payload.');
+  }
+  return account;
+};
+
+const ensureAccountList = (value: unknown): AccountRecord[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((item) => normalizeAccount(item))
+    .filter((account): account is AccountRecord => Boolean(account));
+};
 
 export const accountsApi = {
-  list: async () => {
-    const records = await apiRequest<AccountApiModel[]>('/accounts');
-    return records.map(mapAccount);
-  },
-  invite: async (email: string, role: AccountRole) => {
-    const record = await apiRequest<AccountApiModel>('/accounts/invite', {
-      method: 'POST',
-      body: { email, role }
-    });
-    return mapAccount(record);
-  },
-  activate: async (id: string) => {
-    const record = await apiRequest<AccountApiModel>(`/accounts/${id}/activate`, {
-      method: 'POST'
-    });
-    return mapAccount(record);
-  },
-  remove: async (id: string) => {
-    const record = await apiRequest<AccountApiModel>(`/accounts/${id}`, {
-      method: 'DELETE'
-    });
-    return mapAccount(record);
-  }
+  list: async () => ensureAccountList(await apiRequest<unknown>('/accounts')),
+  invite: async (email: string, role: AccountRole) =>
+    ensureAccount(
+      await apiRequest<unknown>('/accounts/invite', {
+        method: 'POST',
+        body: { email, role }
+      })
+    ),
+  activate: async (id: string) =>
+    ensureAccount(
+      await apiRequest<unknown>(`/accounts/${id}/activate`, {
+        method: 'POST'
+      })
+    ),
+  remove: async (id: string) =>
+    ensureAccount(
+      await apiRequest<unknown>(`/accounts/${id}`, {
+        method: 'DELETE'
+      })
+    )
 };
