@@ -57,6 +57,26 @@ export class AccountsService {
     return saved;
   }
 
+  async ensureUserAccount(email: string) {
+    const normalized = email.trim().toLowerCase();
+    if (!normalized) {
+      throw new Error('INVALID_EMAIL');
+    }
+    const existing = await this.findByEmail(normalized);
+    if (existing) {
+      return existing;
+    }
+    const record: AccountRecord = {
+      id: randomUUID(),
+      email: normalized,
+      role: 'user',
+      status: 'pending',
+      invitationToken: randomUUID(),
+      createdAt: new Date()
+    };
+    return this.repository.insertAccount(record);
+  }
+
   async activateAccount(id: string) {
     const activatedAt = new Date();
     const updated = await this.repository.updateActivation(id, activatedAt);

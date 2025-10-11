@@ -17,6 +17,8 @@ interface EvaluationRow extends Record<string, unknown> {
   created_at: Date;
   updated_at: Date;
   forms: unknown;
+  process_status: string | null;
+  process_started_at: Date | null;
 }
 
 const mapSlots = (value: unknown): InterviewSlotModel[] => {
@@ -63,7 +65,11 @@ const mapForms = (value: unknown): InterviewStatusModel[] => {
         ? new Date(item.submittedAt).toISOString()
         : undefined;
     const notes = typeof item.notes === 'string' ? item.notes : undefined;
-    forms.push({ slotId, interviewerName, submitted, submittedAt, notes });
+    const fitScoreRaw = Number(item.fitScore);
+    const caseScoreRaw = Number(item.caseScore);
+    const fitScore = Number.isFinite(fitScoreRaw) ? fitScoreRaw : undefined;
+    const caseScore = Number.isFinite(caseScoreRaw) ? caseScoreRaw : undefined;
+    forms.push({ slotId, interviewerName, submitted, submittedAt, notes, fitScore, caseScore });
   }
   return forms;
 };
@@ -86,14 +92,20 @@ const mapRowToRecord = (row: EvaluationRow): EvaluationRecord => {
     version: Number(row.version ?? 1),
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
-    forms
+    forms,
+    processStatus:
+      row.process_status === 'active' || row.process_status === 'completed'
+        ? (row.process_status as EvaluationRecord['processStatus'])
+        : 'draft',
+    processStartedAt: row.process_started_at ? row.process_started_at.toISOString() : undefined
   } satisfies EvaluationRecord;
 };
 
 export class EvaluationsRepository {
   async listEvaluations(): Promise<EvaluationRecord[]> {
     const result = await postgresPool.query<EvaluationRow>(
-      `SELECT id, candidate_id, round_number, interview_count, interviews, fit_question_id, version, created_at, updated_at, forms
+      `SELECT id, candidate_id, round_number, interview_count, interviews, fit_question_id, version, created_at, updated_at, forms,
+              process_status, process_started_at
          FROM evaluations
         ORDER BY updated_at DESC, created_at DESC;`
     );
@@ -105,9 +117,10 @@ export class EvaluationsRepository {
     const formsJson = JSON.stringify(model.forms);
 
     const result = await postgresPool.query<EvaluationRow>(
-      `INSERT INTO evaluations (id, candidate_id, round_number, interview_count, interviews, fit_question_id, version, created_at, updated_at, forms)
-         VALUES ($1, $2, $3, $4, $5::jsonb, $6, 1, NOW(), NOW(), $7::jsonb)
-      RETURNING id, candidate_id, round_number, interview_count, interviews, fit_question_id, version, created_at, updated_at, forms;`,
+      `INSERT INTO evaluations (id, candidate_id, round_number, interview_count, interviews, fit_question_id, version, created_at, updated_at, forms, process_status)
+         VALUES ($1, $2, $3, $4, $5::jsonb, $6, 1, NOW(), NOW(), $7::jsonb, 'draft')
+      RETURNING id, candidate_id, round_number, interview_count, interviews, fit_question_id, version, created_at, updated_at, forms,
+                process_status, process_started_at;`,
       [
         model.id,
         model.candidateId ?? null,
@@ -140,7 +153,8 @@ export class EvaluationsRepository {
               version = version + 1,
               updated_at = NOW()
         WHERE id = $7 AND version = $8
-      RETURNING id, candidate_id, round_number, interview_count, interviews, fit_question_id, version, created_at, updated_at, forms;`,
+      RETURNING id, candidate_id, round_number, interview_count, interviews, fit_question_id, version, created_at, updated_at, forms,
+                process_status, process_started_at;`,
       [
         model.candidateId ?? null,
         model.roundNumber ?? null,
@@ -167,5 +181,52 @@ export class EvaluationsRepository {
   async deleteEvaluation(id: string): Promise<boolean> {
     const result = await postgresPool.query('DELETE FROM evaluations WHERE id = $1 RETURNING id;', [id]);
     return result.rows.length > 0;
+  }
+
+  async findEvaluation(id: string): Promise<EvaluationRecord | null> {
+    const result = await postgresPool.query<EvaluationRow>(
+      `SELECT id, candidate_id, round_number, interview_count, interviews, fit_question_id, version, created_at, updated_at, forms,
+              process_status, process_started_at
+         FROM evaluations
+        WHERE id = $1
+        LIMIT 1;`,
+      [id]
+    );
+    const row = result.rows[0];
+    return row ? mapRowToRecord(row) : null;
+  }
+
+  async markProcessStarted(id: string, forms: InterviewStatusModel[]): Promise<EvaluationRecord | null> {
+    const formsJson = JSON.stringify(forms);
+    const result = await postgresPool.query<EvaluationRow>(
+      `UPDATE evaluations
+          SET process_status = 'active',
+              process_started_at = COALESCE(process_started_at, NOW()),
+              forms = $2::jsonb,
+              version = version + 1,
+              updated_at = NOW()
+        WHERE id = $1
+      RETURNING id, candidate_id, round_number, interview_count, interviews, fit_question_id, version, created_at, updated_at, forms,
+                process_status, process_started_at;`,
+      [id, formsJson]
+    );
+    const row = result.rows[0];
+    return row ? mapRowToRecord(row) : null;
+  }
+
+  async updateForms(id: string, forms: InterviewStatusModel[]): Promise<EvaluationRecord | null> {
+    const formsJson = JSON.stringify(forms);
+    const result = await postgresPool.query<EvaluationRow>(
+      `UPDATE evaluations
+          SET forms = $2::jsonb,
+              version = version + 1,
+              updated_at = NOW()
+        WHERE id = $1
+      RETURNING id, candidate_id, round_number, interview_count, interviews, fit_question_id, version, created_at, updated_at, forms,
+                process_status, process_started_at;`,
+      [id, formsJson]
+    );
+    const row = result.rows[0];
+    return row ? mapRowToRecord(row) : null;
   }
 }

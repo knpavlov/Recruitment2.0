@@ -153,7 +153,9 @@ const createTables = async () => {
       ADD COLUMN IF NOT EXISTS fit_question_id UUID,
       ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1,
       ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      ADD COLUMN IF NOT EXISTS forms JSONB NOT NULL DEFAULT '[]'::JSONB;
+      ADD COLUMN IF NOT EXISTS forms JSONB NOT NULL DEFAULT '[]'::JSONB,
+      ADD COLUMN IF NOT EXISTS process_status TEXT NOT NULL DEFAULT 'draft',
+      ADD COLUMN IF NOT EXISTS process_started_at TIMESTAMPTZ;
   `);
 
   await postgresPool.query(`

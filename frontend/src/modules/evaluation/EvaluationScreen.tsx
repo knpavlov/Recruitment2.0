@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import styles from '../../styles/EvaluationScreen.module.css';
 import { EvaluationModal } from './components/EvaluationModal';
 import { EvaluationStatusModal } from './components/EvaluationStatusModal';
@@ -16,7 +16,7 @@ type Banner = { type: 'info' | 'error'; text: string } | null;
 type SortKey = 'name' | 'position' | 'round' | 'avgFit' | 'avgCase';
 
 export const EvaluationScreen = () => {
-  const { list, saveEvaluation, removeEvaluation } = useEvaluationsState();
+  const { list, saveEvaluation, removeEvaluation, startProcess } = useEvaluationsState();
   const { list: candidates } = useCandidatesState();
   const { folders } = useCasesState();
   const { list: fitQuestions } = useFitQuestionsState();
@@ -43,6 +43,34 @@ export const EvaluationScreen = () => {
     return map;
   }, [candidates]);
 
+  const handleStart = useCallback(
+    async (evaluation: EvaluationConfig) => {
+      const result = await startProcess(evaluation.id);
+      if (!result.ok) {
+        if (result.error === 'mailer-unavailable') {
+          setBanner({ type: 'error', text: 'SMTP не настроен. Отправка приглашений невозможна.' });
+          return;
+        }
+        if (result.error === 'version-conflict') {
+          setBanner({ type: 'error', text: 'Процесс уже был запущен ранее.' });
+          return;
+        }
+        if (result.error === 'invalid-input') {
+          setBanner({ type: 'error', text: 'Заполните всех интервьюеров, кейсы и фит вопросы.' });
+          return;
+        }
+        if (result.error === 'not-found') {
+          setBanner({ type: 'error', text: 'Evaluation no longer exists. Refresh the list.' });
+          return;
+        }
+        setBanner({ type: 'error', text: 'Не удалось запустить процесс.' });
+        return;
+      }
+      setBanner({ type: 'info', text: 'Процесс оценки запущен. Интервьюеры получили письма.' });
+    },
+    [setBanner, startProcess]
+  );
+
   const tableRows = useMemo<EvaluationTableRow[]>(() => {
     return list.map((evaluation) => {
       const metadata = evaluation.candidateId ? candidateIndex.get(evaluation.candidateId) : undefined;
@@ -50,6 +78,64 @@ export const EvaluationScreen = () => {
       const candidatePosition = metadata?.position ?? '—';
       const completedForms = evaluation.forms.filter((form) => form.submitted).length;
       const roundNumber = evaluation.roundNumber ?? null;
+      const fitScores = evaluation.forms
+        .map((form) => form.fitScore)
+        .filter((score): score is number => typeof score === 'number');
+      const caseScores = evaluation.forms
+        .map((form) => form.caseScore)
+        .filter((score): score is number => typeof score === 'number');
+
+      const avgFitScore = fitScores.length ? fitScores.reduce((sum, value) => sum + value, 0) / fitScores.length : null;
+      const avgCaseScore = caseScores.length
+        ? caseScores.reduce((sum, value) => sum + value, 0) / caseScores.length
+        : null;
+
+      let canStart = evaluation.processStatus === 'draft';
+      const issues: string[] = [];
+      if (!evaluation.candidateId) {
+        canStart = false;
+        issues.push('Выберите кандидата.');
+      }
+      if (evaluation.interviews.length === 0) {
+        canStart = false;
+        issues.push('Добавьте хотя бы одно интервью.');
+      }
+
+      evaluation.interviews.forEach((slot, index) => {
+        const slotLabel = `Интервью ${index + 1}`;
+        if (!slot.interviewerName.trim()) {
+          canStart = false;
+          issues.push(`${slotLabel}: укажите имя интервьюера.`);
+        }
+        if (!slot.interviewerEmail.trim()) {
+          canStart = false;
+          issues.push(`${slotLabel}: укажите почту интервьюера.`);
+        }
+        if (!slot.caseFolderId) {
+          canStart = false;
+          issues.push(`${slotLabel}: выберите кейс.`);
+        }
+        const fitQuestionId = slot.fitQuestionId ?? evaluation.fitQuestionId;
+        if (!fitQuestionId) {
+          canStart = false;
+          issues.push(`${slotLabel}: назначьте фит-вопрос.`);
+        }
+      });
+
+      if (evaluation.processStatus === 'active') {
+        canStart = false;
+      }
+      if (evaluation.processStatus === 'completed') {
+        canStart = false;
+      }
+
+      const startTooltip = !canStart
+        ? evaluation.processStatus === 'active'
+          ? 'Процесс уже запущен.'
+          : evaluation.processStatus === 'completed'
+            ? 'Процесс завершен.'
+            : issues.join('\n') || 'Заполните все поля перед запуском.'
+        : undefined;
 
       return {
         id: evaluation.id,
@@ -58,16 +144,20 @@ export const EvaluationScreen = () => {
         roundNumber,
         formsCompleted: completedForms,
         formsPlanned: evaluation.interviewCount,
-        avgFitScore: null,
-        avgCaseScore: null,
+        avgFitScore,
+        avgCaseScore,
+        canStart,
+        processStatus: evaluation.processStatus,
+        startTooltip,
         onEdit: () => {
           setModalEvaluation(evaluation);
           setIsModalOpen(true);
         },
-        onOpenStatus: () => setStatusEvaluation(evaluation)
+        onOpenStatus: () => setStatusEvaluation(evaluation),
+        onStart: () => handleStart(evaluation)
       };
     });
-  }, [candidateIndex, list]);
+  }, [candidateIndex, list, handleStart]);
 
   const sortedRows = useMemo(() => {
     const copy = [...tableRows];

@@ -21,6 +21,20 @@ const handleError = (error: unknown, res: Response) => {
         .status(409)
         .json({ code: 'version-conflict', message: 'Evaluation data is outdated. Refresh the page.' });
       return;
+    case 'INCOMPLETE_SETUP':
+      res
+        .status(400)
+        .json({ code: 'incomplete-setup', message: 'Заполните интервьюеров, кейсы и вопросы перед запуском.' });
+      return;
+    case 'PROCESS_ALREADY_STARTED':
+      res.status(409).json({ code: 'already-started', message: 'Процесс уже запущен.' });
+      return;
+    case 'MAILER_UNAVAILABLE':
+      res.status(503).json({ code: 'mailer-unavailable', message: 'Сервис отправки писем недоступен.' });
+      return;
+    case 'ACCESS_DENIED':
+      res.status(403).json({ code: 'access-denied', message: 'Нет доступа к этой записи.' });
+      return;
     default:
       res.status(500).json({ code: 'unknown', message: 'Failed to process the request.' });
   }
@@ -67,6 +81,53 @@ router.delete('/:id', async (req, res) => {
   try {
     const id = await evaluationsService.deleteEvaluation(req.params.id);
     res.json({ id });
+  } catch (error) {
+    handleError(error, res);
+  }
+});
+
+router.post('/:id/start', async (req, res) => {
+  try {
+    const evaluation = await evaluationsService.startProcess(req.params.id);
+    res.json(evaluation);
+  } catch (error) {
+    handleError(error, res);
+  }
+});
+
+router.get('/assignments', async (req, res) => {
+  const email = typeof req.query.email === 'string' ? req.query.email : '';
+  try {
+    const assignments = await evaluationsService.listAssignments(email);
+    res.json(assignments);
+  } catch (error) {
+    handleError(error, res);
+  }
+});
+
+router.post('/assignments/:evaluationId/:slotId', async (req, res) => {
+  const { evaluationId, slotId } = req.params;
+  const { email, fitScore, caseScore, notes, submit } = req.body as {
+    email?: unknown;
+    fitScore?: unknown;
+    caseScore?: unknown;
+    notes?: unknown;
+    submit?: unknown;
+  };
+
+  if (typeof email !== 'string') {
+    res.status(400).json({ code: 'invalid-input', message: 'Укажите почту интервьюера.' });
+    return;
+  }
+
+  try {
+    const assignment = await evaluationsService.submitAssignment(email, evaluationId, slotId, {
+      fitScore: typeof fitScore === 'number' ? fitScore : undefined,
+      caseScore: typeof caseScore === 'number' ? caseScore : undefined,
+      notes: typeof notes === 'string' ? notes : undefined,
+      submit: typeof submit === 'boolean' ? submit : undefined
+    });
+    res.json(assignment);
   } catch (error) {
     handleError(error, res);
   }

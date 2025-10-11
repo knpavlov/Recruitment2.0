@@ -11,6 +11,10 @@ export interface EvaluationTableRow {
   avgCaseScore: number | null;
   onEdit: () => void;
   onOpenStatus: () => void;
+  onStart: () => void;
+  canStart: boolean;
+  processStatus: 'draft' | 'active' | 'completed';
+  startTooltip?: string;
 }
 
 export interface EvaluationTableProps {
@@ -75,6 +79,12 @@ export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: 
             const formsLabel = `${row.formsCompleted}/${row.formsPlanned}`;
             const avgFitLabel = row.avgFitScore != null ? row.avgFitScore.toFixed(1) : '—';
             const avgCaseLabel = row.avgCaseScore != null ? row.avgCaseScore.toFixed(1) : '—';
+            const startLabel =
+              row.processStatus === 'active'
+                ? 'In progress'
+                : row.processStatus === 'completed'
+                  ? 'Completed'
+                  : 'Start process';
             return (
               <tr key={row.id}>
                 <td>{row.candidateName}</td>
@@ -84,6 +94,14 @@ export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: 
                 <td>{avgCaseLabel}</td>
                 <td>{formsLabel}</td>
                 <td className={styles.actionsCell}>
+                  <button
+                    className={styles.tableGhostButton}
+                    onClick={row.onStart}
+                    disabled={!row.canStart}
+                    title={row.startTooltip}
+                  >
+                    {startLabel}
+                  </button>
                   <button className={styles.tableSecondaryButton} onClick={row.onEdit}>
                     Edit
                   </button>
