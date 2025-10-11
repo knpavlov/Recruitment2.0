@@ -229,12 +229,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    const timeoutId = window.setTimeout(() => {
-      logout();
-    }, remaining);
+    const MAX_TIMEOUT_MS = 0x7fffffff;
+    let timerId: ReturnType<typeof window.setTimeout>;
+
+    // Чтобы не слететь сессией в браузерах с ограничением таймера ~24.8 дня,
+    // дробим ожидание на несколько шагов.
+    const scheduleLogout = (delay: number): ReturnType<typeof window.setTimeout> => {
+      const safeDelay = Math.min(delay, MAX_TIMEOUT_MS);
+      return window.setTimeout(() => {
+        const nextRemaining = session.expiresAt - Date.now();
+        if (nextRemaining <= 0) {
+          logout();
+          return;
+        }
+        timerId = scheduleLogout(nextRemaining);
+      }, safeDelay);
+    };
+
+    timerId = scheduleLogout(remaining);
 
     return () => {
-      window.clearTimeout(timeoutId);
+      window.clearTimeout(timerId);
     };
   }, [session, logout]);
 

@@ -11,9 +11,9 @@ const normalizeEmail = (value: string) => value.trim().toLowerCase();
 const mapRequestError = (error: RequestCodeError) => {
   switch (error) {
     case 'not-found':
-      return 'We could not find an admin account with this email.';
+      return 'We could not find an account with this email.';
     case 'forbidden':
-      return 'Only admin accounts can access this platform.';
+      return 'Your account is not allowed to sign in yet.';
     case 'mailer-unavailable':
       return 'Email delivery is not configured. Contact your system administrator to set up SMTP.';
     default:
@@ -136,7 +136,7 @@ export const LoginScreen = () => {
           <div className={styles.brandMark}>R2</div>
           <div>
             <h1 className={styles.title}>Recruitment 2.0</h1>
-            <p className={styles.subtitle}>Secure sign in for admin accounts.</p>
+            <p className={styles.subtitle}>Secure sign in for invited accounts.</p>
           </div>
         </div>
         <p className={styles.description}>Request a one-time code using the email that received your invitation.</p>
