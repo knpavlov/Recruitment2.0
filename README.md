@@ -6,7 +6,7 @@ Monorepo for the recruiting team portal. The structure is split into the fronten
 
 - `frontend/` — SPA with a modern interface, left navigation menu, and screens for cases, candidates, evaluations, and account management.
 - `backend/` — Express API layer with modular domains.
-- `docs/` — documentation about architecture and next steps.
+- `docs/` — documentation about architecture and next steps. See [`docs/authentication-setup.md`](docs/authentication-setup.md) for the email + login checklist.
 
 ## Getting started
 
@@ -39,7 +39,7 @@ The backend uses PostgreSQL. Both the connection string `DATABASE_URL` and indiv
    # PGUSER=...
    # PGPASSWORD=...
    # PGDATABASE=...
-   SUPER_ADMIN_EMAIL=super.admin@company.com
+   SUPER_ADMIN_EMAIL=knpavlov@gmail.com
    ```
 2. Run `npm install` — the `pg` driver will be installed together with the rest of the packages, and a local `package-lock.json` will be generated.
 3. On the first `npm run dev` or `npm run start`, tables and the super admin account will be created automatically.
