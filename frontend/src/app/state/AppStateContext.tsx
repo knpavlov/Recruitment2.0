@@ -6,6 +6,7 @@ import { AccountRecord, AccountRole } from '../../shared/types/account';
 import { DomainResult } from '../../shared/types/results';
 import { casesApi } from '../../modules/cases/services/casesApi';
 import { accountsApi } from '../../modules/accounts/services/accountsApi';
+import { candidatesApi } from '../../modules/candidates/services/candidatesApi';
 import { ApiError } from '../../shared/api/httpClient';
 import { useAuth } from '../../modules/auth/AuthContext';
 
@@ -28,8 +29,11 @@ interface AppStateContextValue {
   };
   candidates: {
     list: CandidateProfile[];
-    saveProfile: (profile: CandidateProfile, expectedVersion: number | null) => DomainResult<CandidateProfile>;
-    removeProfile: (id: string) => DomainResult<string>;
+    saveProfile: (
+      profile: CandidateProfile,
+      expectedVersion: number | null
+    ) => Promise<DomainResult<CandidateProfile>>;
+    removeProfile: (id: string) => Promise<DomainResult<string>>;
   };
   evaluations: {
     list: EvaluationConfig[];
@@ -47,12 +51,6 @@ interface AppStateContextValue {
 const AppStateContext = createContext<AppStateContextValue | null>(null);
 
 const nowIso = () => new Date().toISOString();
-
-const touchCandidate = (profile: CandidateProfile, shouldIncrement = true): CandidateProfile => ({
-  ...profile,
-  version: shouldIncrement ? profile.version + 1 : profile.version,
-  updatedAt: nowIso()
-});
 
 const touchEvaluation = (config: EvaluationConfig, shouldIncrement = true): EvaluationConfig => ({
   ...config,
@@ -107,6 +105,22 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       setCandidates([]);
       setEvaluations([]);
     }
+  }, [session]);
+
+  useEffect(() => {
+    if (!session) {
+      setCandidates([]);
+      return;
+    }
+    const loadCandidates = async () => {
+      try {
+        const remote = await candidatesApi.list();
+        setCandidates(remote);
+      } catch (error) {
+        console.error('Failed to load candidates:', error);
+      }
+    };
+    void loadCandidates();
   }, [session]);
 
   const value = useMemo<AppStateContextValue>(() => ({
@@ -236,36 +250,77 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     },
     candidates: {
       list: candidates,
-      saveProfile: (profile, expectedVersion) => {
-        if (!profile.firstName.trim() || !profile.lastName.trim()) {
+      saveProfile: async (profile, expectedVersion) => {
+        const trimmedFirst = profile.firstName.trim();
+        const trimmedLast = profile.lastName.trim();
+
+        if (!trimmedFirst || !trimmedLast) {
           return { ok: false, error: 'invalid-input' };
         }
-        const exists = candidates.find((item) => item.id === profile.id);
-        if (!exists) {
-          const base: CandidateProfile = {
-            ...profile,
-            version: profile.version || 1,
-            createdAt: nowIso(),
-            updatedAt: nowIso()
-          };
-          const next = touchCandidate(base, false);
-          setCandidates((prev) => [...prev, next]);
-          return { ok: true, data: next };
+
+        const existing = candidates.find((item) => item.id === profile.id);
+
+        if (!existing) {
+          try {
+            const created = await candidatesApi.create({ ...profile, firstName: trimmedFirst, lastName: trimmedLast });
+            setCandidates((prev) => [...prev, created]);
+            return { ok: true, data: created };
+          } catch (error) {
+            if (error instanceof ApiError) {
+              if (error.code === 'invalid-input' || error.status === 400) {
+                return { ok: false, error: 'invalid-input' };
+              }
+              if (error.code === 'duplicate' || error.status === 409) {
+                return { ok: false, error: 'duplicate' };
+              }
+            }
+            console.error('Failed to create candidate:', error);
+            return { ok: false, error: 'unknown' };
+          }
         }
-        if (expectedVersion === null || exists.version !== expectedVersion) {
+
+        if (expectedVersion === null || existing.version !== expectedVersion) {
           return { ok: false, error: 'version-conflict' };
         }
-        const next = touchCandidate(profile);
-        setCandidates((prev) => prev.map((item) => (item.id === profile.id ? next : item)));
-        return { ok: true, data: next };
+
+        try {
+          const updated = await candidatesApi.update(existing.id, { ...profile, firstName: trimmedFirst, lastName: trimmedLast }, expectedVersion);
+          setCandidates((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+          return { ok: true, data: updated };
+        } catch (error) {
+          if (error instanceof ApiError) {
+            if (error.code === 'version-conflict' || error.status === 409) {
+              return { ok: false, error: 'version-conflict' };
+            }
+            if (error.code === 'not-found' || error.status === 404) {
+              return { ok: false, error: 'not-found' };
+            }
+            if (error.code === 'invalid-input' || error.status === 400) {
+              return { ok: false, error: 'invalid-input' };
+            }
+          }
+          console.error('Failed to update candidate:', error);
+          return { ok: false, error: 'unknown' };
+        }
       },
-      removeProfile: (id) => {
+      removeProfile: async (id) => {
         const exists = candidates.some((item) => item.id === id);
         if (!exists) {
           return { ok: false, error: 'not-found' };
         }
-        setCandidates((prev) => prev.filter((item) => item.id !== id));
-        return { ok: true, data: id };
+        try {
+          await candidatesApi.remove(id);
+          setCandidates((prev) => prev.filter((item) => item.id !== id));
+          return { ok: true, data: id };
+        } catch (error) {
+          if (error instanceof ApiError) {
+            if (error.code === 'not-found' || error.status === 404) {
+              return { ok: false, error: 'not-found' };
+            }
+          }
+          console.error('Failed to delete candidate:', error);
+          return { ok: false, error: 'unknown' };
+        }
       }
     },
     evaluations: {
