@@ -4,11 +4,15 @@ import styles from '../../../styles/CandidateModal.module.css';
 import { generateId } from '../../../shared/ui/generateId';
 import { convertFileToResume } from '../services/resumeAdapter';
 import { parseResumeText } from '../services/resumeParser';
+import { DomainResult } from '../../../shared/types/results';
 
 interface CandidateModalProps {
   initialProfile: CandidateProfile | null;
-  onSave: (profile: CandidateProfile, options: { closeAfterSave: boolean; expectedVersion: number | null }) => void;
-  onDelete: (id: string) => void;
+  onSave: (
+    profile: CandidateProfile,
+    options: { closeAfterSave: boolean; expectedVersion: number | null }
+  ) => Promise<DomainResult<CandidateProfile>>;
+  onDelete: (id: string) => Promise<void>;
   onClose: () => void;
 }
 
@@ -17,6 +21,7 @@ const createEmptyProfile = (): CandidateProfile => ({
   version: 1,
   firstName: '',
   lastName: '',
+  gender: undefined,
   age: undefined,
   city: '',
   desiredPosition: '',
@@ -37,6 +42,7 @@ export const CandidateModal = ({ initialProfile, onSave, onDelete, onClose }: Ca
   const [profile, setProfile] = useState<CandidateProfile>(createEmptyProfile());
   const [resume, setResume] = useState<CandidateResume | undefined>(undefined);
   const [aiStatus, setAiStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [formError, setFormError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -48,12 +54,16 @@ export const CandidateModal = ({ initialProfile, onSave, onDelete, onClose }: Ca
       setProfile(empty);
       setResume(undefined);
     }
+    setFormError(null);
   }, [initialProfile]);
 
   const expectedVersion = initialProfile ? initialProfile.version : null;
 
   const handleChange = (field: keyof CandidateProfile, value: string | number | undefined) => {
     setProfile((prev) => ({ ...prev, [field]: value }));
+    if (field === 'firstName' || field === 'lastName') {
+      setFormError(null);
+    }
   };
 
   const handleResumeSelection = async (files: FileList | File[]) => {
@@ -78,10 +88,45 @@ export const CandidateModal = ({ initialProfile, onSave, onDelete, onClose }: Ca
     const parsed = parseResumeText(resume.textContent);
     setProfile((prev) => ({ ...prev, ...parsed }));
     setAiStatus('success');
+    setFormError(null);
   };
 
-  const submitSave = (closeAfterSave: boolean) => {
-    onSave({ ...profile, resume }, { closeAfterSave, expectedVersion });
+  const submitSave = async (closeAfterSave: boolean) => {
+    setFormError(null);
+    const trimmedFirstName = profile.firstName.trim();
+    const trimmedLastName = profile.lastName.trim();
+
+    if (!trimmedFirstName || !trimmedLastName) {
+      setFormError('Check that all required fields are filled.');
+      return;
+    }
+
+    let result: DomainResult<CandidateProfile>;
+    try {
+      result = await onSave(
+        { ...profile, firstName: trimmedFirstName, lastName: trimmedLastName, resume },
+        { closeAfterSave, expectedVersion }
+      );
+    } catch (error) {
+      console.error('Не удалось сохранить карточку кандидата:', error);
+      setFormError('Failed to save the candidate. Try again.');
+      return;
+    }
+
+    if (!result.ok) {
+      if (result.error === 'invalid-input') {
+        setFormError('Check that all required fields are filled.');
+      } else if (result.error === 'version-conflict') {
+        setFormError('Changes not saved: the record was updated by another user. Refresh the page.');
+      } else {
+        setFormError('Failed to save the candidate. Try again.');
+      }
+      return;
+    }
+
+    setFormError(null);
+    setProfile(result.data);
+    setResume(result.data.resume);
   };
 
   const handleDelete = () => {
@@ -89,7 +134,7 @@ export const CandidateModal = ({ initialProfile, onSave, onDelete, onClose }: Ca
       onClose();
       return;
     }
-    onDelete(initialProfile.id);
+    void onDelete(initialProfile.id);
   };
 
   return (
@@ -115,7 +160,14 @@ export const CandidateModal = ({ initialProfile, onSave, onDelete, onClose }: Ca
           <div className={styles.uploadZone}>
             {resume ? (
               <>
-                <p className={styles.resumeName}>{resume.fileName}</p>
+                <a
+                  className={styles.resumeLink}
+                  href={resume.dataUrl}
+                  download={resume.fileName}
+                  rel="noopener noreferrer"
+                >
+                  <p className={styles.resumeName}>{resume.fileName}</p>
+                </a>
                 <p className={styles.resumeMeta}>
                   Uploaded {new Date(resume.uploadedAt).toLocaleString('en-US')} · {(resume.size / 1024).toFixed(1)} KB
                 </p>
@@ -128,7 +180,7 @@ export const CandidateModal = ({ initialProfile, onSave, onDelete, onClose }: Ca
             <button className={styles.secondaryButton} onClick={() => fileInputRef.current?.click()}>
               Choose file
             </button>
-            <button className={styles.secondaryButton} onClick={() => submitSave(false)} disabled={!resume}>
+            <button className={styles.secondaryButton} onClick={() => void submitSave(false)} disabled={!resume}>
               Save resume
             </button>
             <button className={styles.primaryButton} onClick={handleAiFill} disabled={!resume || aiStatus === 'loading'}>
@@ -147,12 +199,37 @@ export const CandidateModal = ({ initialProfile, onSave, onDelete, onClose }: Ca
 
         <div className={styles.formGrid}>
           <label>
-            <span>First name</span>
-            <input value={profile.firstName} onChange={(e) => handleChange('firstName', e.target.value)} />
+            <span>
+              First name <span className={styles.requiredMark}>*</span>
+            </span>
+            <input
+              className={formError && !profile.firstName.trim() ? styles.invalidField : undefined}
+              value={profile.firstName}
+              onChange={(e) => handleChange('firstName', e.target.value)}
+            />
           </label>
           <label>
-            <span>Last name</span>
-            <input value={profile.lastName} onChange={(e) => handleChange('lastName', e.target.value)} />
+            <span>
+              Last name <span className={styles.requiredMark}>*</span>
+            </span>
+            <input
+              className={formError && !profile.lastName.trim() ? styles.invalidField : undefined}
+              value={profile.lastName}
+              onChange={(e) => handleChange('lastName', e.target.value)}
+            />
+          </label>
+          <label>
+            <span>Gender</span>
+            <select
+              value={profile.gender ?? ''}
+              onChange={(e) => handleChange('gender', e.target.value ? e.target.value : undefined)}
+            >
+              <option value="">Not specified</option>
+              <option value="female">Female</option>
+              <option value="male">Male</option>
+              <option value="non-binary">Non-binary</option>
+              <option value="prefer-not-to-say">Prefer not to say</option>
+            </select>
           </label>
           <label>
             <span>Age</span>
@@ -233,6 +310,8 @@ export const CandidateModal = ({ initialProfile, onSave, onDelete, onClose }: Ca
           </label>
         </div>
 
+        {formError && <div className={styles.formError}>{formError}</div>}
+
         <footer className={styles.footer}>
           <button className={styles.dangerButton} onClick={handleDelete} disabled={!initialProfile}>
             Delete profile
@@ -241,10 +320,10 @@ export const CandidateModal = ({ initialProfile, onSave, onDelete, onClose }: Ca
             <button className={styles.secondaryButton} onClick={onClose}>
               Cancel
             </button>
-            <button className={styles.secondaryButton} onClick={() => submitSave(false)}>
+            <button className={styles.secondaryButton} onClick={() => void submitSave(false)}>
               Save
             </button>
-            <button className={styles.primaryButton} onClick={() => submitSave(true)}>
+            <button className={styles.primaryButton} onClick={() => void submitSave(true)}>
               Save and close
             </button>
           </div>
