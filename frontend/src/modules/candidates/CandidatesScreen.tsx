@@ -5,6 +5,8 @@ import { CandidateCard } from './components/CandidateCard';
 import { useCandidatesState } from '../../app/state/AppStateContext';
 import { CandidateProfile } from '../../shared/types/candidate';
 
+type SortMode = 'updated' | 'name' | 'position';
+
 type Banner = { type: 'info' | 'error'; text: string } | null;
 
 export const CandidatesScreen = () => {
@@ -12,27 +14,81 @@ export const CandidatesScreen = () => {
   const [banner, setBanner] = useState<Banner>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalCandidate, setModalCandidate] = useState<CandidateProfile | null>(null);
+  const [modalBanner, setModalBanner] = useState<Banner>(null);
+  const [sortMode, setSortMode] = useState<SortMode>('updated');
 
   const sortedCandidates = useMemo(
-    () => [...list].sort((a, b) => `${a.lastName}${a.firstName}`.localeCompare(`${b.lastName}${b.firstName}`, 'en-US')),
-    [list]
+    () => {
+      const copy = [...list];
+      if (sortMode === 'name') {
+        return copy.sort((a, b) =>
+          `${a.lastName}${a.firstName}`.localeCompare(`${b.lastName}${b.firstName}`, 'en-US')
+        );
+      }
+      if (sortMode === 'position') {
+        return copy.sort((a, b) => {
+          const aPosition = a.desiredPosition?.toLowerCase() ?? '';
+          const bPosition = b.desiredPosition?.toLowerCase() ?? '';
+          if (aPosition && bPosition) {
+            const compare = aPosition.localeCompare(bPosition, 'en-US');
+            if (compare !== 0) {
+              return compare;
+            }
+          } else if (aPosition || bPosition) {
+            return aPosition ? -1 : 1;
+          }
+          return `${a.lastName}${a.firstName}`.localeCompare(`${b.lastName}${b.firstName}`, 'en-US');
+        });
+      }
+      return copy.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+    },
+    [list, sortMode]
   );
 
   const handleCreate = () => {
     setModalCandidate(null);
+    setModalBanner(null);
     setIsModalOpen(true);
   };
 
-  const handleSave = (profile: CandidateProfile, options: { closeAfterSave: boolean; expectedVersion: number | null }) => {
-    const result = saveProfile(profile, options.expectedVersion);
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setModalCandidate(null);
+    setModalBanner(null);
+  };
+
+  const handleSave = async (
+    profile: CandidateProfile,
+    options: { closeAfterSave: boolean; expectedVersion: number | null }
+  ) => {
+    setModalBanner(null);
+
+    const trimmedFirstName = profile.firstName.trim();
+    const trimmedLastName = profile.lastName.trim();
+
+    if (!trimmedFirstName || !trimmedLastName) {
+      setModalBanner({ type: 'error', text: 'Заполните обязательные поля: First name и Last name.' });
+      return;
+    }
+
+    const normalizedProfile: CandidateProfile = {
+      ...profile,
+      firstName: trimmedFirstName,
+      lastName: trimmedLastName
+    };
+
+    const result = await saveProfile(normalizedProfile, options.expectedVersion);
     if (!result.ok) {
       if (result.error === 'version-conflict') {
-        setBanner({
+        setModalBanner({
           type: 'error',
-          text: 'Changes not saved: the record was updated by another user. Refresh the page.'
+          text: 'Не удалось сохранить: карточку изменили в другой сессии. Обновите список и повторите.'
         });
       } else {
-        setBanner({ type: 'error', text: 'Check that all required fields are filled.' });
+        setModalBanner({
+          type: 'error',
+          text: 'Не удалось сохранить изменения. Проверьте обязательные поля и попробуйте снова.'
+        });
       }
       return;
     }
@@ -40,25 +96,25 @@ export const CandidatesScreen = () => {
     setBanner({ type: 'info', text: 'Candidate card saved.' });
 
     if (options.closeAfterSave) {
-      setIsModalOpen(false);
+      closeModal();
     } else {
       setModalCandidate(result.data);
+      setModalBanner({ type: 'info', text: 'Изменения сохранены.' });
     }
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     const confirmed = window.confirm('Delete the candidate card permanently?');
     if (!confirmed) {
       return;
     }
-    const result = removeProfile(id);
+    const result = await removeProfile(id);
     if (!result.ok) {
       setBanner({ type: 'error', text: 'Failed to delete the candidate.' });
       return;
     }
     setBanner({ type: 'info', text: 'Candidate card deleted.' });
-    setIsModalOpen(false);
-    setModalCandidate(null);
+    closeModal();
   };
 
   return (
@@ -68,9 +124,19 @@ export const CandidatesScreen = () => {
           <h1>Candidate database</h1>
           <p className={styles.subtitle}>Create and edit candidate profiles with AI assistance.</p>
         </div>
-        <button className={styles.primaryButton} onClick={handleCreate}>
-          Create profile
-        </button>
+        <div className={styles.actions}>
+          <label className={styles.sortControl}>
+            <span>Sort by</span>
+            <select value={sortMode} onChange={(event) => setSortMode(event.target.value as SortMode)}>
+              <option value="updated">Last change</option>
+              <option value="name">Last name</option>
+              <option value="position">Desired position</option>
+            </select>
+          </label>
+          <button className={styles.primaryButton} onClick={handleCreate}>
+            Create profile
+          </button>
+        </div>
       </header>
 
       {banner && (
@@ -90,6 +156,7 @@ export const CandidatesScreen = () => {
               profile={candidate}
               onOpen={() => {
                 setModalCandidate(candidate);
+                setModalBanner(null);
                 setIsModalOpen(true);
               }}
             />
@@ -100,9 +167,11 @@ export const CandidatesScreen = () => {
       {isModalOpen && (
         <CandidateModal
           initialProfile={modalCandidate}
-          onClose={() => setIsModalOpen(false)}
+          onClose={closeModal}
           onSave={handleSave}
           onDelete={handleDelete}
+          feedback={modalBanner}
+          onFeedbackClear={() => setModalBanner(null)}
         />
       )}
     </section>
