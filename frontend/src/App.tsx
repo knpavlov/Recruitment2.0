@@ -20,20 +20,29 @@ const AppContent = () => {
     }
   }, [session]);
 
+  const accessibleItems = useMemo(() => {
+    if (!session) {
+      return [];
+    }
+    return navigationItems.filter((item) => item.roleAccess.includes(session.role));
+  }, [session]);
+
+  useEffect(() => {
+    if (!session) {
+      return;
+    }
+    if (!accessibleItems.length) {
+      setActivePage('evaluation');
+      return;
+    }
+    if (!accessibleItems.find((item) => item.key === activePage)) {
+      setActivePage(accessibleItems[0].key);
+    }
+  }, [session, accessibleItems, activePage]);
+
   if (!session) {
     return <LoginScreen />;
   }
-
-  const accessibleItems = useMemo(
-    () => navigationItems.filter((item) => item.roleAccess.includes(session.role)),
-    [session.role]
-  );
-
-  useEffect(() => {
-    if (!accessibleItems.find((item) => item.key === activePage)) {
-      setActivePage(accessibleItems[0]?.key ?? 'evaluation');
-    }
-  }, [accessibleItems, activePage]);
 
   const renderContent = () => {
     switch (activePage) {
