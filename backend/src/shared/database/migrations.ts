@@ -70,8 +70,61 @@ const createTables = async () => {
       id UUID PRIMARY KEY,
       first_name TEXT NOT NULL,
       last_name TEXT NOT NULL,
+      gender TEXT,
+      age INTEGER,
+      city TEXT,
+      desired_position TEXT,
+      phone TEXT,
+      email TEXT,
+      experience_summary TEXT,
+      total_experience_years INTEGER,
+      consulting_experience_years INTEGER,
+      consulting_companies TEXT,
+      last_company TEXT,
+      last_position TEXT,
+      last_duration TEXT,
+      version INTEGER NOT NULL DEFAULT 1,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  await postgresPool.query(`
+    ALTER TABLE candidates
+      ADD COLUMN IF NOT EXISTS gender TEXT,
+      ADD COLUMN IF NOT EXISTS age INTEGER,
+      ADD COLUMN IF NOT EXISTS city TEXT,
+      ADD COLUMN IF NOT EXISTS desired_position TEXT,
+      ADD COLUMN IF NOT EXISTS phone TEXT,
+      ADD COLUMN IF NOT EXISTS email TEXT,
+      ADD COLUMN IF NOT EXISTS experience_summary TEXT,
+      ADD COLUMN IF NOT EXISTS total_experience_years INTEGER,
+      ADD COLUMN IF NOT EXISTS consulting_experience_years INTEGER,
+      ADD COLUMN IF NOT EXISTS consulting_companies TEXT,
+      ADD COLUMN IF NOT EXISTS last_company TEXT,
+      ADD COLUMN IF NOT EXISTS last_position TEXT,
+      ADD COLUMN IF NOT EXISTS last_duration TEXT,
+      ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1,
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+  `);
+
+  await postgresPool.query(`
+    CREATE TABLE IF NOT EXISTS candidate_resumes (
+      id UUID PRIMARY KEY,
+      candidate_id UUID NOT NULL REFERENCES candidates(id) ON DELETE CASCADE,
+      file_name TEXT NOT NULL,
+      mime_type TEXT NOT NULL,
+      file_size INTEGER NOT NULL,
+      data_url TEXT NOT NULL,
+      text_content TEXT,
+      uploaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+  `);
+
+  await postgresPool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS candidate_resumes_candidate_id_idx
+      ON candidate_resumes(candidate_id);
   `);
 
   await postgresPool.query(`
