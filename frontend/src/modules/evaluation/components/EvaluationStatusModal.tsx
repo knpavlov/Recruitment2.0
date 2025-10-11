@@ -17,29 +17,52 @@ export const EvaluationStatusModal = ({ evaluation, onClose }: EvaluationStatusM
           </button>
         </header>
         <div className={styles.statusContent}>
-          <p className={styles.statusIntro}>
-            This screen lists forms completed by interviewers. The backend can substitute live data later.
-          </p>
-          <ul className={styles.statusList}>
-            {evaluation.forms.map((form) => (
-              <li key={form.slotId} className={styles.statusRow}>
-                <div>
-                  <h3>{form.interviewerName}</h3>
-                  <p className={styles.statusMeta}>
-                    {form.submitted
-                      ? `Form received ${
-                          form.submittedAt ? new Date(form.submittedAt).toLocaleString('en-US') : ''
-                        }`
-                      : 'Awaiting form submission'}
-                  </p>
-                  {form.notes && <p className={styles.statusNotes}>{form.notes}</p>}
-                </div>
-                <span className={form.submitted ? styles.statusBadgeSuccess : styles.statusBadgePending}>
-                  {form.submitted ? 'Complete' : 'Pending'}
-                </span>
-              </li>
-            ))}
-          </ul>
+          {evaluation.forms.length === 0 ? (
+            <p className={styles.statusIntro}>No interview feedback has been captured yet.</p>
+          ) : (
+            <ul className={styles.statusList}>
+              {evaluation.forms.map((form) => {
+                const submittedLabel = form.submitted
+                  ? `Submitted ${
+                      form.submittedAt
+                        ? new Date(form.submittedAt).toLocaleString('en-GB', {
+                            hour12: false,
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })
+                        : ''
+                    }`
+                  : 'Waiting for submission';
+                const fitScore = form.fitScore != null ? form.fitScore : '—';
+                const caseScore = form.caseScore != null ? form.caseScore : '—';
+                return (
+                  <li key={form.slotId} className={styles.statusRow}>
+                    <div>
+                      <h3>{form.interviewerName}</h3>
+                      <p className={styles.statusMeta}>{submittedLabel}</p>
+                      <div className={styles.statusScores}>
+                        <span>Fit: {fitScore}</span>
+                        <span>Case: {caseScore}</span>
+                      </div>
+                      {form.fitNotes && (
+                        <p className={styles.statusNotes}>Fit notes: {form.fitNotes}</p>
+                      )}
+                      {form.caseNotes && (
+                        <p className={styles.statusNotes}>Case notes: {form.caseNotes}</p>
+                      )}
+                      {form.notes && <p className={styles.statusNotes}>General notes: {form.notes}</p>}
+                    </div>
+                    <span className={form.submitted ? styles.statusBadgeSuccess : styles.statusBadgePending}>
+                      {form.submitted ? 'Complete' : 'Pending'}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
       </div>
     </div>

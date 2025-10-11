@@ -1,5 +1,10 @@
 import { apiRequest } from '../../../shared/api/httpClient';
-import { EvaluationConfig, InterviewSlot, InterviewStatusRecord } from '../../../shared/types/evaluation';
+import {
+  EvaluationConfig,
+  EvaluationProcessStatus,
+  InterviewSlot,
+  InterviewStatusRecord
+} from '../../../shared/types/evaluation';
 
 const normalizeString = (value: unknown): string | undefined => {
   if (typeof value === 'string') {
@@ -36,6 +41,19 @@ const normalizeNumber = (value: unknown): number | undefined => {
 const normalizeBoolean = (value: unknown): boolean | undefined => {
   if (typeof value === 'boolean') {
     return value;
+  }
+  return undefined;
+};
+
+const normalizeScore = (value: unknown): number | undefined => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value);
+    if (!Number.isNaN(parsed)) {
+      return parsed;
+    }
   }
   return undefined;
 };
@@ -88,7 +106,11 @@ const normalizeForm = (value: unknown): InterviewStatusRecord | null => {
     interviewerName: normalizeString(payload.interviewerName) ?? 'Interviewer',
     submitted: normalizeBoolean(payload.submitted) ?? false,
     submittedAt: normalizeIsoString(payload.submittedAt),
-    notes: normalizeString(payload.notes) ?? undefined
+    notes: normalizeString(payload.notes) ?? undefined,
+    fitScore: normalizeScore(payload.fitScore),
+    caseScore: normalizeScore(payload.caseScore),
+    fitNotes: normalizeString(payload.fitNotes) ?? undefined,
+    caseNotes: normalizeString(payload.caseNotes) ?? undefined
   };
 };
 
@@ -108,6 +130,8 @@ const normalizeEvaluation = (value: unknown): EvaluationConfig | null => {
     createdAt?: unknown;
     updatedAt?: unknown;
     forms?: unknown;
+    processStatus?: unknown;
+    processStartedAt?: unknown;
   };
 
   const id = normalizeString(payload.id)?.trim();
@@ -141,7 +165,9 @@ const normalizeEvaluation = (value: unknown): EvaluationConfig | null => {
     version,
     createdAt,
     updatedAt,
-    forms
+    forms,
+    processStatus: (normalizeString(payload.processStatus) as EvaluationProcessStatus | undefined) ?? 'draft',
+    processStartedAt: normalizeIsoString(payload.processStartedAt)
   };
 };
 
@@ -195,6 +221,10 @@ export const evaluationsApi = {
         body: { config: serializeEvaluation(config), expectedVersion }
       })
     ),
+  start: async (id: string) =>
+    apiRequest<{ id: string }>(`/evaluations/${id}/start`, {
+      method: 'POST'
+    }),
   remove: async (id: string) =>
     apiRequest<{ id?: unknown }>(`/evaluations/${id}`, {
       method: 'DELETE'
