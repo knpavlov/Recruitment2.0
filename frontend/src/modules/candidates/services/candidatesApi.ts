@@ -1,5 +1,27 @@
 import { apiRequest } from '../../../shared/api/httpClient';
-import { CandidateProfile, CandidateResume } from '../../../shared/types/candidate';
+import {
+  CandidateProfile,
+  CandidateResume,
+  CandidateTargetPractice
+} from '../../../shared/types/candidate';
+
+const TARGET_PRACTICE_OPTIONS: CandidateTargetPractice[] = [
+  'PI',
+  'PEPI',
+  'ET',
+  'Tax',
+  'Restructuring'
+];
+
+const normalizePractice = (value: unknown): CandidateTargetPractice | undefined => {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return TARGET_PRACTICE_OPTIONS.includes(trimmed as CandidateTargetPractice)
+    ? (trimmed as CandidateTargetPractice)
+    : undefined;
+};
 
 const normalizeIso = (value: unknown): string | null => {
   if (typeof value === 'string') {
@@ -90,6 +112,8 @@ const normalizeCandidate = (value: unknown): CandidateProfile | null => {
     phone?: unknown;
     email?: unknown;
     experienceSummary?: unknown;
+    targetPractice?: unknown;
+    targetOffice?: unknown;
     totalExperienceYears?: unknown;
     consultingExperienceYears?: unknown;
     consultingCompanies?: unknown;
@@ -124,6 +148,8 @@ const normalizeCandidate = (value: unknown): CandidateProfile | null => {
     phone: normalizeString(payload.phone) ?? '',
     email: normalizeString(payload.email) ?? '',
     experienceSummary: normalizeString(payload.experienceSummary) ?? '',
+    targetPractice: normalizePractice(payload.targetPractice),
+    targetOffice: normalizeString(payload.targetOffice) ?? '',
     totalExperienceYears: normalizeNumber(payload.totalExperienceYears),
     consultingExperienceYears: normalizeNumber(payload.consultingExperienceYears),
     consultingCompanies: normalizeString(payload.consultingCompanies) ?? '',
@@ -159,6 +185,8 @@ const serializeCandidate = (profile: CandidateProfile) => ({
   age: profile.age ?? null,
   totalExperienceYears: profile.totalExperienceYears ?? null,
   consultingExperienceYears: profile.consultingExperienceYears ?? null,
+  targetPractice: profile.targetPractice ?? null,
+  targetOffice: profile.targetOffice ?? null,
   resume: profile.resume
     ? {
         ...profile.resume,

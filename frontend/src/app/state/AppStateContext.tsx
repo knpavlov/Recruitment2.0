@@ -9,6 +9,7 @@ import { casesApi } from '../../modules/cases/services/casesApi';
 import { candidatesApi } from '../../modules/candidates/services/candidatesApi';
 import { accountsApi } from '../../modules/accounts/services/accountsApi';
 import { fitQuestionsApi } from '../../modules/questions/services/fitQuestionsApi';
+import { evaluationsApi } from '../../modules/evaluation/services/evaluationsApi';
 import { ApiError } from '../../shared/api/httpClient';
 import { useAuth } from '../../modules/auth/AuthContext';
 
@@ -47,8 +48,11 @@ interface AppStateContextValue {
   };
   evaluations: {
     list: EvaluationConfig[];
-    saveEvaluation: (config: EvaluationConfig, expectedVersion: number | null) => DomainResult<EvaluationConfig>;
-    removeEvaluation: (id: string) => DomainResult<string>;
+    saveEvaluation: (
+      config: EvaluationConfig,
+      expectedVersion: number | null
+    ) => Promise<DomainResult<EvaluationConfig>>;
+    removeEvaluation: (id: string) => Promise<DomainResult<string>>;
   };
   accounts: {
     list: AccountRecord[];
@@ -61,12 +65,6 @@ interface AppStateContextValue {
 const AppStateContext = createContext<AppStateContextValue | null>(null);
 
 const nowIso = () => new Date().toISOString();
-
-const touchEvaluation = (config: EvaluationConfig, shouldIncrement = true): EvaluationConfig => ({
-  ...config,
-  version: shouldIncrement ? config.version + 1 : config.version,
-  updatedAt: nowIso()
-});
 
 export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [folders, setFolders] = useState<CaseFolder[]>([]);
@@ -132,6 +130,21 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       }
     };
     void loadCandidates();
+  }, [session]);
+
+  useEffect(() => {
+    if (!session) {
+      return;
+    }
+    const loadEvaluations = async () => {
+      try {
+        const remote = await evaluationsApi.list();
+        setEvaluations(remote);
+      } catch (error) {
+        console.error('Failed to load evaluations:', error);
+      }
+    };
+    void loadEvaluations();
   }, [session]);
 
   useEffect(() => {
@@ -413,35 +426,47 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     },
     evaluations: {
       list: evaluations,
-      saveEvaluation: (config, expectedVersion) => {
+      saveEvaluation: async (config, expectedVersion) => {
         if (!config.candidateId) {
           return { ok: false, error: 'invalid-input' };
         }
-        const exists = evaluations.find((item) => item.id === config.id);
-        if (!exists) {
-          const next: EvaluationConfig = {
-            ...config,
-            createdAt: nowIso(),
-            updatedAt: nowIso(),
-            version: 1
-          };
-          setEvaluations((prev) => [...prev, next]);
-          return { ok: true, data: next };
+        try {
+          if (expectedVersion === null) {
+            const created = await evaluationsApi.create(config);
+            setEvaluations((prev) => [...prev, created]);
+            return { ok: true, data: created };
+          }
+          const updated = await evaluationsApi.update(config.id, config, expectedVersion);
+          setEvaluations((prev) => prev.map((item) => (item.id === config.id ? updated : item)));
+          return { ok: true, data: updated };
+        } catch (error) {
+          if (error instanceof ApiError) {
+            if (error.code === 'version-conflict') {
+              return { ok: false, error: 'version-conflict' };
+            }
+            if (error.code === 'invalid-input') {
+              return { ok: false, error: 'invalid-input' };
+            }
+            if (error.code === 'not-found') {
+              return { ok: false, error: 'not-found' };
+            }
+          }
+          console.error('Failed to save evaluation:', error);
+          return { ok: false, error: 'unknown' };
         }
-        if (expectedVersion === null || exists.version !== expectedVersion) {
-          return { ok: false, error: 'version-conflict' };
-        }
-        const next = touchEvaluation(config);
-        setEvaluations((prev) => prev.map((item) => (item.id === config.id ? next : item)));
-        return { ok: true, data: next };
       },
-      removeEvaluation: (id) => {
-        const exists = evaluations.some((item) => item.id === id);
-        if (!exists) {
-          return { ok: false, error: 'not-found' };
+      removeEvaluation: async (id) => {
+        try {
+          await evaluationsApi.remove(id);
+          setEvaluations((prev) => prev.filter((item) => item.id !== id));
+          return { ok: true, data: id };
+        } catch (error) {
+          if (error instanceof ApiError && error.code === 'not-found') {
+            return { ok: false, error: 'not-found' };
+          }
+          console.error('Failed to delete evaluation:', error);
+          return { ok: false, error: 'unknown' };
         }
-        setEvaluations((prev) => prev.filter((item) => item.id !== id));
-        return { ok: true, data: id };
       }
     },
     accounts: {

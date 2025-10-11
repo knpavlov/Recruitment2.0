@@ -17,6 +17,8 @@ export interface CandidateRecord {
   age?: number;
   city?: string;
   desiredPosition?: string;
+  targetPractice?: string;
+  targetOffice?: string;
   phone?: string;
   email?: string;
   experienceSummary?: string;
@@ -39,6 +41,8 @@ export interface CandidateWriteModel {
   age?: number;
   city?: string;
   desiredPosition?: string;
+  targetPractice?: string;
+  targetOffice?: string;
   phone?: string;
   email?: string;
   experienceSummary?: string;

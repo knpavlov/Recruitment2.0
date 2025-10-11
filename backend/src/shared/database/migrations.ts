@@ -74,6 +74,8 @@ const createTables = async () => {
       age INTEGER,
       city TEXT,
       desired_position TEXT,
+      target_practice TEXT,
+      target_office TEXT,
       phone TEXT,
       email TEXT,
       experience_summary TEXT,
@@ -95,6 +97,8 @@ const createTables = async () => {
       ADD COLUMN IF NOT EXISTS age INTEGER,
       ADD COLUMN IF NOT EXISTS city TEXT,
       ADD COLUMN IF NOT EXISTS desired_position TEXT,
+      ADD COLUMN IF NOT EXISTS target_practice TEXT,
+      ADD COLUMN IF NOT EXISTS target_office TEXT,
       ADD COLUMN IF NOT EXISTS phone TEXT,
       ADD COLUMN IF NOT EXISTS email TEXT,
       ADD COLUMN IF NOT EXISTS experience_summary TEXT,
@@ -132,8 +136,24 @@ const createTables = async () => {
       id UUID PRIMARY KEY,
       candidate_id UUID REFERENCES candidates(id) ON DELETE SET NULL,
       round_number INTEGER,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      interview_count INTEGER NOT NULL DEFAULT 0,
+      interviews JSONB NOT NULL DEFAULT '[]'::JSONB,
+      fit_question_id UUID,
+      version INTEGER NOT NULL DEFAULT 1,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      forms JSONB NOT NULL DEFAULT '[]'::JSONB
     );
+  `);
+
+  await postgresPool.query(`
+    ALTER TABLE evaluations
+      ADD COLUMN IF NOT EXISTS interview_count INTEGER NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS interviews JSONB NOT NULL DEFAULT '[]'::JSONB,
+      ADD COLUMN IF NOT EXISTS fit_question_id UUID,
+      ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1,
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      ADD COLUMN IF NOT EXISTS forms JSONB NOT NULL DEFAULT '[]'::JSONB;
   `);
 
   await postgresPool.query(`
