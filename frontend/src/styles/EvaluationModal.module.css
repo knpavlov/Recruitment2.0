@@ -46,6 +46,51 @@
   gap: 16px;
 }
 
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.toolbarTitle {
+  margin: 0;
+  font-size: 18px;
+  color: #0f172a;
+}
+
+.toolbarActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.toolbarPrimaryButton,
+.toolbarSecondaryButton {
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  padding: 10px 18px;
+  font-size: 14px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.toolbarPrimaryButton {
+  background: linear-gradient(135deg, #38bdf8, #818cf8);
+  color: #ffffff;
+}
+
+.toolbarSecondaryButton {
+  background: rgba(148, 163, 184, 0.2);
+  color: #0f172a;
+}
+
+.toolbarPrimaryButton:hover,
+.toolbarSecondaryButton:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.15);
+}
+
 .statusContent {
   padding: 24px 32px 32px 32px;
   display: flex;
@@ -89,9 +134,36 @@
   gap: 16px;
 }
 
-.interviewBlock h3 {
-  margin: 0;
+.interviewHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
   grid-column: 1 / -1;
+}
+
+.interviewHeader h3 {
+  margin: 0;
+}
+
+.removeInterviewButton {
+  border: none;
+  background: transparent;
+  color: #ef4444;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 8px;
+  transition: background 0.2s ease;
+}
+
+.removeInterviewButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.removeInterviewButton:not(:disabled):hover {
+  background: rgba(248, 113, 113, 0.15);
 }
 
 .footer {
