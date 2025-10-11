@@ -7,6 +7,17 @@ interface CandidateCardProps {
 }
 
 export const CandidateCard = ({ profile, onOpen }: CandidateCardProps) => {
+  const formatUpdatedAt = (value: string) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return 'Last updated recently';
+    }
+    return `Last updated on ${date.toLocaleString('en-US', {
+      dateStyle: 'medium',
+      timeStyle: 'short'
+    })}`;
+  };
+
   return (
     <button className={styles.card} onClick={onOpen}>
       <h3>
@@ -14,7 +25,7 @@ export const CandidateCard = ({ profile, onOpen }: CandidateCardProps) => {
       </h3>
       <p className={styles.meta}>{profile.city || 'City not specified'}</p>
       <p className={styles.position}>{profile.desiredPosition || 'Position not specified'}</p>
-      {profile.resume && <p className={styles.resume}>Resume uploaded ({profile.resume.fileName})</p>}
+      <p className={styles.timestamp}>{formatUpdatedAt(profile.updatedAt)}</p>
     </button>
   );
 };

@@ -28,10 +28,10 @@
   color: #2563eb;
 }
 
-.resume {
+.timestamp {
   margin: 0;
   font-size: 13px;
-  color: #0f172a;
+  color: #64748b;
 }
 
 .card:hover {

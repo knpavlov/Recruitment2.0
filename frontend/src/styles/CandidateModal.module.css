@@ -60,10 +60,16 @@
   flex-wrap: wrap;
 }
 
-.resumeName {
+.resumeLink {
   margin: 0 0 8px;
   font-weight: 600;
   color: #0f172a;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.resumeLink:hover {
+  text-decoration: underline;
 }
 
 .resumeMeta {

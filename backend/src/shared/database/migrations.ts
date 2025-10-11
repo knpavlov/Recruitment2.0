@@ -70,8 +70,56 @@ const createTables = async () => {
       id UUID PRIMARY KEY,
       first_name TEXT NOT NULL,
       last_name TEXT NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      gender TEXT,
+      age INTEGER,
+      city TEXT,
+      desired_position TEXT,
+      phone TEXT,
+      email TEXT,
+      experience_summary TEXT,
+      total_experience_years INTEGER,
+      consulting_experience_years INTEGER,
+      consulting_companies TEXT,
+      last_company TEXT,
+      last_position TEXT,
+      last_duration TEXT,
+      resume_id TEXT,
+      resume_file_name TEXT,
+      resume_mime_type TEXT,
+      resume_size INTEGER,
+      resume_data_url TEXT,
+      resume_uploaded_at TIMESTAMPTZ,
+      resume_text_content TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      version INTEGER NOT NULL DEFAULT 1
     );
+  `);
+
+  await postgresPool.query(`
+    ALTER TABLE candidates
+      ADD COLUMN IF NOT EXISTS gender TEXT,
+      ADD COLUMN IF NOT EXISTS age INTEGER,
+      ADD COLUMN IF NOT EXISTS city TEXT,
+      ADD COLUMN IF NOT EXISTS desired_position TEXT,
+      ADD COLUMN IF NOT EXISTS phone TEXT,
+      ADD COLUMN IF NOT EXISTS email TEXT,
+      ADD COLUMN IF NOT EXISTS experience_summary TEXT,
+      ADD COLUMN IF NOT EXISTS total_experience_years INTEGER,
+      ADD COLUMN IF NOT EXISTS consulting_experience_years INTEGER,
+      ADD COLUMN IF NOT EXISTS consulting_companies TEXT,
+      ADD COLUMN IF NOT EXISTS last_company TEXT,
+      ADD COLUMN IF NOT EXISTS last_position TEXT,
+      ADD COLUMN IF NOT EXISTS last_duration TEXT,
+      ADD COLUMN IF NOT EXISTS resume_id TEXT,
+      ADD COLUMN IF NOT EXISTS resume_file_name TEXT,
+      ADD COLUMN IF NOT EXISTS resume_mime_type TEXT,
+      ADD COLUMN IF NOT EXISTS resume_size INTEGER,
+      ADD COLUMN IF NOT EXISTS resume_data_url TEXT,
+      ADD COLUMN IF NOT EXISTS resume_uploaded_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS resume_text_content TEXT,
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1;
   `);
 
   await postgresPool.query(`
