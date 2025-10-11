@@ -119,13 +119,21 @@ export const EvaluationScreen = () => {
     });
   };
 
-  const handleSave = (evaluation: EvaluationConfig, options: { closeAfterSave: boolean; expectedVersion: number | null }) => {
-    const result = saveEvaluation(evaluation, options.expectedVersion);
+  const handleSave = async (
+    evaluation: EvaluationConfig,
+    options: { closeAfterSave: boolean; expectedVersion: number | null }
+  ) => {
+    const result = await saveEvaluation(evaluation, options.expectedVersion);
     if (!result.ok) {
       if (result.error === 'version-conflict') {
         setBanner({
           type: 'error',
           text: 'Version conflict. Refresh the page to view the latest data.'
+        });
+      } else if (result.error === 'not-found') {
+        setBanner({
+          type: 'error',
+          text: 'Evaluation no longer exists. Refresh the list to continue.'
         });
       } else {
         setBanner({
@@ -145,12 +153,12 @@ export const EvaluationScreen = () => {
     }
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     const confirmed = window.confirm('Delete the evaluation setup and all related interviews?');
     if (!confirmed) {
       return;
     }
-    const result = removeEvaluation(id);
+    const result = await removeEvaluation(id);
     if (!result.ok) {
       setBanner({ type: 'error', text: 'Failed to delete the evaluation.' });
       return;

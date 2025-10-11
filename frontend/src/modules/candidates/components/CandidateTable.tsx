@@ -7,6 +7,8 @@ export type CandidateSortKey =
   | 'age'
   | 'city'
   | 'desiredPosition'
+  | 'targetPractice'
+  | 'targetOffice'
   | 'phone'
   | 'email'
   | 'totalExperience'
@@ -20,6 +22,8 @@ export interface CandidateTableRow {
   age: string;
   city: string;
   desiredPosition: string;
+  targetPractice: string;
+  targetOffice: string;
   phone: string;
   email: string;
   totalExperience: string;
@@ -51,6 +55,8 @@ const SORTABLE_COLUMNS: Array<{ key: CandidateSortKey; title: string }> = [
   { key: 'age', title: 'Age' },
   { key: 'city', title: 'City' },
   { key: 'desiredPosition', title: 'Desired position' },
+  { key: 'targetPractice', title: 'Target practice' },
+  { key: 'targetOffice', title: 'Target office' },
   { key: 'phone', title: 'Phone' },
   { key: 'email', title: 'Email' },
   { key: 'totalExperience', title: 'Total experience' },
@@ -104,6 +110,8 @@ export const CandidateTable = ({ rows, sortDirection, sortKey, onSortChange }: C
               <td>{row.age}</td>
               <td>{row.city}</td>
               <td>{row.desiredPosition}</td>
+              <td>{row.targetPractice}</td>
+              <td>{row.targetOffice}</td>
               <td>{row.phone}</td>
               <td>{row.email}</td>
               <td>{row.totalExperience}</td>

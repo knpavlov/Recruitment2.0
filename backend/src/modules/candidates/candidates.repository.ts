@@ -10,6 +10,8 @@ interface CandidateJoinedRow extends Record<string, unknown> {
   age: number | null;
   city: string | null;
   desired_position: string | null;
+  target_practice: string | null;
+  target_office: string | null;
   phone: string | null;
   email: string | null;
   experience_summary: string | null;
@@ -39,6 +41,8 @@ const selectCandidateBase = `
          c.age,
          c.city,
          c.desired_position,
+         c.target_practice,
+         c.target_office,
          c.phone,
          c.email,
          c.experience_summary,
@@ -101,6 +105,8 @@ const mapRowToCandidate = (row: CandidateJoinedRow): CandidateRecord => {
     age: toOptionalNumber(row.age),
     city: toOptionalString(row.city),
     desiredPosition: toOptionalString(row.desired_position),
+    targetPractice: toOptionalString(row.target_practice),
+    targetOffice: toOptionalString(row.target_office),
     phone: toOptionalString(row.phone),
     email: toOptionalString(row.email),
     experienceSummary: toOptionalString(row.experience_summary),
@@ -198,6 +204,8 @@ export class CandidatesRepository {
             city,
             desired_position,
             phone,
+            target_practice,
+            target_office,
             email,
             experience_summary,
             total_experience_years,
@@ -212,7 +220,7 @@ export class CandidatesRepository {
          )
          VALUES (
             $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-            $11, $12, $13, $14, $15, $16, 1, NOW(), NOW()
+            $11, $12, $13, $14, $15, $16, $17, $18, 1, NOW(), NOW()
          );`,
         [
           model.id,
@@ -222,6 +230,8 @@ export class CandidatesRepository {
           toNullableNumber(model.age),
           toNullableString(model.city),
           toNullableString(model.desiredPosition),
+          toNullableString(model.targetPractice),
+          toNullableString(model.targetOffice),
           toNullableString(model.phone),
           toNullableString(model.email),
           toNullableString(model.experienceSummary),
@@ -265,17 +275,19 @@ export class CandidatesRepository {
                 city = $5,
                 desired_position = $6,
                 phone = $7,
-                email = $8,
-                experience_summary = $9,
-                total_experience_years = $10,
-                consulting_experience_years = $11,
-                consulting_companies = $12,
-                last_company = $13,
-                last_position = $14,
-                last_duration = $15,
+                target_practice = $8,
+                target_office = $9,
+                email = $10,
+                experience_summary = $11,
+                total_experience_years = $12,
+                consulting_experience_years = $13,
+                consulting_companies = $14,
+                last_company = $15,
+                last_position = $16,
+                last_duration = $17,
                 version = version + 1,
                 updated_at = NOW()
-          WHERE id = $16 AND version = $17
+          WHERE id = $18 AND version = $19
           RETURNING id;`,
         [
           model.firstName,
@@ -285,6 +297,8 @@ export class CandidatesRepository {
           toNullableString(model.city),
           toNullableString(model.desiredPosition),
           toNullableString(model.phone),
+          toNullableString(model.targetPractice),
+          toNullableString(model.targetOffice),
           toNullableString(model.email),
           toNullableString(model.experienceSummary),
           toNullableNumber(model.totalExperienceYears),

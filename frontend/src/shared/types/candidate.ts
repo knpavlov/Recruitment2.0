@@ -8,6 +8,8 @@ export interface CandidateResume {
   textContent?: string;
 }
 
+export type CandidateTargetPractice = 'PI' | 'PEPI' | 'ET' | 'Tax' | 'Restructuring';
+
 export interface CandidateProfile {
   id: string;
   version: number;
@@ -17,6 +19,8 @@ export interface CandidateProfile {
   age?: number;
   city?: string;
   desiredPosition?: string;
+  targetPractice?: CandidateTargetPractice;
+  targetOffice?: string;
   phone?: string;
   email?: string;
   experienceSummary?: string;

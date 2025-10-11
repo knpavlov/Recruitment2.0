@@ -86,6 +86,12 @@ export const CandidatesScreen = () => {
         case 'desiredPosition':
           result = compareStrings(a.desiredPosition, b.desiredPosition);
           break;
+        case 'targetPractice':
+          result = compareStrings(a.targetPractice, b.targetPractice);
+          break;
+        case 'targetOffice':
+          result = compareStrings(a.targetOffice, b.targetOffice);
+          break;
         case 'phone':
           result = compareStrings(a.phone, b.phone);
           break;
@@ -175,6 +181,8 @@ export const CandidatesScreen = () => {
           age: candidate.age != null ? String(candidate.age) : '—',
           city: formatText(candidate.city),
           desiredPosition: formatText(candidate.desiredPosition),
+          targetPractice: formatText(candidate.targetPractice),
+          targetOffice: formatText(candidate.targetOffice),
           phone: formatText(candidate.phone),
           email: formatText(candidate.email),
           totalExperience: formatExperience(candidate.totalExperienceYears),

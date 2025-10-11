@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { CandidateProfile, CandidateResume } from '../../../shared/types/candidate';
+import {
+  CandidateProfile,
+  CandidateResume,
+  CandidateTargetPractice
+} from '../../../shared/types/candidate';
 import styles from '../../../styles/CandidateModal.module.css';
 import { generateId } from '../../../shared/ui/generateId';
 import { convertFileToResume } from '../services/resumeAdapter';
@@ -17,6 +21,14 @@ interface CandidateModalProps {
   onFeedbackClear: () => void;
 }
 
+const TARGET_PRACTICE_OPTIONS: CandidateTargetPractice[] = [
+  'PI',
+  'PEPI',
+  'ET',
+  'Tax',
+  'Restructuring'
+];
+
 const createEmptyProfile = (): CandidateProfile => ({
   id: generateId(),
   version: 1,
@@ -26,6 +38,8 @@ const createEmptyProfile = (): CandidateProfile => ({
   age: undefined,
   city: '',
   desiredPosition: '',
+  targetPractice: undefined,
+  targetOffice: '',
   phone: '',
   email: '',
   experienceSummary: '',
@@ -54,7 +68,7 @@ export const CandidateModal = ({
 
   useEffect(() => {
     if (initialProfile) {
-      setProfile(initialProfile);
+      setProfile({ ...initialProfile, targetOffice: initialProfile.targetOffice ?? '' });
       setResume(initialProfile.resume);
     } else {
       const empty = createEmptyProfile();
@@ -243,6 +257,26 @@ export const CandidateModal = ({
           <label>
             <span>Desired position</span>
             <input value={profile.desiredPosition} onChange={(e) => handleChange('desiredPosition', e.target.value)} />
+          </label>
+          <label>
+            <span>Target practice</span>
+            <select
+              value={profile.targetPractice ?? ''}
+              onChange={(e) =>
+                handleChange('targetPractice', e.target.value ? (e.target.value as CandidateTargetPractice) : undefined)
+              }
+            >
+              <option value="">Not selected</option>
+              {TARGET_PRACTICE_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>Target office</span>
+            <input value={profile.targetOffice} onChange={(e) => handleChange('targetOffice', e.target.value)} />
           </label>
           <label>
             <span>Phone</span>

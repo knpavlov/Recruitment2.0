@@ -70,7 +70,7 @@ export const CaseFolderCard = ({ folder, onRename, onDelete, onUpload, onRemoveF
           {Math.round(file.size / 1024)} KB · {new Date(file.uploadedAt).toLocaleString('en-US')}
         </p>
       </div>
-      <div className={styles.fileActionsStack}>
+      <div className={styles.fileActionsInline}>
         <a className={styles.secondaryButton} href={file.dataUrl} download={file.fileName}>
           Download
         </a>
@@ -94,61 +94,29 @@ export const CaseFolderCard = ({ folder, onRename, onDelete, onUpload, onRemoveF
   return (
     <div className={styles.folderCard}>
       <header className={styles.folderHeader}>
-        <div>
-          <h3>{folder.name}</h3>
-          <p className={styles.folderId}>ID: {folder.id}</p>
-        </div>
-      </header>
-
-      <div
-        className={styles.dropZone}
-        onDragOver={(event) => {
-          event.preventDefault();
-        }}
-        onDrop={handleDrop}
-      >
-        <p>Drag files here or upload manually</p>
-        <button className={styles.secondaryButton} onClick={() => fileInputRef.current?.click()}>
-          Select files
-        </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          className={styles.hiddenInput}
-          onChange={handleManualUpload}
-        />
-      </div>
-
-      {folder.files.length === 0 ? (
-        <div className={styles.emptyFiles}>The folder is empty. Upload cases to activate it.</div>
-      ) : (
-        <ul className={styles.filesList}>{folder.files.map(renderFile)}</ul>
-      )}
-
-      <footer className={styles.folderFooter}>
-        <div className={styles.folderActionsSection}>
-          {isEditingName ? (
-            <div className={styles.renameRow}>
-              <input value={draftName} onChange={(event) => setDraftName(event.target.value)} />
-              <div className={styles.renameButtons}>
-                <button className={styles.primaryButton} onClick={submitRename}>
-                  Save
-                </button>
-                <button
-                  className={styles.secondaryButton}
-                  onClick={() => {
-                    setIsEditingName(false);
-                    setDraftName(folder.name);
-                    setError(null);
-                  }}
-                >
-                  Cancel
-                </button>
-              </div>
+        {isEditingName ? (
+          <div className={styles.titleEdit}>
+            <input value={draftName} onChange={(event) => setDraftName(event.target.value)} />
+            <div className={styles.titleActions}>
+              <button className={styles.primaryButton} onClick={() => void submitRename()}>
+                Save
+              </button>
+              <button
+                className={styles.secondaryButton}
+                onClick={() => {
+                  setIsEditingName(false);
+                  setDraftName(folder.name);
+                  setError(null);
+                }}
+              >
+                Cancel
+              </button>
             </div>
-          ) : (
-            <div className={styles.folderActionsBar}>
+          </div>
+        ) : (
+          <>
+            <h3 className={styles.folderTitle}>{folder.name}</h3>
+            <div className={styles.folderHeaderActions}>
               <button
                 className={styles.secondaryButton}
                 onClick={() => {
@@ -177,13 +145,40 @@ export const CaseFolderCard = ({ folder, onRename, onDelete, onUpload, onRemoveF
                 Delete
               </button>
             </div>
-          )}
-        </div>
-        <div className={styles.folderMeta}>
-          <span>Updated: {new Date(folder.updatedAt).toLocaleString('en-US')}</span>
-          <span>Version: {folder.version}</span>
-        </div>
-      </footer>
+          </>
+        )}
+      </header>
+
+      <div className={styles.folderMetaRow}>
+        <span>Updated: {new Date(folder.updatedAt).toLocaleString('en-US')}</span>
+        <span>Version: {folder.version}</span>
+      </div>
+
+      <div
+        className={styles.dropZone}
+        onDragOver={(event) => {
+          event.preventDefault();
+        }}
+        onDrop={handleDrop}
+      >
+        <p>Drag files here or upload manually</p>
+        <button className={styles.secondaryButton} onClick={() => fileInputRef.current?.click()}>
+          Select files
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          className={styles.hiddenInput}
+          onChange={handleManualUpload}
+        />
+      </div>
+
+      {folder.files.length === 0 ? (
+        <div className={styles.emptyFiles}>The folder is empty. Upload cases to activate it.</div>
+      ) : (
+        <ul className={styles.filesList}>{folder.files.map(renderFile)}</ul>
+      )}
 
       {error && <p className={styles.error}>{error}</p>}
     </div>
