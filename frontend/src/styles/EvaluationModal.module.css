@@ -79,6 +79,34 @@
   gap: 16px;
 }
 
+.toolsRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 16px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.toolsRow h3 {
+  margin: 0 0 4px;
+  color: #0f172a;
+}
+
+.toolsDescription {
+  margin: 0;
+  font-size: 14px;
+  color: #64748b;
+}
+
+.toolsButtons {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .interviewBlock {
   padding: 16px;
   border-radius: 16px;
@@ -89,9 +117,30 @@
   gap: 16px;
 }
 
-.interviewBlock h3 {
-  margin: 0;
+.blockHeader {
   grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.blockHeader h3 {
+  margin: 0;
+}
+
+.removeButton {
+  border: none;
+  background: rgba(248, 113, 113, 0.15);
+  color: #b91c1c;
+  padding: 6px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.removeButton:hover {
+  transform: translateY(-1px);
 }
 
 .footer {

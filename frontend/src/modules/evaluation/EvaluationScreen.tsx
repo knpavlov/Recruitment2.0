@@ -3,7 +3,12 @@ import styles from '../../styles/EvaluationScreen.module.css';
 import { EvaluationModal } from './components/EvaluationModal';
 import { EvaluationCard } from './components/EvaluationCard';
 import { EvaluationStatusModal } from './components/EvaluationStatusModal';
-import { useEvaluationsState, useCandidatesState, useCasesState } from '../../app/state/AppStateContext';
+import {
+  useEvaluationsState,
+  useCandidatesState,
+  useCasesState,
+  useFitQuestionsState
+} from '../../app/state/AppStateContext';
 import { EvaluationConfig } from '../../shared/types/evaluation';
 
 type Banner = { type: 'info' | 'error'; text: string } | null;
@@ -12,6 +17,7 @@ export const EvaluationScreen = () => {
   const { list, saveEvaluation, removeEvaluation } = useEvaluationsState();
   const { list: candidates } = useCandidatesState();
   const { folders } = useCasesState();
+  const { list: fitQuestions } = useFitQuestionsState();
   const [banner, setBanner] = useState<Banner>(null);
   const [modalEvaluation, setModalEvaluation] = useState<EvaluationConfig | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -120,6 +126,7 @@ export const EvaluationScreen = () => {
           onDelete={handleDelete}
           candidates={candidates}
           folders={folders}
+          fitQuestions={fitQuestions}
         />
       )}
 

@@ -10,13 +10,20 @@ interface EvaluationCardProps {
 
 export const EvaluationCard = ({ evaluation, candidateName, onEdit, onOpenStatus }: EvaluationCardProps) => {
   const completedForms = evaluation.forms.filter((form) => form.submitted).length;
+  const displayedCandidate = candidateName || 'Not selected';
+  const roundLabel = evaluation.roundNumber ? `Round ${evaluation.roundNumber}` : 'Round not set';
+  const formsLabel = `Forms: ${completedForms}/${evaluation.interviewCount}`;
+  const avgFitPlaceholder = 'Avg fit: —';
+  const avgCasePlaceholder = 'Avg case: —';
   return (
     <div className={styles.card}>
       <div>
-        <h3>Evaluation #{evaluation.id.slice(0, 6)}</h3>
-        <p className={styles.meta}>Candidate: {candidateName}</p>
+        <h3>
+          {displayedCandidate} · {roundLabel}
+        </h3>
+        <p className={styles.meta}>{formsLabel}</p>
         <p className={styles.meta}>
-          Interviews: {evaluation.interviewCount} · Forms: {completedForms}/{evaluation.interviewCount}
+          {avgFitPlaceholder} · {avgCasePlaceholder}
         </p>
       </div>
       <div className={styles.actions}>
