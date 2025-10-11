@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import { postgresPool } from './postgres.client.js';
 
-const SUPER_ADMIN_EMAIL = process.env.SUPER_ADMIN_EMAIL ?? 'super.admin@company.com';
+const SUPER_ADMIN_EMAIL = process.env.SUPER_ADMIN_EMAIL ?? 'knpavlov@gmail.com';
 
 const connectClient = async () =>
   (postgresPool as unknown as { connect: () => Promise<any> }).connect();

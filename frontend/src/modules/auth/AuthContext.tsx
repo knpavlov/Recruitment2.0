@@ -5,6 +5,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState
 } from 'react';
 import { AccountRole } from '../../shared/types/account';
@@ -16,6 +17,7 @@ export interface AuthSession {
   email: string;
   role: AccountRole;
   expiresAt: number;
+  persistence: 'local' | 'session';
 }
 
 export type RequestCodeError = 'not-found' | 'forbidden' | 'mailer-unavailable' | 'unknown';
@@ -58,58 +60,82 @@ const SESSION_STORAGE_KEY = 'recruitment:session';
 const LAST_EMAIL_KEY = 'recruitment:last-email';
 const LONG_SESSION_MS = 30 * 24 * 60 * 60 * 1000;
 const SHORT_SESSION_MS = 12 * 60 * 60 * 1000;
+const SESSION_CHECK_INTERVAL_MS = 30 * 1000;
+
+const isRole = (value: unknown): value is AccountRole =>
+  value === 'super-admin' || value === 'admin' || value === 'user';
 
 const isBrowserEnvironment = () => typeof window !== 'undefined';
+
+const parseStoredSession = (raw: string, fallbackPersistence: AuthSession['persistence']): AuthSession | null => {
+  try {
+    const parsed = JSON.parse(raw) as Partial<AuthSession> | null;
+    if (!parsed || typeof parsed !== 'object') {
+      return null;
+    }
+
+    const token = typeof parsed.token === 'string' && parsed.token.trim() ? parsed.token : null;
+    const email = typeof parsed.email === 'string' && parsed.email.trim() ? parsed.email.trim().toLowerCase() : null;
+    const role = isRole(parsed.role) ? parsed.role : null;
+    const expiresAt = typeof parsed.expiresAt === 'number' && Number.isFinite(parsed.expiresAt)
+      ? parsed.expiresAt
+      : null;
+    const persistence = parsed.persistence === 'local' || parsed.persistence === 'session'
+      ? parsed.persistence
+      : fallbackPersistence;
+
+    if (!token || !email || !role || !expiresAt) {
+      return null;
+    }
+
+    return { token, email, role, expiresAt, persistence };
+  } catch (error) {
+    console.warn('Failed to parse persisted session:', error);
+    return null;
+  }
+};
 
 const readStoredSession = (): AuthSession | null => {
   if (!isBrowserEnvironment()) {
     return null;
   }
 
-  const storages: Storage[] = [window.localStorage, window.sessionStorage];
+  const storages: Array<{ storage: Storage; persistence: AuthSession['persistence'] }> = [
+    { storage: window.localStorage, persistence: 'local' },
+    { storage: window.sessionStorage, persistence: 'session' }
+  ];
 
-  for (const storage of storages) {
+  for (const { storage, persistence } of storages) {
     const raw = storage.getItem(SESSION_STORAGE_KEY);
     if (!raw) {
       continue;
     }
 
-    try {
-      const parsed = JSON.parse(raw) as Partial<AuthSession> | null;
-      if (
-        !parsed ||
-        typeof parsed.token !== 'string' ||
-        typeof parsed.email !== 'string' ||
-        typeof parsed.role !== 'string' ||
-        typeof parsed.expiresAt !== 'number'
-      ) {
-        storage.removeItem(SESSION_STORAGE_KEY);
-        continue;
-      }
-
-      if (parsed.expiresAt <= Date.now()) {
-        storage.removeItem(SESSION_STORAGE_KEY);
-        continue;
-      }
-
-      return parsed as AuthSession;
-    } catch (error) {
-      console.warn('Failed to parse persisted session:', error);
+    const parsed = parseStoredSession(raw, persistence);
+    if (!parsed) {
       storage.removeItem(SESSION_STORAGE_KEY);
+      continue;
     }
+
+    if (parsed.expiresAt <= Date.now()) {
+      storage.removeItem(SESSION_STORAGE_KEY);
+      continue;
+    }
+
+    return parsed;
   }
 
   return null;
 };
 
-const persistSession = (session: AuthSession, remember: boolean) => {
+const persistSession = (session: AuthSession) => {
   if (!isBrowserEnvironment()) {
     return;
   }
 
   const payload = JSON.stringify(session);
-  const primary = remember ? window.localStorage : window.sessionStorage;
-  const secondary = remember ? window.sessionStorage : window.localStorage;
+  const primary = session.persistence === 'local' ? window.localStorage : window.sessionStorage;
+  const secondary = session.persistence === 'local' ? window.sessionStorage : window.localStorage;
 
   primary.setItem(SESSION_STORAGE_KEY, payload);
   secondary.removeItem(SESSION_STORAGE_KEY);
@@ -143,6 +169,11 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<AuthSession | null>(() => readStoredSession());
   const [lastEmail, setLastEmail] = useState<string | null>(() => readLastEmail());
+  const sessionRef = useRef<AuthSession | null>(session);
+
+  useEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
 
   const rememberEmail = useCallback((email: string) => {
     const normalized = email.trim().toLowerCase();
@@ -186,16 +217,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       try {
         const response = await authApi.verifyCode(normalizedEmail, trimmedCode);
-        const expiresAt = Date.now() + (remember ? LONG_SESSION_MS : SHORT_SESSION_MS);
+        const persistence: AuthSession['persistence'] = remember ? 'local' : 'session';
+        const now = Date.now();
+        const ttl = persistence === 'local' ? LONG_SESSION_MS : SHORT_SESSION_MS;
+        const computedExpiresAt = now + ttl;
+        const expiresAt = Number.isFinite(computedExpiresAt) && computedExpiresAt > now
+          ? computedExpiresAt
+          : now + SHORT_SESSION_MS;
+        const normalizedResponseEmail = response.email.trim().toLowerCase();
         const nextSession: AuthSession = {
           token: response.token,
-          email: response.email,
+          email: normalizedResponseEmail,
           role: response.role,
-          expiresAt
+          expiresAt,
+          persistence
         };
         setSession(nextSession);
-        persistSession(nextSession, remember);
-        rememberEmail(response.email);
+        persistSession(nextSession);
+        rememberEmail(normalizedResponseEmail);
         return { ok: true, session: nextSession };
       } catch (error) {
         if (error instanceof ApiError) {
@@ -223,18 +262,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    const remaining = session.expiresAt - Date.now();
-    if (remaining <= 0) {
-      logout();
-      return;
-    }
+    const checkExpiration = () => {
+      const current = sessionRef.current;
+      if (!current) {
+        return;
+      }
+      if (current.expiresAt <= Date.now()) {
+        logout();
+      }
+    };
 
-    const timeoutId = window.setTimeout(() => {
-      logout();
-    }, remaining);
+    checkExpiration();
+
+    const intervalId = window.setInterval(checkExpiration, SESSION_CHECK_INTERVAL_MS);
 
     return () => {
-      window.clearTimeout(timeoutId);
+      window.clearInterval(intervalId);
     };
   }, [session, logout]);
 

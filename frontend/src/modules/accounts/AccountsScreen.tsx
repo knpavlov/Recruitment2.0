@@ -37,7 +37,9 @@ export const AccountsScreen = () => {
           ? 'This user has already been invited.'
           : result.error === 'invalid-input'
             ? 'Enter a valid email.'
-            : 'Failed to send the invitation. Try again later.';
+            : result.error === 'mailer-unavailable'
+              ? 'Email delivery is not configured. Fix the settings and try again.'
+              : 'Failed to send the invitation. Try again later.';
       setBanner({ type: 'error', text: message });
       return;
     }
