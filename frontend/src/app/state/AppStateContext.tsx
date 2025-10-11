@@ -320,6 +320,9 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
             if (error.code === 'invalid-input' || error.status === 400) {
               return { ok: false, error: 'invalid-input' };
             }
+            if (error.code === 'mailer-unavailable' || error.status === 503) {
+              return { ok: false, error: 'mailer-unavailable' };
+            }
           }
           console.error('Failed to send invitation:', error);
           return { ok: false, error: 'unknown' };

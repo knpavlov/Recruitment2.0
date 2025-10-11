@@ -58,6 +58,7 @@ const SESSION_STORAGE_KEY = 'recruitment:session';
 const LAST_EMAIL_KEY = 'recruitment:last-email';
 const LONG_SESSION_MS = 30 * 24 * 60 * 60 * 1000;
 const SHORT_SESSION_MS = 12 * 60 * 60 * 1000;
+const MAX_TIMEOUT_MS = 2_147_483_647;
 
 const isBrowserEnvironment = () => typeof window !== 'undefined';
 
@@ -223,18 +224,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    const remaining = session.expiresAt - Date.now();
-    if (remaining <= 0) {
-      logout();
-      return;
-    }
+    // Ограничение таймеров в браузере — 2 147 483 647 мс (~24,8 дня), поэтому
+    // для длительных сессий планируем периодические проверки, чтобы избежать
+    // мгновенного выхода из-за переполнения значения таймера.
 
-    const timeoutId = window.setTimeout(() => {
-      logout();
-    }, remaining);
+    let disposed = false;
+    let timeoutId: number | null = null;
+
+    const scheduleCheck = () => {
+      if (disposed) {
+        return;
+      }
+
+      const remaining = session.expiresAt - Date.now();
+      if (remaining <= 0) {
+        logout();
+        return;
+      }
+
+      const delay = Math.min(remaining, MAX_TIMEOUT_MS);
+      timeoutId = window.setTimeout(() => {
+        scheduleCheck();
+      }, delay);
+    };
+
+    scheduleCheck();
 
     return () => {
-      window.clearTimeout(timeoutId);
+      disposed = true;
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
     };
   }, [session, logout]);
 
