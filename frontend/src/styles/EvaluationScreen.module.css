@@ -21,6 +21,42 @@
   color: #475569;
 }
 
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sortControl {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #475569;
+}
+
+.sortControl select {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: #ffffff;
+  color: #0f172a;
+}
+
+.sortToggle {
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: rgba(148, 163, 184, 0.15);
+  color: #0f172a;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.sortToggle:hover {
+  transform: translateY(-1px);
+}
+
 .primaryButton {
   padding: 12px 20px;
   border-radius: 12px;
@@ -52,9 +88,10 @@
   color: #b91c1c;
 }
 
-.cardsGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+
+.contentArea {
+  display: flex;
+  flex-direction: column;
   gap: 24px;
 }
 
