@@ -7,9 +7,14 @@ import { parseResumeText } from '../services/resumeParser';
 
 interface CandidateModalProps {
   initialProfile: CandidateProfile | null;
-  onSave: (profile: CandidateProfile, options: { closeAfterSave: boolean; expectedVersion: number | null }) => void;
-  onDelete: (id: string) => void;
+  onSave: (
+    profile: CandidateProfile,
+    options: { closeAfterSave: boolean; expectedVersion: number | null }
+  ) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
   onClose: () => void;
+  feedback: { type: 'info' | 'error'; text: string } | null;
+  onFeedbackClear: () => void;
 }
 
 const createEmptyProfile = (): CandidateProfile => ({
@@ -17,6 +22,7 @@ const createEmptyProfile = (): CandidateProfile => ({
   version: 1,
   firstName: '',
   lastName: '',
+  gender: undefined,
   age: undefined,
   city: '',
   desiredPosition: '',
@@ -33,7 +39,14 @@ const createEmptyProfile = (): CandidateProfile => ({
   updatedAt: new Date().toISOString()
 });
 
-export const CandidateModal = ({ initialProfile, onSave, onDelete, onClose }: CandidateModalProps) => {
+export const CandidateModal = ({
+  initialProfile,
+  onSave,
+  onDelete,
+  onClose,
+  feedback,
+  onFeedbackClear
+}: CandidateModalProps) => {
   const [profile, setProfile] = useState<CandidateProfile>(createEmptyProfile());
   const [resume, setResume] = useState<CandidateResume | undefined>(undefined);
   const [aiStatus, setAiStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
@@ -53,6 +66,7 @@ export const CandidateModal = ({ initialProfile, onSave, onDelete, onClose }: Ca
   const expectedVersion = initialProfile ? initialProfile.version : null;
 
   const handleChange = (field: keyof CandidateProfile, value: string | number | undefined) => {
+    onFeedbackClear();
     setProfile((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -66,6 +80,17 @@ export const CandidateModal = ({ initialProfile, onSave, onDelete, onClose }: Ca
     setResume(converted);
     setProfile((prev) => ({ ...prev, resume: converted }));
     setAiStatus('idle');
+    onFeedbackClear();
+  };
+
+  const handleResumeRemoval = () => {
+    setResume(undefined);
+    setProfile((prev) => ({ ...prev, resume: undefined }));
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    setAiStatus('idle');
+    onFeedbackClear();
   };
 
   const handleAiFill = async () => {
@@ -74,14 +99,24 @@ export const CandidateModal = ({ initialProfile, onSave, onDelete, onClose }: Ca
       return;
     }
     setAiStatus('loading');
+    onFeedbackClear();
     await new Promise((resolve) => setTimeout(resolve, 600));
     const parsed = parseResumeText(resume.textContent);
     setProfile((prev) => ({ ...prev, ...parsed }));
     setAiStatus('success');
   };
 
+  const trimmedProfile: CandidateProfile = {
+    ...profile,
+    firstName: profile.firstName.trim(),
+    lastName: profile.lastName.trim()
+  };
+
+  const isProfileValid = Boolean(trimmedProfile.firstName && trimmedProfile.lastName);
+
   const submitSave = (closeAfterSave: boolean) => {
-    onSave({ ...profile, resume }, { closeAfterSave, expectedVersion });
+    setProfile(trimmedProfile);
+    void onSave({ ...trimmedProfile, resume }, { closeAfterSave, expectedVersion });
   };
 
   const handleDelete = () => {
@@ -89,7 +124,8 @@ export const CandidateModal = ({ initialProfile, onSave, onDelete, onClose }: Ca
       onClose();
       return;
     }
-    onDelete(initialProfile.id);
+    onFeedbackClear();
+    void onDelete(initialProfile.id);
   };
 
   return (
@@ -101,6 +137,15 @@ export const CandidateModal = ({ initialProfile, onSave, onDelete, onClose }: Ca
             ×
           </button>
         </header>
+
+        {feedback && (
+          <div
+            className={feedback.type === 'info' ? styles.feedbackInfo : styles.feedbackError}
+            role={feedback.type === 'error' ? 'alert' : 'status'}
+          >
+            {feedback.text}
+          </div>
+        )}
 
         <section
           className={styles.uploadSection}
@@ -115,7 +160,14 @@ export const CandidateModal = ({ initialProfile, onSave, onDelete, onClose }: Ca
           <div className={styles.uploadZone}>
             {resume ? (
               <>
-                <p className={styles.resumeName}>{resume.fileName}</p>
+                <a
+                  className={styles.resumeLink}
+                  href={resume.dataUrl}
+                  download={resume.fileName}
+                  rel="noopener noreferrer"
+                >
+                  <p className={styles.resumeName}>{resume.fileName}</p>
+                </a>
                 <p className={styles.resumeMeta}>
                   Uploaded {new Date(resume.uploadedAt).toLocaleString('en-US')} · {(resume.size / 1024).toFixed(1)} KB
                 </p>
@@ -128,8 +180,12 @@ export const CandidateModal = ({ initialProfile, onSave, onDelete, onClose }: Ca
             <button className={styles.secondaryButton} onClick={() => fileInputRef.current?.click()}>
               Choose file
             </button>
-            <button className={styles.secondaryButton} onClick={() => submitSave(false)} disabled={!resume}>
-              Save resume
+            <button
+              className={styles.dangerButton}
+              onClick={handleResumeRemoval}
+              disabled={!resume}
+            >
+              Delete resume
             </button>
             <button className={styles.primaryButton} onClick={handleAiFill} disabled={!resume || aiStatus === 'loading'}>
               {aiStatus === 'loading' ? 'AI is analysing…' : 'Fill with AI'}
@@ -147,12 +203,29 @@ export const CandidateModal = ({ initialProfile, onSave, onDelete, onClose }: Ca
 
         <div className={styles.formGrid}>
           <label>
-            <span>First name</span>
+            <span className={styles.labelText}>
+              First name<span className={styles.requiredMark}>*</span>
+            </span>
             <input value={profile.firstName} onChange={(e) => handleChange('firstName', e.target.value)} />
           </label>
           <label>
-            <span>Last name</span>
+            <span className={styles.labelText}>
+              Last name<span className={styles.requiredMark}>*</span>
+            </span>
             <input value={profile.lastName} onChange={(e) => handleChange('lastName', e.target.value)} />
+          </label>
+          <label>
+            <span>Gender</span>
+            <select
+              value={profile.gender ?? ''}
+              onChange={(e) => handleChange('gender', e.target.value ? e.target.value : undefined)}
+            >
+              <option value="">Not specified</option>
+              <option value="female">Female</option>
+              <option value="male">Male</option>
+              <option value="non-binary">Non-binary</option>
+              <option value="prefer-not-to-say">Prefer not to say</option>
+            </select>
           </label>
           <label>
             <span>Age</span>
@@ -241,10 +314,10 @@ export const CandidateModal = ({ initialProfile, onSave, onDelete, onClose }: Ca
             <button className={styles.secondaryButton} onClick={onClose}>
               Cancel
             </button>
-            <button className={styles.secondaryButton} onClick={() => submitSave(false)}>
+            <button className={styles.secondaryButton} onClick={() => submitSave(false)} disabled={!isProfileValid}>
               Save
             </button>
-            <button className={styles.primaryButton} onClick={() => submitSave(true)}>
+            <button className={styles.primaryButton} onClick={() => submitSave(true)} disabled={!isProfileValid}>
               Save and close
             </button>
           </div>

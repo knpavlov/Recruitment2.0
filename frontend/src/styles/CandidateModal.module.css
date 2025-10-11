@@ -39,6 +39,25 @@
   cursor: pointer;
 }
 
+.feedbackInfo,
+.feedbackError {
+  margin: 16px 32px 0 32px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.feedbackInfo {
+  background: rgba(134, 239, 172, 0.2);
+  color: #14532d;
+}
+
+.feedbackError {
+  background: rgba(254, 202, 202, 0.4);
+  color: #b91c1c;
+}
+
 .uploadSection {
   padding: 24px 32px;
   display: flex;
@@ -64,6 +83,15 @@
   margin: 0 0 8px;
   font-weight: 600;
   color: #0f172a;
+}
+
+.resumeLink {
+  text-decoration: none;
+  color: inherit;
+}
+
+.resumeLink:hover .resumeName {
+  text-decoration: underline;
 }
 
 .resumeMeta {
@@ -103,8 +131,20 @@
   color: #475569;
 }
 
+.labelText {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.requiredMark {
+  color: #dc2626;
+  font-weight: 600;
+}
+
 .formGrid input,
-.formGrid textarea {
+.formGrid textarea,
+.formGrid select {
   border-radius: 12px;
   border: 1px solid rgba(148, 163, 184, 0.4);
   padding: 12px;
