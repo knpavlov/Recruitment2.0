@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import styles from '../../styles/EvaluationScreen.module.css';
 import { EvaluationModal } from './components/EvaluationModal';
 import { EvaluationStatusModal } from './components/EvaluationStatusModal';
@@ -10,13 +10,16 @@ import {
 } from '../../app/state/AppStateContext';
 import { EvaluationConfig } from '../../shared/types/evaluation';
 import { EvaluationTable, EvaluationTableRow } from './components/EvaluationTable';
+import { useAuth } from '../auth/AuthContext';
+import { InterviewerScreen } from './InterviewerScreen';
 
 type Banner = { type: 'info' | 'error'; text: string } | null;
 
 type SortKey = 'name' | 'position' | 'round' | 'avgFit' | 'avgCase';
 
 export const EvaluationScreen = () => {
-  const { list, saveEvaluation, removeEvaluation } = useEvaluationsState();
+  const { session } = useAuth();
+  const { list, saveEvaluation, removeEvaluation, startProcess } = useEvaluationsState();
   const { list: candidates } = useCandidatesState();
   const { folders } = useCasesState();
   const { list: fitQuestions } = useFitQuestionsState();
@@ -26,6 +29,10 @@ export const EvaluationScreen = () => {
   const [statusEvaluation, setStatusEvaluation] = useState<EvaluationConfig | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  if (session?.role === 'user') {
+    return <InterviewerScreen />;
+  }
 
   const candidateIndex = useMemo(() => {
     const map = new Map<
@@ -43,6 +50,34 @@ export const EvaluationScreen = () => {
     return map;
   }, [candidates]);
 
+  const handleStartProcess = useCallback(
+    async (evaluation: EvaluationConfig) => {
+      const result = await startProcess(evaluation.id);
+      if (!result.ok) {
+        if (result.error === 'missing-assignment-data') {
+          setBanner({ type: 'error', text: 'Укажите интервьюеров, кейсы и фит вопросы для всех слотов.' });
+          return;
+        }
+        if (result.error === 'process-already-started') {
+          setBanner({ type: 'error', text: 'Процесс уже был запущен ранее.' });
+          return;
+        }
+        if (result.error === 'mailer-unavailable') {
+          setBanner({ type: 'error', text: 'Не удалось отправить письма: сервис рассылки недоступен.' });
+          return;
+        }
+        if (result.error === 'not-found') {
+          setBanner({ type: 'error', text: 'Оценка не найдена. Обновите страницу.' });
+          return;
+        }
+        setBanner({ type: 'error', text: 'Не удалось запустить процесс оценки.' });
+        return;
+      }
+      setBanner({ type: 'info', text: 'Процесс оценки запущен. Интервьюеры уведомлены по электронной почте.' });
+    },
+    [startProcess]
+  );
+
   const tableRows = useMemo<EvaluationTableRow[]>(() => {
     return list.map((evaluation) => {
       const metadata = evaluation.candidateId ? candidateIndex.get(evaluation.candidateId) : undefined;
@@ -50,6 +85,14 @@ export const EvaluationScreen = () => {
       const candidatePosition = metadata?.position ?? '—';
       const completedForms = evaluation.forms.filter((form) => form.submitted).length;
       const roundNumber = evaluation.roundNumber ?? null;
+      const slotsReady = evaluation.interviews.every((slot) => {
+        const nameReady = slot.interviewerName.trim().length > 0;
+        const emailReady = slot.interviewerEmail.trim().length > 0;
+        const caseReady = Boolean(slot.caseFolderId?.trim());
+        const fitReady = Boolean(slot.fitQuestionId?.trim());
+        return nameReady && emailReady && caseReady && fitReady;
+      });
+      const startDisabled = evaluation.processStatus !== 'draft' || !slotsReady;
 
       return {
         id: evaluation.id,
@@ -60,6 +103,9 @@ export const EvaluationScreen = () => {
         formsPlanned: evaluation.interviewCount,
         avgFitScore: null,
         avgCaseScore: null,
+        processStatus: evaluation.processStatus,
+        onStartProcess: () => handleStartProcess(evaluation),
+        startDisabled,
         onEdit: () => {
           setModalEvaluation(evaluation);
           setIsModalOpen(true);
@@ -67,7 +113,7 @@ export const EvaluationScreen = () => {
         onOpenStatus: () => setStatusEvaluation(evaluation)
       };
     });
-  }, [candidateIndex, list]);
+  }, [candidateIndex, list, handleStartProcess]);
 
   const sortedRows = useMemo(() => {
     const copy = [...tableRows];
@@ -167,6 +213,7 @@ export const EvaluationScreen = () => {
     setModalEvaluation(null);
     setIsModalOpen(false);
   };
+
 
   return (
     <section className={styles.wrapper}>

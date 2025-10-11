@@ -4,6 +4,9 @@ export type DomainErrorCode =
   | 'duplicate'
   | 'invalid-input'
   | 'mailer-unavailable'
+  | 'process-already-started'
+  | 'missing-assignment-data'
+  | 'access-denied'
   | 'unknown';
 
 export interface DomainFailure {

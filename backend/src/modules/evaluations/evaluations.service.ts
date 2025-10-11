@@ -85,8 +85,22 @@ const sanitizeForms = (
     const submitted = typeof payload.submitted === 'boolean' ? payload.submitted : false;
     const submittedAt = readOptionalIsoDate(payload.submittedAt);
     const notes = readOptionalString(payload.notes);
+    const fitScore = readOptionalPositiveInteger(payload.fitScore);
+    const caseScore = readOptionalPositiveInteger(payload.caseScore);
+    const fitNotes = readOptionalString(payload.fitNotes);
+    const caseNotes = readOptionalString(payload.caseNotes);
 
-    forms.push({ slotId, interviewerName, submitted, submittedAt, notes });
+    forms.push({
+      slotId,
+      interviewerName,
+      submitted,
+      submittedAt,
+      notes,
+      fitScore,
+      caseScore,
+      fitNotes,
+      caseNotes
+    });
   }
   return forms;
 };

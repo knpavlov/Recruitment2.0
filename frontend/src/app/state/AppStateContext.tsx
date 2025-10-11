@@ -53,6 +53,7 @@ interface AppStateContextValue {
       expectedVersion: number | null
     ) => Promise<DomainResult<EvaluationConfig>>;
     removeEvaluation: (id: string) => Promise<DomainResult<string>>;
+    startProcess: (id: string) => Promise<DomainResult<string>>;
   };
   accounts: {
     list: AccountRecord[];
@@ -465,6 +466,41 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
             return { ok: false, error: 'not-found' };
           }
           console.error('Failed to delete evaluation:', error);
+          return { ok: false, error: 'unknown' };
+        }
+      },
+      startProcess: async (id) => {
+        try {
+          await evaluationsApi.start(id);
+          const startedAt = nowIso();
+          setEvaluations((prev) =>
+            prev.map((item) =>
+              item.id === id
+                ? {
+                    ...item,
+                    processStatus: 'in-progress',
+                    processStartedAt: item.processStartedAt ?? startedAt
+                  }
+                : item
+            )
+          );
+          return { ok: true, data: id };
+        } catch (error) {
+          if (error instanceof ApiError) {
+            if (error.code === 'process-already-started') {
+              return { ok: false, error: 'process-already-started' };
+            }
+            if (error.code === 'missing-assignment-data') {
+              return { ok: false, error: 'missing-assignment-data' };
+            }
+            if (error.code === 'mailer-unavailable') {
+              return { ok: false, error: 'mailer-unavailable' };
+            }
+            if (error.code === 'not-found') {
+              return { ok: false, error: 'not-found' };
+            }
+          }
+          console.error('Failed to start evaluation process:', error);
           return { ok: false, error: 'unknown' };
         }
       }
