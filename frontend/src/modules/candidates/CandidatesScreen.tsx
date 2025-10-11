@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import styles from '../../styles/CandidatesScreen.module.css';
 import { CandidateModal } from './components/CandidateModal';
-import { CandidateCard } from './components/CandidateCard';
+import { CandidateTable, CandidateTableRow } from './components/CandidateTable';
 import { useCandidatesState } from '../../app/state/AppStateContext';
 import { CandidateProfile } from '../../shared/types/candidate';
 
@@ -56,6 +56,25 @@ export const CandidatesScreen = () => {
     setModalCandidate(null);
     setModalBanner(null);
   };
+
+  const openCandidate = useCallback((candidate: CandidateProfile) => {
+    setModalCandidate(candidate);
+    setModalBanner(null);
+    setIsModalOpen(true);
+  }, []);
+
+  const tableRows = useMemo<CandidateTableRow[]>(
+    () =>
+      sortedCandidates.map((candidate) => ({
+        id: candidate.id,
+        name: `${candidate.firstName} ${candidate.lastName}`.trim() || 'Unnamed candidate',
+        desiredPosition: candidate.desiredPosition?.trim() || '—',
+        city: candidate.city?.trim() || '—',
+        updatedAt: candidate.updatedAt,
+        onOpen: () => openCandidate(candidate)
+      })),
+    [openCandidate, sortedCandidates]
+  );
 
   const handleSave = async (
     profile: CandidateProfile,
@@ -143,26 +162,7 @@ export const CandidatesScreen = () => {
         <div className={banner.type === 'info' ? styles.infoBanner : styles.errorBanner}>{banner.text}</div>
       )}
 
-      <div className={styles.cardsGrid}>
-        {sortedCandidates.length === 0 ? (
-          <div className={styles.emptyState}>
-            <h2>No candidates yet</h2>
-            <p>Use the “Create profile” button to add the first candidate.</p>
-          </div>
-        ) : (
-          sortedCandidates.map((candidate) => (
-            <CandidateCard
-              key={candidate.id}
-              profile={candidate}
-              onOpen={() => {
-                setModalCandidate(candidate);
-                setModalBanner(null);
-                setIsModalOpen(true);
-              }}
-            />
-          ))
-        )}
-      </div>
+      <CandidateTable rows={tableRows} />
 
       {isModalOpen && (
         <CandidateModal
