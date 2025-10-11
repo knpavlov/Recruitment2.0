@@ -1,11 +1,20 @@
 import { useCallback, useMemo, useState } from 'react';
 import styles from '../../styles/CandidatesScreen.module.css';
 import { CandidateModal } from './components/CandidateModal';
-import { CandidateTable, CandidateTableRow } from './components/CandidateTable';
+import { CandidateSortKey, CandidateTable, CandidateTableRow } from './components/CandidateTable';
 import { useCandidatesState } from '../../app/state/AppStateContext';
 import { CandidateProfile } from '../../shared/types/candidate';
 
-type SortMode = 'updated' | 'name' | 'position';
+const normalizeText = (value?: string | null) => value?.trim() ?? '';
+
+const genderLabels: Record<string, string> = {
+  female: 'Female',
+  male: 'Male',
+  'non-binary': 'Non-binary',
+  'prefer-not-to-say': 'Prefer not to say'
+};
+
+const getGenderLabel = (code?: string | null) => genderLabels[code ?? ''] ?? 'Not specified';
 
 type Banner = { type: 'info' | 'error'; text: string } | null;
 
@@ -15,35 +24,66 @@ export const CandidatesScreen = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalCandidate, setModalCandidate] = useState<CandidateProfile | null>(null);
   const [modalBanner, setModalBanner] = useState<Banner>(null);
-  const [sortMode, setSortMode] = useState<SortMode>('updated');
+  const [sortKey, setSortKey] = useState<CandidateSortKey>('updatedAt');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
-  const sortedCandidates = useMemo(
-    () => {
-      const copy = [...list];
-      if (sortMode === 'name') {
-        return copy.sort((a, b) =>
-          `${a.lastName}${a.firstName}`.localeCompare(`${b.lastName}${b.firstName}`, 'en-US')
-        );
+  const sortedCandidates = useMemo(() => {
+    const copy = [...list];
+
+    const compareStrings = (a: string, b: string) => a.localeCompare(b, 'en-US', { sensitivity: 'base' });
+    const compareNullableNumbers = (a: number | null | undefined, b: number | null | undefined) => {
+      const safeA = a ?? Number.NEGATIVE_INFINITY;
+      const safeB = b ?? Number.NEGATIVE_INFINITY;
+      return safeA - safeB;
+    };
+
+    copy.sort((a, b) => {
+      let result = 0;
+
+      if (sortKey === 'firstName') {
+        result = compareStrings(normalizeText(a.firstName), normalizeText(b.firstName));
+      } else if (sortKey === 'lastName') {
+        result = compareStrings(normalizeText(a.lastName), normalizeText(b.lastName));
+      } else if (sortKey === 'gender') {
+        result = compareStrings(getGenderLabel(a.gender), getGenderLabel(b.gender));
+      } else if (sortKey === 'age') {
+        result = compareNullableNumbers(a.age, b.age);
+      } else if (sortKey === 'city') {
+        result = compareStrings(normalizeText(a.city), normalizeText(b.city));
+      } else if (sortKey === 'desiredPosition') {
+        result = compareStrings(normalizeText(a.desiredPosition), normalizeText(b.desiredPosition));
+      } else if (sortKey === 'phone') {
+        result = compareStrings(normalizeText(a.phone), normalizeText(b.phone));
+      } else if (sortKey === 'email') {
+        result = compareStrings(normalizeText(a.email), normalizeText(b.email));
+      } else if (sortKey === 'totalExperience') {
+        result = compareNullableNumbers(a.totalExperienceYears, b.totalExperienceYears);
+      } else {
+        const aTime = new Date(a.updatedAt).getTime();
+        const bTime = new Date(b.updatedAt).getTime();
+        result = aTime - bTime;
       }
-      if (sortMode === 'position') {
-        return copy.sort((a, b) => {
-          const aPosition = a.desiredPosition?.toLowerCase() ?? '';
-          const bPosition = b.desiredPosition?.toLowerCase() ?? '';
-          if (aPosition && bPosition) {
-            const compare = aPosition.localeCompare(bPosition, 'en-US');
-            if (compare !== 0) {
-              return compare;
-            }
-          } else if (aPosition || bPosition) {
-            return aPosition ? -1 : 1;
-          }
-          return `${a.lastName}${a.firstName}`.localeCompare(`${b.lastName}${b.firstName}`, 'en-US');
-        });
+
+      if (result === 0) {
+        result = compareStrings(normalizeText(a.lastName), normalizeText(b.lastName));
       }
-      return copy.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-    },
-    [list, sortMode]
-  );
+
+      return sortDirection === 'asc' ? result : -result;
+    });
+
+    return copy;
+  }, [list, sortDirection, sortKey]);
+
+  const handleSortChange = (key: CandidateSortKey) => {
+    setSortKey((currentKey) => {
+      if (currentKey === key) {
+        setSortDirection((currentDirection) => (currentDirection === 'asc' ? 'desc' : 'asc'));
+        return currentKey;
+      }
+      setSortDirection(key === 'updatedAt' ? 'desc' : 'asc');
+      return key;
+    });
+  };
 
   const handleCreate = () => {
     setModalCandidate(null);
@@ -63,18 +103,25 @@ export const CandidatesScreen = () => {
     setIsModalOpen(true);
   }, []);
 
-  const tableRows = useMemo<CandidateTableRow[]>(
-    () =>
-      sortedCandidates.map((candidate) => ({
-        id: candidate.id,
-        name: `${candidate.firstName} ${candidate.lastName}`.trim() || 'Unnamed candidate',
-        desiredPosition: candidate.desiredPosition?.trim() || '—',
-        city: candidate.city?.trim() || '—',
-        updatedAt: candidate.updatedAt,
-        onOpen: () => openCandidate(candidate)
-      })),
-    [openCandidate, sortedCandidates]
-  );
+  const tableRows = useMemo<CandidateTableRow[]>(() => {
+    return sortedCandidates.map((candidate) => ({
+      id: candidate.id,
+      firstName: normalizeText(candidate.firstName) || '—',
+      lastName: normalizeText(candidate.lastName) || '—',
+      gender: getGenderLabel(candidate.gender),
+      age: candidate.age ?? null,
+      city: normalizeText(candidate.city) || '—',
+      desiredPosition: normalizeText(candidate.desiredPosition) || '—',
+      phone: normalizeText(candidate.phone) || '—',
+      email: normalizeText(candidate.email) || '—',
+      totalExperienceYears: candidate.totalExperienceYears ?? null,
+      updatedAt: candidate.updatedAt,
+      resumeDownload: candidate.resume
+        ? { url: candidate.resume.dataUrl, fileName: candidate.resume.fileName }
+        : null,
+      onOpen: () => openCandidate(candidate)
+    }));
+  }, [openCandidate, sortedCandidates]);
 
   const handleSave = async (
     profile: CandidateProfile,
@@ -144,14 +191,6 @@ export const CandidatesScreen = () => {
           <p className={styles.subtitle}>Create and edit candidate profiles with AI assistance.</p>
         </div>
         <div className={styles.actions}>
-          <label className={styles.sortControl}>
-            <span>Sort by</span>
-            <select value={sortMode} onChange={(event) => setSortMode(event.target.value as SortMode)}>
-              <option value="updated">Last change</option>
-              <option value="name">Last name</option>
-              <option value="position">Desired position</option>
-            </select>
-          </label>
           <button className={styles.primaryButton} onClick={handleCreate}>
             Create profile
           </button>
@@ -162,7 +201,7 @@ export const CandidatesScreen = () => {
         <div className={banner.type === 'info' ? styles.infoBanner : styles.errorBanner}>{banner.text}</div>
       )}
 
-      <CandidateTable rows={tableRows} />
+      <CandidateTable rows={tableRows} sortDirection={sortDirection} sortKey={sortKey} onSortChange={handleSortChange} />
 
       {isModalOpen && (
         <CandidateModal
