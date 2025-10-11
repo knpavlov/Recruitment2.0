@@ -142,7 +142,9 @@ const createTables = async () => {
       version INTEGER NOT NULL DEFAULT 1,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      forms JSONB NOT NULL DEFAULT '[]'::JSONB
+      forms JSONB NOT NULL DEFAULT '[]'::JSONB,
+      process_status TEXT NOT NULL DEFAULT 'draft',
+      process_started_at TIMESTAMPTZ
     );
   `);
 
@@ -153,7 +155,24 @@ const createTables = async () => {
       ADD COLUMN IF NOT EXISTS fit_question_id UUID,
       ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1,
       ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      ADD COLUMN IF NOT EXISTS forms JSONB NOT NULL DEFAULT '[]'::JSONB;
+      ADD COLUMN IF NOT EXISTS forms JSONB NOT NULL DEFAULT '[]'::JSONB,
+      ADD COLUMN IF NOT EXISTS process_status TEXT NOT NULL DEFAULT 'draft',
+      ADD COLUMN IF NOT EXISTS process_started_at TIMESTAMPTZ;
+  `);
+
+  await postgresPool.query(`
+    CREATE TABLE IF NOT EXISTS evaluation_assignments (
+      id UUID PRIMARY KEY,
+      evaluation_id UUID NOT NULL REFERENCES evaluations(id) ON DELETE CASCADE,
+      slot_id TEXT NOT NULL,
+      interviewer_email TEXT NOT NULL,
+      interviewer_name TEXT NOT NULL,
+      case_folder_id UUID NOT NULL,
+      fit_question_id UUID NOT NULL,
+      invitation_sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (evaluation_id, slot_id)
+    );
   `);
 
   await postgresPool.query(`
