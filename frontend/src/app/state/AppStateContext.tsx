@@ -5,6 +5,7 @@ import { EvaluationConfig } from '../../shared/types/evaluation';
 import { AccountRecord, AccountRole } from '../../shared/types/account';
 import { DomainResult } from '../../shared/types/results';
 import { casesApi } from '../../modules/cases/services/casesApi';
+import { candidatesApi } from '../../modules/candidates/services/candidatesApi';
 import { accountsApi } from '../../modules/accounts/services/accountsApi';
 import { ApiError } from '../../shared/api/httpClient';
 import { useAuth } from '../../modules/auth/AuthContext';
@@ -28,8 +29,11 @@ interface AppStateContextValue {
   };
   candidates: {
     list: CandidateProfile[];
-    saveProfile: (profile: CandidateProfile, expectedVersion: number | null) => DomainResult<CandidateProfile>;
-    removeProfile: (id: string) => DomainResult<string>;
+    saveProfile: (
+      profile: CandidateProfile,
+      expectedVersion: number | null
+    ) => Promise<DomainResult<CandidateProfile>>;
+    removeProfile: (id: string) => Promise<DomainResult<string>>;
   };
   evaluations: {
     list: EvaluationConfig[];
@@ -47,12 +51,6 @@ interface AppStateContextValue {
 const AppStateContext = createContext<AppStateContextValue | null>(null);
 
 const nowIso = () => new Date().toISOString();
-
-const touchCandidate = (profile: CandidateProfile, shouldIncrement = true): CandidateProfile => ({
-  ...profile,
-  version: shouldIncrement ? profile.version + 1 : profile.version,
-  updatedAt: nowIso()
-});
 
 const touchEvaluation = (config: EvaluationConfig, shouldIncrement = true): EvaluationConfig => ({
   ...config,
@@ -107,6 +105,21 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       setCandidates([]);
       setEvaluations([]);
     }
+  }, [session]);
+
+  useEffect(() => {
+    if (!session) {
+      return;
+    }
+    const loadCandidates = async () => {
+      try {
+        const remote = await candidatesApi.list();
+        setCandidates(remote);
+      } catch (error) {
+        console.error('Failed to load candidates:', error);
+      }
+    };
+    void loadCandidates();
   }, [session]);
 
   const value = useMemo<AppStateContextValue>(() => ({
@@ -236,36 +249,67 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     },
     candidates: {
       list: candidates,
-      saveProfile: (profile, expectedVersion) => {
-        if (!profile.firstName.trim() || !profile.lastName.trim()) {
+      saveProfile: async (profile, expectedVersion) => {
+        const firstName = profile.firstName.trim();
+        const lastName = profile.lastName.trim();
+        if (!firstName || !lastName) {
           return { ok: false, error: 'invalid-input' };
         }
-        const exists = candidates.find((item) => item.id === profile.id);
-        if (!exists) {
-          const base: CandidateProfile = {
-            ...profile,
-            version: profile.version || 1,
-            createdAt: nowIso(),
-            updatedAt: nowIso()
-          };
-          const next = touchCandidate(base, false);
-          setCandidates((prev) => [...prev, next]);
-          return { ok: true, data: next };
+
+        const sanitized: CandidateProfile = {
+          ...profile,
+          firstName,
+          lastName,
+          gender: profile.gender?.trim() ? profile.gender.trim() : undefined,
+          city: profile.city?.trim() ?? '',
+          desiredPosition: profile.desiredPosition?.trim() ?? '',
+          phone: profile.phone?.trim() ?? '',
+          email: profile.email?.trim() ?? '',
+          experienceSummary: profile.experienceSummary?.trim() ?? '',
+          consultingCompanies: profile.consultingCompanies?.trim() ?? '',
+          lastCompany: profile.lastCompany?.trim() ?? '',
+          lastPosition: profile.lastPosition?.trim() ?? '',
+          lastDuration: profile.lastDuration?.trim() ?? ''
+        };
+
+        try {
+          if (expectedVersion === null) {
+            const created = await candidatesApi.create(sanitized);
+            setCandidates((prev) => [...prev, created]);
+            return { ok: true, data: created };
+          }
+
+          const updated = await candidatesApi.update(profile.id, sanitized, expectedVersion);
+          setCandidates((prev) => prev.map((item) => (item.id === profile.id ? updated : item)));
+          return { ok: true, data: updated };
+        } catch (error) {
+          if (error instanceof ApiError) {
+            if (error.code === 'version-conflict') {
+              return { ok: false, error: 'version-conflict' };
+            }
+            if (error.code === 'invalid-input') {
+              return { ok: false, error: 'invalid-input' };
+            }
+            if (error.code === 'not-found') {
+              return { ok: false, error: 'not-found' };
+            }
+          }
+          console.error('Failed to save candidate:', error);
+          return { ok: false, error: 'unknown' };
         }
-        if (expectedVersion === null || exists.version !== expectedVersion) {
-          return { ok: false, error: 'version-conflict' };
-        }
-        const next = touchCandidate(profile);
-        setCandidates((prev) => prev.map((item) => (item.id === profile.id ? next : item)));
-        return { ok: true, data: next };
       },
-      removeProfile: (id) => {
-        const exists = candidates.some((item) => item.id === id);
-        if (!exists) {
-          return { ok: false, error: 'not-found' };
+      removeProfile: async (id) => {
+        try {
+          await candidatesApi.remove(id);
+          setCandidates((prev) => prev.filter((item) => item.id !== id));
+          return { ok: true, data: id };
+        } catch (error) {
+          if (error instanceof ApiError && error.code === 'not-found') {
+            return { ok: false, error: 'not-found' };
+          }
+          console.error('Failed to delete candidate:', error);
+          return { ok: false, error: 'unknown' };
         }
-        setCandidates((prev) => prev.filter((item) => item.id !== id));
-        return { ok: true, data: id };
       }
     },
     evaluations: {
