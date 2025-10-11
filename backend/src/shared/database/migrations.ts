@@ -145,6 +145,47 @@ const createTables = async () => {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `);
+
+  await postgresPool.query(`
+    ALTER TABLE questions
+      ADD COLUMN IF NOT EXISTS content TEXT,
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS version INTEGER;
+  `);
+
+  await postgresPool.query(`UPDATE questions SET content = '' WHERE content IS NULL;`);
+  await postgresPool.query(`UPDATE questions SET updated_at = created_at WHERE updated_at IS NULL;`);
+  await postgresPool.query(`UPDATE questions SET version = 1 WHERE version IS NULL;`);
+
+  await postgresPool.query(`
+    ALTER TABLE questions
+      ALTER COLUMN content SET DEFAULT '',
+      ALTER COLUMN content SET NOT NULL,
+      ALTER COLUMN updated_at SET DEFAULT NOW(),
+      ALTER COLUMN updated_at SET NOT NULL,
+      ALTER COLUMN version SET DEFAULT 1,
+      ALTER COLUMN version SET NOT NULL;
+  `);
+
+  await postgresPool.query(`
+    CREATE TABLE IF NOT EXISTS question_criteria (
+      id UUID PRIMARY KEY,
+      question_id UUID NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      position INTEGER NOT NULL DEFAULT 0,
+      score_1 TEXT,
+      score_2 TEXT,
+      score_3 TEXT,
+      score_4 TEXT,
+      score_5 TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  await postgresPool.query(`
+    CREATE INDEX IF NOT EXISTS question_criteria_question_id_idx
+      ON question_criteria(question_id, position);
+  `);
 };
 
 const syncSuperAdmin = async () => {

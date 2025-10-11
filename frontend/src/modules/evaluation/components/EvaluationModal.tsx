@@ -4,6 +4,7 @@ import { EvaluationConfig, InterviewSlot, InterviewStatusRecord } from '../../..
 import { CandidateProfile } from '../../../shared/types/candidate';
 import { CaseFolder } from '../../../shared/types/caseLibrary';
 import { generateId } from '../../../shared/ui/generateId';
+import { FitQuestion } from '../../../shared/types/fitQuestion';
 
 interface EvaluationModalProps {
   initialConfig: EvaluationConfig | null;
@@ -12,6 +13,7 @@ interface EvaluationModalProps {
   onClose: () => void;
   candidates: CandidateProfile[];
   folders: CaseFolder[];
+  questions: FitQuestion[];
 }
 
 const createInterviewSlot = (): InterviewSlot => ({
@@ -48,7 +50,8 @@ export const EvaluationModal = ({
   onDelete,
   onClose,
   candidates,
-  folders
+  folders,
+  questions
 }: EvaluationModalProps) => {
   const [config, setConfig] = useState<EvaluationConfig>(createDefaultConfig());
 
@@ -112,6 +115,15 @@ export const EvaluationModal = ({
     [candidates]
   );
 
+  const questionOptions = useMemo(
+    () =>
+      questions.map((question) => ({
+        id: question.id,
+        label: question.shortTitle
+      })),
+    [questions]
+  );
+
   return (
     <div className={styles.overlay}>
       <div className={styles.modal}>
@@ -167,7 +179,11 @@ export const EvaluationModal = ({
               onChange={(e) => setConfig((prev) => ({ ...prev, fitQuestionId: e.target.value || undefined }))}
             >
               <option value="">Not selected</option>
-              <option value="culture">Standard culture question</option>
+              {questionOptions.map((question) => (
+                <option key={question.id} value={question.id}>
+                  {question.label}
+                </option>
+              ))}
             </select>
           </label>
 
@@ -210,7 +226,11 @@ export const EvaluationModal = ({
                     onChange={(e) => updateInterview(slot.id, { fitQuestionId: e.target.value || undefined })}
                   >
                     <option value="">Default</option>
-                    <option value="culture">Standard question</option>
+                    {questionOptions.map((question) => (
+                      <option key={question.id} value={question.id}>
+                        {question.label}
+                      </option>
+                    ))}
                   </select>
                 </label>
               </div>

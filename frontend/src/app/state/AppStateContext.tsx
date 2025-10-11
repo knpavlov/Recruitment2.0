@@ -9,6 +9,8 @@ import { candidatesApi } from '../../modules/candidates/services/candidatesApi';
 import { accountsApi } from '../../modules/accounts/services/accountsApi';
 import { ApiError } from '../../shared/api/httpClient';
 import { useAuth } from '../../modules/auth/AuthContext';
+import { FitQuestion } from '../../shared/types/fitQuestion';
+import { questionsApi } from '../../modules/questions/services/questionsApi';
 
 interface AppStateContextValue {
   cases: {
@@ -34,6 +36,14 @@ interface AppStateContextValue {
       expectedVersion: number | null
     ) => Promise<DomainResult<CandidateProfile>>;
     removeProfile: (id: string) => Promise<DomainResult<string>>;
+  };
+  questions: {
+    list: FitQuestion[];
+    saveQuestion: (
+      question: FitQuestion,
+      expectedVersion: number | null
+    ) => Promise<DomainResult<FitQuestion>>;
+    removeQuestion: (id: string) => Promise<DomainResult<string>>;
   };
   evaluations: {
     list: EvaluationConfig[];
@@ -61,6 +71,7 @@ const touchEvaluation = (config: EvaluationConfig, shouldIncrement = true): Eval
 export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [folders, setFolders] = useState<CaseFolder[]>([]);
   const [candidates, setCandidates] = useState<CandidateProfile[]>([]);
+  const [questions, setQuestions] = useState<FitQuestion[]>([]);
   const [evaluations, setEvaluations] = useState<EvaluationConfig[]>([]);
   const [accounts, setAccounts] = useState<AccountRecord[]>([]);
   const { session } = useAuth();
@@ -103,6 +114,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (!session) {
       setCandidates([]);
+      setQuestions([]);
       setEvaluations([]);
     }
   }, [session]);
@@ -120,6 +132,21 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       }
     };
     void loadCandidates();
+  }, [session]);
+
+  useEffect(() => {
+    if (!session) {
+      return;
+    }
+    const loadQuestions = async () => {
+      try {
+        const remote = await questionsApi.list();
+        setQuestions(remote);
+      } catch (error) {
+        console.error('Не удалось загрузить фит-вопросы:', error);
+      }
+    };
+    void loadQuestions();
   }, [session]);
 
   const value = useMemo<AppStateContextValue>(() => ({
@@ -312,6 +339,91 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
         }
       }
     },
+    questions: {
+      list: questions,
+      saveQuestion: async (question, expectedVersion) => {
+        const trimmedTitle = question.shortTitle.trim();
+        const trimmedContent = question.content.trim();
+
+        if (!trimmedTitle || !trimmedContent) {
+          return { ok: false, error: 'invalid-input' };
+        }
+
+        const normalizedCriteria = question.criteria.map((item, index) => ({
+          ...item,
+          name: item.name.trim(),
+          position: index,
+          score1: item.score1?.trim() || undefined,
+          score2: item.score2?.trim() || undefined,
+          score3: item.score3?.trim() || undefined,
+          score4: item.score4?.trim() || undefined,
+          score5: item.score5?.trim() || undefined
+        }));
+
+        if (normalizedCriteria.some((item) => !item.name)) {
+          return { ok: false, error: 'invalid-input' };
+        }
+
+        const payload: FitQuestion = {
+          ...question,
+          shortTitle: trimmedTitle,
+          content: trimmedContent,
+          criteria: normalizedCriteria
+        };
+
+        try {
+          const result =
+            expectedVersion === null
+              ? await questionsApi.create(payload)
+              : await questionsApi.update(payload.id, payload, expectedVersion);
+
+          setQuestions((prev) => {
+            const exists = prev.some((item) => item.id === result.id);
+            if (exists) {
+              return prev
+                .map((item) => (item.id === result.id ? result : item))
+                .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+            }
+            return [result, ...prev].sort(
+              (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+            );
+          });
+
+          return { ok: true, data: result };
+        } catch (error) {
+          if (error instanceof ApiError) {
+            if (error.code === 'version-conflict') {
+              return { ok: false, error: 'version-conflict' };
+            }
+            if (error.code === 'invalid-input' || error.status === 400) {
+              return { ok: false, error: 'invalid-input' };
+            }
+            if (error.code === 'not-found' || error.status === 404) {
+              return { ok: false, error: 'not-found' };
+            }
+          }
+          console.error('Не удалось сохранить фит-вопрос:', error);
+          return { ok: false, error: 'unknown' };
+        }
+      },
+      removeQuestion: async (id) => {
+        const exists = questions.some((item) => item.id === id);
+        if (!exists) {
+          return { ok: false, error: 'not-found' };
+        }
+        try {
+          await questionsApi.remove(id);
+          setQuestions((prev) => prev.filter((item) => item.id !== id));
+          return { ok: true, data: id };
+        } catch (error) {
+          if (error instanceof ApiError && (error.code === 'not-found' || error.status === 404)) {
+            return { ok: false, error: 'not-found' };
+          }
+          console.error('Не удалось удалить фит-вопрос:', error);
+          return { ok: false, error: 'unknown' };
+        }
+      }
+    },
     evaluations: {
       list: evaluations,
       saveEvaluation: (config, expectedVersion) => {
@@ -412,7 +524,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
         }
       }
     }
-  }), [folders, candidates, evaluations, accounts, syncFolders]);
+  }), [folders, candidates, questions, evaluations, accounts, syncFolders]);
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;
 };
@@ -427,5 +539,6 @@ export const useAppState = () => {
 
 export const useCasesState = () => useAppState().cases;
 export const useCandidatesState = () => useAppState().candidates;
+export const useQuestionsState = () => useAppState().questions;
 export const useEvaluationsState = () => useAppState().evaluations;
 export const useAccountsState = () => useAppState().accounts;
