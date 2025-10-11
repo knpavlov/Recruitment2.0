@@ -43,7 +43,8 @@ const createDefaultConfig = (): EvaluationConfig => {
     version: 1,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    forms: interviews.map((slot) => createStatusRecord(slot))
+    forms: interviews.map((slot) => createStatusRecord(slot)),
+    processStatus: 'draft'
   };
 };
 

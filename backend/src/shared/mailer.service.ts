@@ -282,4 +282,26 @@ export class MailerService {
     const body = `One-time access code: ${code}. Enter it within 10 minutes.`;
     await this.deliver(email, subject, body);
   }
+
+  async sendInterviewAssignment(
+    email: string,
+    payload: {
+      candidateName: string;
+      interviewerName: string;
+      caseTitle: string;
+      fitQuestionTitle: string;
+      link: string;
+    }
+  ) {
+    const subject = `Интервью с кандидатом ${payload.candidateName}`;
+    const lines = [
+      `Здравствуйте, ${payload.interviewerName}!`,
+      `Вам назначено интервью с кандидатом ${payload.candidateName}.`,
+      `Кейс: ${payload.caseTitle}.`,
+      `Фит-вопрос: ${payload.fitQuestionTitle}.`,
+      payload.link ? `Перейдите по ссылке, чтобы открыть материалы и форму оценки: ${payload.link}` : null,
+      'Для входа используйте одноразовый код на этой почте. Если вы уже авторизованы, ссылка откроется сразу.'
+    ].filter((line): line is string => Boolean(line));
+    await this.deliver(email, subject, lines.join('\n\n'));
+  }
 }
