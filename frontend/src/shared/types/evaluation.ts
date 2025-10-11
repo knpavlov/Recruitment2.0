@@ -12,6 +12,8 @@ export interface InterviewStatusRecord {
   submitted: boolean;
   submittedAt?: string;
   notes?: string;
+  fitScore?: number;
+  caseScore?: number;
 }
 
 export interface EvaluationConfig {
@@ -25,4 +27,6 @@ export interface EvaluationConfig {
   createdAt: string;
   updatedAt: string;
   forms: InterviewStatusRecord[];
+  processStatus: 'draft' | 'active' | 'completed';
+  processStartedAt?: string;
 }

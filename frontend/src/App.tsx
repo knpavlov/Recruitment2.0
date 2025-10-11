@@ -10,6 +10,7 @@ import { AuthProvider, useAuth } from './modules/auth/AuthContext';
 import { AppStateProvider } from './app/state/AppStateContext';
 import { LoginScreen } from './modules/auth/LoginScreen';
 import { FitQuestionsScreen } from './modules/questions/FitQuestionsScreen';
+import { InterviewerScreen } from './modules/interviewer/InterviewerScreen';
 
 const AppContent = () => {
   const { session } = useAuth();
@@ -43,6 +44,10 @@ const AppContent = () => {
 
   if (!session) {
     return <LoginScreen />;
+  }
+
+  if (session.role === 'user') {
+    return <InterviewerScreen />;
   }
 
   const renderContent = () => {

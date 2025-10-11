@@ -76,6 +76,8 @@ const normalizeForm = (value: unknown): InterviewStatusRecord | null => {
     submitted?: unknown;
     submittedAt?: unknown;
     notes?: unknown;
+    fitScore?: unknown;
+    caseScore?: unknown;
   };
 
   const slotId = normalizeString(payload.slotId)?.trim();
@@ -88,7 +90,9 @@ const normalizeForm = (value: unknown): InterviewStatusRecord | null => {
     interviewerName: normalizeString(payload.interviewerName) ?? 'Interviewer',
     submitted: normalizeBoolean(payload.submitted) ?? false,
     submittedAt: normalizeIsoString(payload.submittedAt),
-    notes: normalizeString(payload.notes) ?? undefined
+    notes: normalizeString(payload.notes) ?? undefined,
+    fitScore: normalizeNumber(payload.fitScore),
+    caseScore: normalizeNumber(payload.caseScore)
   };
 };
 
@@ -108,12 +112,18 @@ const normalizeEvaluation = (value: unknown): EvaluationConfig | null => {
     createdAt?: unknown;
     updatedAt?: unknown;
     forms?: unknown;
+    processStatus?: unknown;
+    processStartedAt?: unknown;
   };
 
   const id = normalizeString(payload.id)?.trim();
   const version = normalizeNumber(payload.version);
   const createdAt = normalizeIsoString(payload.createdAt);
   const updatedAt = normalizeIsoString(payload.updatedAt);
+  const processStatus = normalizeString(payload.processStatus) as
+    | EvaluationConfig['processStatus']
+    | undefined;
+  const processStartedAt = normalizeIsoString(payload.processStartedAt);
 
   if (!id || version === undefined || !createdAt || !updatedAt) {
     return null;
@@ -141,7 +151,9 @@ const normalizeEvaluation = (value: unknown): EvaluationConfig | null => {
     version,
     createdAt,
     updatedAt,
-    forms
+    forms,
+    processStatus: processStatus ?? 'draft',
+    processStartedAt
   };
 };
 
@@ -175,7 +187,9 @@ const serializeEvaluation = (config: EvaluationConfig) => ({
   forms: config.forms.map((form) => ({
     ...form,
     submittedAt: form.submittedAt ?? null,
-    notes: form.notes ?? null
+    notes: form.notes ?? null,
+    fitScore: form.fitScore ?? null,
+    caseScore: form.caseScore ?? null
   }))
 });
 
@@ -198,5 +212,11 @@ export const evaluationsApi = {
   remove: async (id: string) =>
     apiRequest<{ id?: unknown }>(`/evaluations/${id}`, {
       method: 'DELETE'
-    }).then((result) => (typeof result.id === 'string' ? result.id : id))
+    }).then((result) => (typeof result.id === 'string' ? result.id : id)),
+  start: async (id: string) =>
+    ensureEvaluation(
+      await apiRequest<unknown>(`/evaluations/${id}/start`, {
+        method: 'POST'
+      })
+    )
 };

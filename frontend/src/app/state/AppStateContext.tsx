@@ -53,6 +53,7 @@ interface AppStateContextValue {
       expectedVersion: number | null
     ) => Promise<DomainResult<EvaluationConfig>>;
     removeEvaluation: (id: string) => Promise<DomainResult<string>>;
+    startProcess: (id: string) => Promise<DomainResult<EvaluationConfig>>;
   };
   accounts: {
     list: AccountRecord[];
@@ -465,6 +466,30 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
             return { ok: false, error: 'not-found' };
           }
           console.error('Failed to delete evaluation:', error);
+          return { ok: false, error: 'unknown' };
+        }
+      },
+      startProcess: async (id) => {
+        try {
+          const updated = await evaluationsApi.start(id);
+          setEvaluations((prev) => prev.map((item) => (item.id === id ? updated : item)));
+          return { ok: true, data: updated };
+        } catch (error) {
+          if (error instanceof ApiError) {
+            if (error.code === 'incomplete-setup' || error.code === 'invalid-input') {
+              return { ok: false, error: 'invalid-input' };
+            }
+            if (error.code === 'already-started') {
+              return { ok: false, error: 'version-conflict' };
+            }
+            if (error.code === 'mailer-unavailable') {
+              return { ok: false, error: 'mailer-unavailable' };
+            }
+            if (error.code === 'not-found') {
+              return { ok: false, error: 'not-found' };
+            }
+          }
+          console.error('Failed to start evaluation process:', error);
           return { ok: false, error: 'unknown' };
         }
       }
