@@ -1,11 +1,9 @@
 import { useCallback, useMemo, useState } from 'react';
 import styles from '../../styles/CandidatesScreen.module.css';
 import { CandidateModal } from './components/CandidateModal';
-import { CandidateTable, CandidateTableRow } from './components/CandidateTable';
+import { CandidateTable, CandidateTableRow, CandidateSortKey } from './components/CandidateTable';
 import { useCandidatesState } from '../../app/state/AppStateContext';
-import { CandidateProfile } from '../../shared/types/candidate';
-
-type SortMode = 'updated' | 'name' | 'position';
+import { CandidateProfile, CandidateResume } from '../../shared/types/candidate';
 
 type Banner = { type: 'info' | 'error'; text: string } | null;
 
@@ -15,35 +13,137 @@ export const CandidatesScreen = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalCandidate, setModalCandidate] = useState<CandidateProfile | null>(null);
   const [modalBanner, setModalBanner] = useState<Banner>(null);
-  const [sortMode, setSortMode] = useState<SortMode>('updated');
+  const [sortKey, setSortKey] = useState<CandidateSortKey>('updatedAt');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const getGenderLabel = (value?: string) => {
+    switch (value) {
+      case 'female':
+        return 'Female';
+      case 'male':
+        return 'Male';
+      case 'non-binary':
+        return 'Non-binary';
+      case 'prefer-not-to-say':
+        return 'Prefer not to say';
+      default:
+        return 'Not specified';
+    }
+  };
 
-  const sortedCandidates = useMemo(
-    () => {
-      const copy = [...list];
-      if (sortMode === 'name') {
-        return copy.sort((a, b) =>
-          `${a.lastName}${a.firstName}`.localeCompare(`${b.lastName}${b.firstName}`, 'en-US')
-        );
+  const sortedCandidates = useMemo(() => {
+    const copy = [...list];
+
+    const compareStrings = (a?: string | null, b?: string | null) => {
+      const normalizedA = a?.trim();
+      const normalizedB = b?.trim();
+      const hasA = Boolean(normalizedA);
+      const hasB = Boolean(normalizedB);
+
+      if (hasA && hasB) {
+        return normalizedA!.localeCompare(normalizedB!, 'en-US', { sensitivity: 'base' });
       }
-      if (sortMode === 'position') {
-        return copy.sort((a, b) => {
-          const aPosition = a.desiredPosition?.toLowerCase() ?? '';
-          const bPosition = b.desiredPosition?.toLowerCase() ?? '';
-          if (aPosition && bPosition) {
-            const compare = aPosition.localeCompare(bPosition, 'en-US');
-            if (compare !== 0) {
-              return compare;
-            }
-          } else if (aPosition || bPosition) {
-            return aPosition ? -1 : 1;
-          }
-          return `${a.lastName}${a.firstName}`.localeCompare(`${b.lastName}${b.firstName}`, 'en-US');
-        });
+      if (hasA) {
+        return -1;
       }
-      return copy.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-    },
-    [list, sortMode]
-  );
+      if (hasB) {
+        return 1;
+      }
+      return 0;
+    };
+
+    const compareNumbers = (a?: number | null, b?: number | null) => {
+      if (a != null && b != null) {
+        return a - b;
+      }
+      if (a != null) {
+        return -1;
+      }
+      if (b != null) {
+        return 1;
+      }
+      return 0;
+    };
+
+    copy.sort((a, b) => {
+      let result = 0;
+
+      switch (sortKey) {
+        case 'firstName':
+          result = compareStrings(a.firstName, b.firstName);
+          break;
+        case 'lastName':
+          result = compareStrings(a.lastName, b.lastName);
+          break;
+        case 'gender':
+          result = compareStrings(getGenderLabel(a.gender), getGenderLabel(b.gender));
+          break;
+        case 'age':
+          result = compareNumbers(a.age, b.age);
+          break;
+        case 'city':
+          result = compareStrings(a.city, b.city);
+          break;
+        case 'desiredPosition':
+          result = compareStrings(a.desiredPosition, b.desiredPosition);
+          break;
+        case 'phone':
+          result = compareStrings(a.phone, b.phone);
+          break;
+        case 'email':
+          result = compareStrings(a.email, b.email);
+          break;
+        case 'totalExperience':
+          result = compareNumbers(a.totalExperienceYears, b.totalExperienceYears);
+          break;
+        case 'updatedAt':
+          result = new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
+          break;
+        default:
+          result = 0;
+      }
+
+      if (result === 0) {
+        result = compareStrings(`${a.lastName}${a.firstName}`, `${b.lastName}${b.firstName}`);
+      }
+
+      return sortDirection === 'asc' ? result : -result;
+    });
+
+    return copy;
+  }, [list, sortDirection, sortKey]);
+
+  const handleSortChange = (key: CandidateSortKey) => {
+    setSortKey((currentKey) => {
+      if (currentKey === key) {
+        setSortDirection((currentDirection) => (currentDirection === 'asc' ? 'desc' : 'asc'));
+        return currentKey;
+      }
+      setSortDirection(key === 'updatedAt' ? 'desc' : 'asc');
+      return key;
+    });
+  };
+
+  const formatText = (value?: string | null) => {
+    const trimmed = value?.trim();
+    return trimmed && trimmed.length > 0 ? trimmed : '—';
+  };
+
+  const formatExperience = (value?: number | null) => {
+    if (value == null) {
+      return '—';
+    }
+    return value === 1 ? '1 yr' : `${value} yrs`;
+  };
+
+  const downloadResumeFile = useCallback((resume: CandidateResume) => {
+    const link = document.createElement('a');
+    link.href = resume.dataUrl;
+    link.download = resume.fileName;
+    link.rel = 'noopener noreferrer';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }, []);
 
   const handleCreate = () => {
     setModalCandidate(null);
@@ -65,15 +165,26 @@ export const CandidatesScreen = () => {
 
   const tableRows = useMemo<CandidateTableRow[]>(
     () =>
-      sortedCandidates.map((candidate) => ({
-        id: candidate.id,
-        name: `${candidate.firstName} ${candidate.lastName}`.trim() || 'Unnamed candidate',
-        desiredPosition: candidate.desiredPosition?.trim() || '—',
-        city: candidate.city?.trim() || '—',
-        updatedAt: candidate.updatedAt,
-        onOpen: () => openCandidate(candidate)
-      })),
-    [openCandidate, sortedCandidates]
+      sortedCandidates.map((candidate) => {
+        const resume = candidate.resume;
+        return {
+          id: candidate.id,
+          firstName: formatText(candidate.firstName),
+          lastName: formatText(candidate.lastName),
+          gender: getGenderLabel(candidate.gender),
+          age: candidate.age != null ? String(candidate.age) : '—',
+          city: formatText(candidate.city),
+          desiredPosition: formatText(candidate.desiredPosition),
+          phone: formatText(candidate.phone),
+          email: formatText(candidate.email),
+          totalExperience: formatExperience(candidate.totalExperienceYears),
+          updatedAt: candidate.updatedAt,
+          hasResume: Boolean(resume),
+          onOpen: () => openCandidate(candidate),
+          onDownloadResume: resume ? () => downloadResumeFile(resume) : undefined
+        };
+      }),
+    [downloadResumeFile, openCandidate, sortedCandidates]
   );
 
   const handleSave = async (
@@ -144,14 +255,6 @@ export const CandidatesScreen = () => {
           <p className={styles.subtitle}>Create and edit candidate profiles with AI assistance.</p>
         </div>
         <div className={styles.actions}>
-          <label className={styles.sortControl}>
-            <span>Sort by</span>
-            <select value={sortMode} onChange={(event) => setSortMode(event.target.value as SortMode)}>
-              <option value="updated">Last change</option>
-              <option value="name">Last name</option>
-              <option value="position">Desired position</option>
-            </select>
-          </label>
           <button className={styles.primaryButton} onClick={handleCreate}>
             Create profile
           </button>
@@ -162,7 +265,12 @@ export const CandidatesScreen = () => {
         <div className={banner.type === 'info' ? styles.infoBanner : styles.errorBanner}>{banner.text}</div>
       )}
 
-      <CandidateTable rows={tableRows} />
+      <CandidateTable
+        rows={tableRows}
+        sortKey={sortKey}
+        sortDirection={sortDirection}
+        onSortChange={handleSortChange}
+      />
 
       {isModalOpen && (
         <CandidateModal
