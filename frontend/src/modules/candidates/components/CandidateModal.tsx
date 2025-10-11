@@ -28,6 +28,8 @@ const createEmptyProfile = (): CandidateProfile => ({
   desiredPosition: '',
   phone: '',
   email: '',
+  targetPractice: undefined,
+  targetOffice: '',
   experienceSummary: '',
   totalExperienceYears: undefined,
   consultingExperienceYears: undefined,
@@ -243,6 +245,29 @@ export const CandidateModal = ({
           <label>
             <span>Desired position</span>
             <input value={profile.desiredPosition} onChange={(e) => handleChange('desiredPosition', e.target.value)} />
+          </label>
+          <label>
+            <span>Target practice</span>
+            <select
+              value={profile.targetPractice ?? ''}
+              onChange={(e) =>
+                handleChange(
+                  'targetPractice',
+                  e.target.value ? (e.target.value as CandidateProfile['targetPractice']) : undefined
+                )
+              }
+            >
+              <option value="">Not specified</option>
+              <option value="PI">PI</option>
+              <option value="PEPI">PEPI</option>
+              <option value="ET">ET</option>
+              <option value="Tax">Tax</option>
+              <option value="Restructuring">Restructuring</option>
+            </select>
+          </label>
+          <label>
+            <span>Target office</span>
+            <input value={profile.targetOffice ?? ''} onChange={(e) => handleChange('targetOffice', e.target.value)} />
           </label>
           <label>
             <span>Phone</span>

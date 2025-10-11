@@ -8,8 +8,11 @@ import { generateId } from '../../../shared/ui/generateId';
 
 interface EvaluationModalProps {
   initialConfig: EvaluationConfig | null;
-  onSave: (config: EvaluationConfig, options: { closeAfterSave: boolean; expectedVersion: number | null }) => void;
-  onDelete: (id: string) => void;
+  onSave: (
+    config: EvaluationConfig,
+    options: { closeAfterSave: boolean; expectedVersion: number | null }
+  ) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
   onClose: () => void;
   candidates: CandidateProfile[];
   folders: CaseFolder[];
@@ -153,11 +156,11 @@ export const EvaluationModal = ({
       onClose();
       return;
     }
-    onDelete(initialConfig.id);
+    void onDelete(initialConfig.id);
   };
 
   const submit = (closeAfterSave: boolean) => {
-    onSave(config, { closeAfterSave, expectedVersion });
+    void onSave(config, { closeAfterSave, expectedVersion });
   };
 
   const candidateOptions = useMemo(

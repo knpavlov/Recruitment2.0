@@ -36,6 +36,19 @@ const normalizeString = (value: unknown): string | undefined => {
   return undefined;
 };
 
+const normalizePractice = (
+  value: unknown
+): CandidateProfile['targetPractice'] | undefined => {
+  const raw = normalizeString(value)?.trim();
+  if (!raw) {
+    return undefined;
+  }
+  const allowed: CandidateProfile['targetPractice'][] = ['PI', 'PEPI', 'ET', 'Tax', 'Restructuring'];
+  return allowed.includes(raw as CandidateProfile['targetPractice'])
+    ? (raw as CandidateProfile['targetPractice'])
+    : undefined;
+};
+
 const normalizeResume = (value: unknown): CandidateResume | undefined => {
   if (!value || typeof value !== 'object') {
     return undefined;
@@ -87,6 +100,8 @@ const normalizeCandidate = (value: unknown): CandidateProfile | null => {
     age?: unknown;
     city?: unknown;
     desiredPosition?: unknown;
+    targetPractice?: unknown;
+    targetOffice?: unknown;
     phone?: unknown;
     email?: unknown;
     experienceSummary?: unknown;
@@ -121,6 +136,8 @@ const normalizeCandidate = (value: unknown): CandidateProfile | null => {
     age: normalizeNumber(payload.age),
     city: normalizeString(payload.city) ?? '',
     desiredPosition: normalizeString(payload.desiredPosition) ?? '',
+    targetPractice: normalizePractice(payload.targetPractice),
+    targetOffice: normalizeString(payload.targetOffice) ?? '',
     phone: normalizeString(payload.phone) ?? '',
     email: normalizeString(payload.email) ?? '',
     experienceSummary: normalizeString(payload.experienceSummary) ?? '',
@@ -157,6 +174,7 @@ const serializeCandidate = (profile: CandidateProfile) => ({
   ...profile,
   gender: profile.gender ?? null,
   age: profile.age ?? null,
+  targetPractice: profile.targetPractice ?? null,
   totalExperienceYears: profile.totalExperienceYears ?? null,
   consultingExperienceYears: profile.consultingExperienceYears ?? null,
   resume: profile.resume

@@ -64,13 +64,13 @@ export const CaseFolderCard = ({ folder, onRename, onDelete, onUpload, onRemoveF
 
   const renderFile = (file: CaseFileRecord) => (
     <li key={file.id} className={styles.fileRow}>
-      <div className={styles.fileInfo}>
+      <div className={styles.fileRowContent}>
         <p className={styles.fileName}>{file.fileName}</p>
         <p className={styles.fileMeta}>
           {Math.round(file.size / 1024)} KB · {new Date(file.uploadedAt).toLocaleString('en-US')}
         </p>
       </div>
-      <div className={styles.fileActionsStack}>
+      <div className={styles.fileRowActions}>
         <a className={styles.secondaryButton} href={file.dataUrl} download={file.fileName}>
           Download
         </a>
@@ -94,9 +94,65 @@ export const CaseFolderCard = ({ folder, onRename, onDelete, onUpload, onRemoveF
   return (
     <div className={styles.folderCard}>
       <header className={styles.folderHeader}>
-        <div>
-          <h3>{folder.name}</h3>
-          <p className={styles.folderId}>ID: {folder.id}</p>
+        <div className={styles.folderTitleArea}>
+          {isEditingName ? (
+            <input
+              className={styles.folderNameInput}
+              value={draftName}
+              onChange={(event) => setDraftName(event.target.value)}
+            />
+          ) : (
+            <h3 className={styles.folderTitle}>{folder.name}</h3>
+          )}
+        </div>
+        <div className={styles.folderHeaderActions}>
+          {isEditingName ? (
+            <>
+              <button className={styles.primaryButton} onClick={submitRename}>
+                Save
+              </button>
+              <button
+                className={styles.secondaryButton}
+                onClick={() => {
+                  setIsEditingName(false);
+                  setDraftName(folder.name);
+                  setError(null);
+                }}
+              >
+                Cancel
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                className={styles.secondaryButton}
+                onClick={() => {
+                  setIsEditingName(true);
+                  setDraftName(folder.name);
+                  setError(null);
+                }}
+              >
+                Rename
+              </button>
+              <button
+                className={styles.dangerButton}
+                onClick={async () => {
+                  const confirmed = window.confirm('Delete the folder and all nested files permanently?');
+                  if (!confirmed) {
+                    return;
+                  }
+                  try {
+                    await onDelete();
+                    setError(null);
+                  } catch (deleteError) {
+                    setError((deleteError as Error).message);
+                  }
+                }}
+              >
+                Delete
+              </button>
+            </>
+          )}
         </div>
       </header>
 
@@ -127,58 +183,6 @@ export const CaseFolderCard = ({ folder, onRename, onDelete, onUpload, onRemoveF
       )}
 
       <footer className={styles.folderFooter}>
-        <div className={styles.folderActionsSection}>
-          {isEditingName ? (
-            <div className={styles.renameRow}>
-              <input value={draftName} onChange={(event) => setDraftName(event.target.value)} />
-              <div className={styles.renameButtons}>
-                <button className={styles.primaryButton} onClick={submitRename}>
-                  Save
-                </button>
-                <button
-                  className={styles.secondaryButton}
-                  onClick={() => {
-                    setIsEditingName(false);
-                    setDraftName(folder.name);
-                    setError(null);
-                  }}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className={styles.folderActionsBar}>
-              <button
-                className={styles.secondaryButton}
-                onClick={() => {
-                  setIsEditingName(true);
-                  setDraftName(folder.name);
-                  setError(null);
-                }}
-              >
-                Rename
-              </button>
-              <button
-                className={styles.dangerButton}
-                onClick={async () => {
-                  const confirmed = window.confirm('Delete the folder and all nested files permanently?');
-                  if (!confirmed) {
-                    return;
-                  }
-                  try {
-                    await onDelete();
-                    setError(null);
-                  } catch (deleteError) {
-                    setError((deleteError as Error).message);
-                  }
-                }}
-              >
-                Delete
-              </button>
-            </div>
-          )}
-        </div>
         <div className={styles.folderMeta}>
           <span>Updated: {new Date(folder.updatedAt).toLocaleString('en-US')}</span>
           <span>Version: {folder.version}</span>
