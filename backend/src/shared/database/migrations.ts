@@ -145,6 +145,54 @@ const createTables = async () => {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `);
+
+  await postgresPool.query(`
+    CREATE TABLE IF NOT EXISTS fit_questions (
+      id UUID PRIMARY KEY,
+      short_title TEXT NOT NULL,
+      content TEXT NOT NULL,
+      version INTEGER NOT NULL DEFAULT 1,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  await postgresPool.query(`
+    CREATE TABLE IF NOT EXISTS fit_question_criteria (
+      id UUID PRIMARY KEY,
+      question_id UUID NOT NULL REFERENCES fit_questions(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      rating_1 TEXT,
+      rating_2 TEXT,
+      rating_3 TEXT,
+      rating_4 TEXT,
+      rating_5 TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  await postgresPool.query(`
+    ALTER TABLE fit_questions
+      ADD COLUMN IF NOT EXISTS short_title TEXT NOT NULL DEFAULT 'Untitled question',
+      ADD COLUMN IF NOT EXISTS content TEXT NOT NULL DEFAULT '',
+      ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1,
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+  `);
+
+  await postgresPool.query(`
+    ALTER TABLE fit_questions
+      ALTER COLUMN short_title DROP DEFAULT,
+      ALTER COLUMN content DROP DEFAULT;
+  `);
+
+  await postgresPool.query(`
+    ALTER TABLE fit_question_criteria
+      ADD COLUMN IF NOT EXISTS rating_1 TEXT,
+      ADD COLUMN IF NOT EXISTS rating_2 TEXT,
+      ADD COLUMN IF NOT EXISTS rating_3 TEXT,
+      ADD COLUMN IF NOT EXISTS rating_4 TEXT,
+      ADD COLUMN IF NOT EXISTS rating_5 TEXT;
+  `);
 };
 
 const syncSuperAdmin = async () => {
