@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { evaluationsService } from './evaluations.module.js';
+import { evaluationWorkflowService, evaluationsService } from './evaluations.module.js';
 
 const router = Router();
 
@@ -16,6 +16,25 @@ const handleError = (error: unknown, res: Response) => {
     case 'NOT_FOUND':
       res.status(404).json({ code: 'not-found', message: 'Evaluation not found.' });
       return;
+    case 'PROCESS_ALREADY_STARTED':
+      res.status(409).json({ code: 'process-already-started', message: 'The process has already been started.' });
+      return;
+    case 'MISSING_ASSIGNMENT_DATA':
+      res.status(400).json({ code: 'missing-assignment-data', message: 'Fill in interviewers, cases and fit questions.' });
+      return;
+    case 'MAILER_UNAVAILABLE':
+      res
+        .status(503)
+        .json({ code: 'mailer-unavailable', message: 'Email service is not configured. Cannot notify interviewers.' });
+      return;
+    case 'PORTAL_URL_NOT_CONFIGURED':
+      res
+        .status(503)
+        .json({
+          code: 'portal-url-missing',
+          message: 'Interview portal URL is not configured. Set INTERVIEW_PORTAL_URL to a public site.'
+        });
+      return;
     case 'VERSION_CONFLICT':
       res
         .status(409)
@@ -29,6 +48,15 @@ const handleError = (error: unknown, res: Response) => {
 router.get('/', async (_req, res) => {
   const evaluations = await evaluationsService.listEvaluations();
   res.json(evaluations);
+});
+
+router.post('/:id/start', async (req, res) => {
+  try {
+    const result = await evaluationWorkflowService.startProcess(req.params.id);
+    res.json(result);
+  } catch (error) {
+    handleError(error, res);
+  }
 });
 
 router.post('/', async (req, res) => {

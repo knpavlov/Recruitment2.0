@@ -8,6 +8,18 @@ export class CasesService {
     return this.repository.listFolders();
   }
 
+  async getFolder(id: string): Promise<CaseFolder> {
+    const trimmed = id.trim();
+    if (!trimmed) {
+      throw new Error('INVALID_INPUT');
+    }
+    const folder = await this.repository.findFolderById(trimmed);
+    if (!folder) {
+      throw new Error('NOT_FOUND');
+    }
+    return folder;
+  }
+
   async createFolder(name: string): Promise<CaseFolder> {
     const trimmed = name.trim();
     if (!trimmed) {
