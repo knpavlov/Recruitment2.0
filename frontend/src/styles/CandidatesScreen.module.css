@@ -11,6 +11,12 @@
   gap: 24px;
 }
 
+.actions {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+}
+
 .header h1 {
   margin: 0;
   font-size: 32px;
@@ -33,6 +39,22 @@
 
 .primaryButton:hover {
   transform: translateY(-1px);
+}
+
+.sortControl {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+  color: #475569;
+}
+
+.sortControl select {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: white;
+  font-size: 14px;
 }
 
 .infoBanner,
