@@ -53,6 +53,7 @@ interface AppStateContextValue {
       expectedVersion: number | null
     ) => Promise<DomainResult<EvaluationConfig>>;
     removeEvaluation: (id: string) => Promise<DomainResult<string>>;
+    startProcess: (id: string, expectedVersion: number) => Promise<DomainResult<EvaluationConfig>>;
   };
   accounts: {
     list: AccountRecord[];
@@ -430,13 +431,30 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
         if (!config.candidateId) {
           return { ok: false, error: 'invalid-input' };
         }
+        const sanitized: EvaluationConfig = {
+          ...config,
+          status: config.status ?? 'draft',
+          processStartedAt: config.processStartedAt ?? undefined,
+          interviews: config.interviews.map((slot) => ({
+            ...slot,
+            interviewerName: slot.interviewerName.trim() || 'Interviewer',
+            interviewerEmail: slot.interviewerEmail.trim(),
+            caseFolderId: slot.caseFolderId ?? undefined,
+            fitQuestionId: slot.fitQuestionId ?? undefined
+          })),
+          forms: config.forms?.map((form) => ({
+            ...form,
+            interviewerName: form.interviewerName.trim() || 'Interviewer',
+            interviewerEmail: form.interviewerEmail.trim()
+          })) ?? []
+        };
         try {
           if (expectedVersion === null) {
-            const created = await evaluationsApi.create(config);
+            const created = await evaluationsApi.create(sanitized);
             setEvaluations((prev) => [...prev, created]);
             return { ok: true, data: created };
           }
-          const updated = await evaluationsApi.update(config.id, config, expectedVersion);
+          const updated = await evaluationsApi.update(config.id, sanitized, expectedVersion);
           setEvaluations((prev) => prev.map((item) => (item.id === config.id ? updated : item)));
           return { ok: true, data: updated };
         } catch (error) {
@@ -465,6 +483,30 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
             return { ok: false, error: 'not-found' };
           }
           console.error('Failed to delete evaluation:', error);
+          return { ok: false, error: 'unknown' };
+        }
+      },
+      startProcess: async (id, expectedVersion) => {
+        try {
+          const updated = await evaluationsApi.startProcess(id, expectedVersion);
+          setEvaluations((prev) => prev.map((item) => (item.id === id ? updated : item)));
+          return { ok: true, data: updated };
+        } catch (error) {
+          if (error instanceof ApiError) {
+            if (error.code === 'version-conflict') {
+              return { ok: false, error: 'version-conflict' };
+            }
+            if (error.code === 'invalid-setup') {
+              return { ok: false, error: 'invalid-setup' };
+            }
+            if (error.code === 'already-started') {
+              return { ok: false, error: 'already-started' };
+            }
+            if (error.code === 'not-found') {
+              return { ok: false, error: 'not-found' };
+            }
+          }
+          console.error('Failed to start evaluation process:', error);
           return { ok: false, error: 'unknown' };
         }
       }

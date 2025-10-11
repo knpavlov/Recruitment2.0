@@ -139,6 +139,8 @@ const createTables = async () => {
       interview_count INTEGER NOT NULL DEFAULT 0,
       interviews JSONB NOT NULL DEFAULT '[]'::JSONB,
       fit_question_id UUID,
+      status TEXT NOT NULL DEFAULT 'draft',
+      process_started_at TIMESTAMPTZ,
       version INTEGER NOT NULL DEFAULT 1,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -151,6 +153,8 @@ const createTables = async () => {
       ADD COLUMN IF NOT EXISTS interview_count INTEGER NOT NULL DEFAULT 0,
       ADD COLUMN IF NOT EXISTS interviews JSONB NOT NULL DEFAULT '[]'::JSONB,
       ADD COLUMN IF NOT EXISTS fit_question_id UUID,
+      ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'draft',
+      ADD COLUMN IF NOT EXISTS process_started_at TIMESTAMPTZ,
       ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1,
       ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       ADD COLUMN IF NOT EXISTS forms JSONB NOT NULL DEFAULT '[]'::JSONB;

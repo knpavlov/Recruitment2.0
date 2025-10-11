@@ -98,7 +98,9 @@
 
 .actionsCell {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
+  align-items: center;
 }
 
 .tablePrimaryButton {
@@ -130,4 +132,42 @@
 .emptyState h2 {
   margin-bottom: 8px;
   color: #0f172a;
+}
+
+.processCell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.status_draft {
+  background: rgba(148, 163, 184, 0.2);
+  color: #475569;
+}
+
+.status_in-progress {
+  background: rgba(251, 191, 36, 0.2);
+  color: #92400e;
+}
+
+.status_completed {
+  background: rgba(134, 239, 172, 0.25);
+  color: #166534;
+}
+
+.processHint {
+  font-size: 12px;
+  color: #64748b;
 }

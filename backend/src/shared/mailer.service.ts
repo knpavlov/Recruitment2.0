@@ -282,4 +282,19 @@ export class MailerService {
     const body = `One-time access code: ${code}. Enter it within 10 minutes.`;
     await this.deliver(email, subject, body);
   }
+
+  async sendInterviewAssignment(
+    email: string,
+    payload: { candidateName: string; roundNumber?: number; interviewerName: string; portalUrl: string }
+  ) {
+    const subject = `Interview assignment: ${payload.candidateName}`;
+    const lines: string[] = [
+      `Hello ${payload.interviewerName},`,
+      `You have been assigned to interview ${payload.candidateName}.`,
+      payload.roundNumber ? `Round: ${payload.roundNumber}` : null,
+      `Open the interviewer portal to review materials and submit feedback: ${payload.portalUrl}`,
+      'Use your email to request a one-time access code if needed.'
+    ].filter((line): line is string => Boolean(line));
+    await this.deliver(email, subject, lines.join('\n\n'));
+  }
 }

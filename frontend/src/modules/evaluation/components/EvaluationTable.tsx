@@ -1,4 +1,5 @@
 import styles from '../../../styles/EvaluationScreen.module.css';
+import { EvaluationStatus } from '../../../shared/types/evaluation';
 
 export interface EvaluationTableRow {
   id: string;
@@ -9,6 +10,11 @@ export interface EvaluationTableRow {
   formsPlanned: number;
   avgFitScore: number | null;
   avgCaseScore: number | null;
+  status: EvaluationStatus;
+  processStartedAt?: string;
+  canStartProcess: boolean;
+  isStarting: boolean;
+  onStartProcess: () => void;
   onEdit: () => void;
   onOpenStatus: () => void;
 }
@@ -66,6 +72,7 @@ export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: 
               );
             })}
             <th>Forms</th>
+            <th>Process</th>
             <th className={styles.actionsHeader}>Actions</th>
           </tr>
         </thead>
@@ -75,6 +82,23 @@ export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: 
             const formsLabel = `${row.formsCompleted}/${row.formsPlanned}`;
             const avgFitLabel = row.avgFitScore != null ? row.avgFitScore.toFixed(1) : '—';
             const avgCaseLabel = row.avgCaseScore != null ? row.avgCaseScore.toFixed(1) : '—';
+            const startedAtLabel = row.processStartedAt
+              ? new Date(row.processStartedAt).toLocaleString()
+              : null;
+            const statusLabel =
+              row.status === 'completed'
+                ? 'Completed'
+                : row.status === 'in-progress'
+                  ? 'In progress'
+                  : 'Draft';
+            const processHint =
+              row.status === 'draft'
+                ? row.canStartProcess
+                  ? 'Ready to start'
+                  : 'Needs configuration'
+                : row.status === 'in-progress'
+                  ? startedAtLabel || 'Started'
+                  : startedAtLabel || 'Finished';
             return (
               <tr key={row.id}>
                 <td>{row.candidateName}</td>
@@ -83,7 +107,22 @@ export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: 
                 <td>{avgFitLabel}</td>
                 <td>{avgCaseLabel}</td>
                 <td>{formsLabel}</td>
+                <td>
+                  <div className={styles.processCell}>
+                    <span className={`${styles.statusBadge} ${styles[`status_${row.status}`]}`}>{statusLabel}</span>
+                    <span className={styles.processHint}>{processHint}</span>
+                  </div>
+                </td>
                 <td className={styles.actionsCell}>
+                  {row.status === 'draft' && (
+                    <button
+                      className={styles.tablePrimaryButton}
+                      onClick={row.onStartProcess}
+                      disabled={!row.canStartProcess || row.isStarting}
+                    >
+                      {row.isStarting ? 'Starting…' : 'Start process'}
+                    </button>
+                  )}
                   <button className={styles.tableSecondaryButton} onClick={row.onEdit}>
                     Edit
                   </button>

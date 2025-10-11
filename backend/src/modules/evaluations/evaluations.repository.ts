@@ -1,6 +1,7 @@
 import { postgresPool } from '../../shared/database/postgres.client.js';
 import {
   EvaluationRecord,
+  EvaluationStatus,
   EvaluationWriteModel,
   InterviewSlotModel,
   InterviewStatusModel
@@ -13,6 +14,8 @@ interface EvaluationRow extends Record<string, unknown> {
   interview_count: number | null;
   interviews: unknown;
   fit_question_id: string | null;
+  status: string | null;
+  process_started_at: Date | null;
   version: number;
   created_at: Date;
   updated_at: Date;
@@ -57,15 +60,28 @@ const mapForms = (value: unknown): InterviewStatusModel[] => {
       continue;
     }
     const interviewerName = typeof item.interviewerName === 'string' ? item.interviewerName : 'Interviewer';
+    const interviewerEmail = typeof item.interviewerEmail === 'string' ? item.interviewerEmail : '';
     const submitted = typeof item.submitted === 'boolean' ? item.submitted : false;
     const submittedAt =
       typeof item.submittedAt === 'string' && item.submittedAt.trim()
         ? new Date(item.submittedAt).toISOString()
         : undefined;
+    const fitScore = typeof item.fitScore === 'number' && Number.isFinite(item.fitScore) ? item.fitScore : undefined;
+    const caseScore = typeof item.caseScore === 'number' && Number.isFinite(item.caseScore) ? item.caseScore : undefined;
     const notes = typeof item.notes === 'string' ? item.notes : undefined;
-    forms.push({ slotId, interviewerName, submitted, submittedAt, notes });
+    forms.push({ slotId, interviewerName, interviewerEmail, submitted, submittedAt, fitScore, caseScore, notes });
   }
   return forms;
+};
+
+const normalizeStatus = (value: string | null): EvaluationStatus => {
+  if (!value) {
+    return 'draft';
+  }
+  if (value === 'draft' || value === 'in-progress' || value === 'completed') {
+    return value;
+  }
+  return 'draft';
 };
 
 const mapRowToRecord = (row: EvaluationRow): EvaluationRecord => {
@@ -83,6 +99,8 @@ const mapRowToRecord = (row: EvaluationRow): EvaluationRecord => {
     interviewCount,
     interviews,
     fitQuestionId: row.fit_question_id ?? undefined,
+    status: normalizeStatus(typeof row.status === 'string' ? row.status : null),
+    processStartedAt: row.process_started_at ? row.process_started_at.toISOString() : undefined,
     version: Number(row.version ?? 1),
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
@@ -93,11 +111,25 @@ const mapRowToRecord = (row: EvaluationRow): EvaluationRecord => {
 export class EvaluationsRepository {
   async listEvaluations(): Promise<EvaluationRecord[]> {
     const result = await postgresPool.query<EvaluationRow>(
-      `SELECT id, candidate_id, round_number, interview_count, interviews, fit_question_id, version, created_at, updated_at, forms
+      `SELECT id, candidate_id, round_number, interview_count, interviews, fit_question_id, status, process_started_at, version, created_at, updated_at, forms
          FROM evaluations
         ORDER BY updated_at DESC, created_at DESC;`
     );
     return result.rows.map((row) => mapRowToRecord(row));
+  }
+
+  async findEvaluation(id: string): Promise<EvaluationRecord | null> {
+    const result = await postgresPool.query<EvaluationRow>(
+      `SELECT id, candidate_id, round_number, interview_count, interviews, fit_question_id, status, process_started_at, version, created_at, updated_at, forms
+         FROM evaluations
+        WHERE id = $1
+        LIMIT 1;`,
+      [id]
+    );
+    if (result.rows.length === 0) {
+      return null;
+    }
+    return mapRowToRecord(result.rows[0]);
   }
 
   async createEvaluation(model: EvaluationWriteModel): Promise<EvaluationRecord> {
@@ -105,9 +137,9 @@ export class EvaluationsRepository {
     const formsJson = JSON.stringify(model.forms);
 
     const result = await postgresPool.query<EvaluationRow>(
-      `INSERT INTO evaluations (id, candidate_id, round_number, interview_count, interviews, fit_question_id, version, created_at, updated_at, forms)
-         VALUES ($1, $2, $3, $4, $5::jsonb, $6, 1, NOW(), NOW(), $7::jsonb)
-      RETURNING id, candidate_id, round_number, interview_count, interviews, fit_question_id, version, created_at, updated_at, forms;`,
+      `INSERT INTO evaluations (id, candidate_id, round_number, interview_count, interviews, fit_question_id, status, process_started_at, version, created_at, updated_at, forms)
+         VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, 1, NOW(), NOW(), $9::jsonb)
+      RETURNING id, candidate_id, round_number, interview_count, interviews, fit_question_id, status, process_started_at, version, created_at, updated_at, forms;`,
       [
         model.id,
         model.candidateId ?? null,
@@ -115,6 +147,8 @@ export class EvaluationsRepository {
         model.interviewCount,
         interviewsJson,
         model.fitQuestionId ?? null,
+        model.status,
+        model.processStartedAt ? new Date(model.processStartedAt) : null,
         formsJson
       ]
     );
@@ -136,17 +170,21 @@ export class EvaluationsRepository {
               interview_count = $3,
               interviews = $4::jsonb,
               fit_question_id = $5,
-              forms = $6::jsonb,
+              status = $6,
+              process_started_at = $7,
+              forms = $8::jsonb,
               version = version + 1,
               updated_at = NOW()
-        WHERE id = $7 AND version = $8
-      RETURNING id, candidate_id, round_number, interview_count, interviews, fit_question_id, version, created_at, updated_at, forms;`,
+        WHERE id = $9 AND version = $10
+      RETURNING id, candidate_id, round_number, interview_count, interviews, fit_question_id, status, process_started_at, version, created_at, updated_at, forms;`,
       [
         model.candidateId ?? null,
         model.roundNumber ?? null,
         model.interviewCount,
         interviewsJson,
         model.fitQuestionId ?? null,
+        model.status,
+        model.processStartedAt ? new Date(model.processStartedAt) : null,
         formsJson,
         model.id,
         expectedVersion

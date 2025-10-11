@@ -15,8 +15,26 @@ type Banner = { type: 'info' | 'error'; text: string } | null;
 
 type SortKey = 'name' | 'position' | 'round' | 'avgFit' | 'avgCase';
 
+const calculateAverageScore = (
+  forms: EvaluationConfig['forms'],
+  field: 'fitScore' | 'caseScore'
+): number | null => {
+  const scores: number[] = [];
+  forms.forEach((form) => {
+    const value = form[field];
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      scores.push(value);
+    }
+  });
+  if (scores.length === 0) {
+    return null;
+  }
+  const total = scores.reduce((sum, score) => sum + score, 0);
+  return total / scores.length;
+};
+
 export const EvaluationScreen = () => {
-  const { list, saveEvaluation, removeEvaluation } = useEvaluationsState();
+  const { list, saveEvaluation, removeEvaluation, startProcess } = useEvaluationsState();
   const { list: candidates } = useCandidatesState();
   const { folders } = useCasesState();
   const { list: fitQuestions } = useFitQuestionsState();
@@ -24,6 +42,7 @@ export const EvaluationScreen = () => {
   const [modalEvaluation, setModalEvaluation] = useState<EvaluationConfig | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [statusEvaluation, setStatusEvaluation] = useState<EvaluationConfig | null>(null);
+  const [startingEvaluationId, setStartingEvaluationId] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
@@ -43,6 +62,8 @@ export const EvaluationScreen = () => {
     return map;
   }, [candidates]);
 
+  const emailPattern = useMemo(() => /.+@.+\..+/, []);
+
   const tableRows = useMemo<EvaluationTableRow[]>(() => {
     return list.map((evaluation) => {
       const metadata = evaluation.candidateId ? candidateIndex.get(evaluation.candidateId) : undefined;
@@ -50,6 +71,19 @@ export const EvaluationScreen = () => {
       const candidatePosition = metadata?.position ?? '—';
       const completedForms = evaluation.forms.filter((form) => form.submitted).length;
       const roundNumber = evaluation.roundNumber ?? null;
+      const avgFitScore = calculateAverageScore(evaluation.forms, 'fitScore');
+      const avgCaseScore = calculateAverageScore(evaluation.forms, 'caseScore');
+      const formsPlanned = evaluation.interviews.length || evaluation.interviewCount;
+      const setupComplete =
+        Boolean(evaluation.candidateId) &&
+        evaluation.interviews.length > 0 &&
+        evaluation.interviews.every(
+          (slot) =>
+            Boolean(slot.interviewerName.trim()) &&
+            Boolean(slot.caseFolderId) &&
+            Boolean(slot.fitQuestionId) &&
+            emailPattern.test(slot.interviewerEmail.trim())
+        );
 
       return {
         id: evaluation.id,
@@ -57,9 +91,14 @@ export const EvaluationScreen = () => {
         candidatePosition,
         roundNumber,
         formsCompleted: completedForms,
-        formsPlanned: evaluation.interviewCount,
-        avgFitScore: null,
-        avgCaseScore: null,
+        formsPlanned,
+        avgFitScore,
+        avgCaseScore,
+        status: evaluation.status,
+        processStartedAt: evaluation.processStartedAt,
+        canStartProcess: setupComplete && evaluation.status === 'draft',
+        isStarting: startingEvaluationId === evaluation.id,
+        onStartProcess: () => handleStartProcess(evaluation),
         onEdit: () => {
           setModalEvaluation(evaluation);
           setIsModalOpen(true);
@@ -67,7 +106,7 @@ export const EvaluationScreen = () => {
         onOpenStatus: () => setStatusEvaluation(evaluation)
       };
     });
-  }, [candidateIndex, list]);
+  }, [candidateIndex, emailPattern, list, startingEvaluationId]);
 
   const sortedRows = useMemo(() => {
     const copy = [...tableRows];
@@ -150,6 +189,39 @@ export const EvaluationScreen = () => {
       setIsModalOpen(false);
     } else {
       setModalEvaluation(result.data);
+    }
+  };
+
+  const handleStartProcess = async (evaluation: EvaluationConfig) => {
+    setStartingEvaluationId(evaluation.id);
+    try {
+      const result = await startProcess(evaluation.id, evaluation.version);
+      if (!result.ok) {
+        if (result.error === 'invalid-setup') {
+          setBanner({
+            type: 'error',
+            text: 'Укажите для всех интервьюеров электронную почту, кейс и фит-вопрос.'
+          });
+        } else if (result.error === 'version-conflict') {
+          setBanner({
+            type: 'error',
+            text: 'Конфликт версий. Обновите страницу, чтобы увидеть актуальные данные.'
+          });
+        } else if (result.error === 'already-started') {
+          setBanner({
+            type: 'error',
+            text: 'Процесс уже был запущен ранее.'
+          });
+        } else if (result.error === 'not-found') {
+          setBanner({ type: 'error', text: 'Оценка больше не существует.' });
+        } else {
+          setBanner({ type: 'error', text: 'Не удалось запустить процесс оценки.' });
+        }
+        return;
+      }
+      setBanner({ type: 'info', text: 'Процесс оценки запущен. Интервьюеры получили приглашения.' });
+    } finally {
+      setStartingEvaluationId(null);
     }
   };
 
