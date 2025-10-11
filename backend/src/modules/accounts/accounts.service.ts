@@ -26,6 +26,26 @@ export class AccountsService {
     return this.repository.findByEmail(email);
   }
 
+  async ensureAccount(email: string, role: AccountRole = 'user') {
+    const normalized = email.trim().toLowerCase();
+    if (!normalized) {
+      throw new Error('INVALID_EMAIL');
+    }
+    const existing = await this.findByEmail(normalized);
+    if (existing) {
+      return existing;
+    }
+    const record: AccountRecord = {
+      id: randomUUID(),
+      email: normalized,
+      role,
+      status: 'pending',
+      invitationToken: randomUUID(),
+      createdAt: new Date()
+    };
+    return this.repository.insertAccount(record);
+  }
+
   async inviteAccount(email: string, role: AccountRole) {
     const normalized = email.trim().toLowerCase();
     if (!normalized || role === 'super-admin') {

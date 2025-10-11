@@ -10,6 +10,7 @@ import { AuthProvider, useAuth } from './modules/auth/AuthContext';
 import { AppStateProvider } from './app/state/AppStateContext';
 import { LoginScreen } from './modules/auth/LoginScreen';
 import { FitQuestionsScreen } from './modules/questions/FitQuestionsScreen';
+import { InterviewerApp } from './modules/interviewer/InterviewerApp';
 
 const AppContent = () => {
   const { session } = useAuth();
@@ -80,10 +81,31 @@ const AppContent = () => {
   );
 };
 
-export const App = () => (
-  <AuthProvider>
-    <AppStateProvider>
-      <AppContent />
-    </AppStateProvider>
-  </AuthProvider>
-);
+type AppMode = 'default' | 'interviewer';
+
+const detectMode = (): AppMode => {
+  if (typeof window === 'undefined') {
+    return 'default';
+  }
+  return window.location.pathname.startsWith('/interviewer') ? 'interviewer' : 'default';
+};
+
+export const App = () => {
+  const [mode] = useState<AppMode>(() => detectMode());
+
+  if (mode === 'interviewer') {
+    return (
+      <AuthProvider>
+        <InterviewerApp />
+      </AuthProvider>
+    );
+  }
+
+  return (
+    <AuthProvider>
+      <AppStateProvider>
+        <AppContent />
+      </AppStateProvider>
+    </AuthProvider>
+  );
+};

@@ -28,6 +28,7 @@ const createInterviewSlot = (): InterviewSlot => ({
 const createStatusRecord = (slot: InterviewSlot): InterviewStatusRecord => ({
   slotId: slot.id,
   interviewerName: slot.interviewerName || 'Interviewer',
+  interviewerEmail: slot.interviewerEmail || '',
   submitted: false
 });
 
@@ -40,6 +41,8 @@ const createDefaultConfig = (): EvaluationConfig => {
     interviewCount: 1,
     interviews,
     fitQuestionId: undefined,
+    status: 'draft',
+    processStartedAt: undefined,
     version: 1,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -104,7 +107,11 @@ export const EvaluationModal = ({
       const forms = interviews.map((slot) => {
         const existing = prev.forms.find((form) => form.slotId === slot.id);
         return existing
-          ? { ...existing, interviewerName: slot.interviewerName || existing.interviewerName }
+          ? {
+              ...existing,
+              interviewerName: slot.interviewerName || existing.interviewerName,
+              interviewerEmail: slot.interviewerEmail || existing.interviewerEmail
+            }
           : createStatusRecord(slot);
       });
       return { ...prev, interviews, interviewCount: interviews.length, forms };

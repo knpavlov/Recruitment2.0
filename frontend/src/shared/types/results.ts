@@ -3,6 +3,9 @@ export type DomainErrorCode =
   | 'version-conflict'
   | 'duplicate'
   | 'invalid-input'
+  | 'invalid-setup'
+  | 'already-started'
+  | 'process-not-started'
   | 'mailer-unavailable'
   | 'unknown';
 

@@ -1,9 +1,16 @@
 import { apiRequest } from '../../../shared/api/httpClient';
-import { EvaluationConfig, InterviewSlot, InterviewStatusRecord } from '../../../shared/types/evaluation';
+import {
+  EvaluationConfig,
+  EvaluationStatus,
+  InterviewerAssignment,
+  InterviewSlot,
+  InterviewStatusRecord
+} from '../../../shared/types/evaluation';
 
 const normalizeString = (value: unknown): string | undefined => {
   if (typeof value === 'string') {
-    return value;
+    const trimmed = value.trim();
+    return trimmed || undefined;
   }
   return undefined;
 };
@@ -40,6 +47,13 @@ const normalizeBoolean = (value: unknown): boolean | undefined => {
   return undefined;
 };
 
+const normalizeStatus = (value: unknown): EvaluationStatus | undefined => {
+  if (value === 'draft' || value === 'in-progress' || value === 'completed') {
+    return value;
+  }
+  return undefined;
+};
+
 const normalizeSlot = (value: unknown): InterviewSlot | null => {
   if (!value || typeof value !== 'object') {
     return null;
@@ -52,7 +66,7 @@ const normalizeSlot = (value: unknown): InterviewSlot | null => {
     fitQuestionId?: unknown;
   };
 
-  const id = normalizeString(payload.id)?.trim();
+  const id = normalizeString(payload.id);
   if (!id) {
     return null;
   }
@@ -61,8 +75,8 @@ const normalizeSlot = (value: unknown): InterviewSlot | null => {
     id,
     interviewerName: normalizeString(payload.interviewerName) ?? 'Interviewer',
     interviewerEmail: normalizeString(payload.interviewerEmail) ?? '',
-    caseFolderId: normalizeString(payload.caseFolderId)?.trim() || undefined,
-    fitQuestionId: normalizeString(payload.fitQuestionId)?.trim() || undefined
+    caseFolderId: normalizeString(payload.caseFolderId),
+    fitQuestionId: normalizeString(payload.fitQuestionId)
   };
 };
 
@@ -73,12 +87,15 @@ const normalizeForm = (value: unknown): InterviewStatusRecord | null => {
   const payload = value as Partial<InterviewStatusRecord> & {
     slotId?: unknown;
     interviewerName?: unknown;
+    interviewerEmail?: unknown;
     submitted?: unknown;
     submittedAt?: unknown;
+    fitScore?: unknown;
+    caseScore?: unknown;
     notes?: unknown;
   };
 
-  const slotId = normalizeString(payload.slotId)?.trim();
+  const slotId = normalizeString(payload.slotId);
   if (!slotId) {
     return null;
   }
@@ -86,9 +103,12 @@ const normalizeForm = (value: unknown): InterviewStatusRecord | null => {
   return {
     slotId,
     interviewerName: normalizeString(payload.interviewerName) ?? 'Interviewer',
+    interviewerEmail: normalizeString(payload.interviewerEmail) ?? '',
     submitted: normalizeBoolean(payload.submitted) ?? false,
     submittedAt: normalizeIsoString(payload.submittedAt),
-    notes: normalizeString(payload.notes) ?? undefined
+    fitScore: normalizeNumber(payload.fitScore),
+    caseScore: normalizeNumber(payload.caseScore),
+    notes: normalizeString(payload.notes)
   };
 };
 
@@ -104,13 +124,15 @@ const normalizeEvaluation = (value: unknown): EvaluationConfig | null => {
     interviewCount?: unknown;
     interviews?: unknown;
     fitQuestionId?: unknown;
+    status?: unknown;
+    processStartedAt?: unknown;
     version?: unknown;
     createdAt?: unknown;
     updatedAt?: unknown;
     forms?: unknown;
   };
 
-  const id = normalizeString(payload.id)?.trim();
+  const id = normalizeString(payload.id);
   const version = normalizeNumber(payload.version);
   const createdAt = normalizeIsoString(payload.createdAt);
   const updatedAt = normalizeIsoString(payload.updatedAt);
@@ -133,11 +155,13 @@ const normalizeEvaluation = (value: unknown): EvaluationConfig | null => {
 
   return {
     id,
-    candidateId: normalizeString(payload.candidateId)?.trim() || undefined,
+    candidateId: normalizeString(payload.candidateId),
     roundNumber: normalizeNumber(payload.roundNumber),
     interviewCount: normalizeNumber(payload.interviewCount) ?? interviews.length,
     interviews,
-    fitQuestionId: normalizeString(payload.fitQuestionId)?.trim() || undefined,
+    fitQuestionId: normalizeString(payload.fitQuestionId),
+    status: normalizeStatus(payload.status) ?? 'draft',
+    processStartedAt: normalizeIsoString(payload.processStartedAt),
     version,
     createdAt,
     updatedAt,
@@ -167,6 +191,7 @@ const serializeEvaluation = (config: EvaluationConfig) => ({
   candidateId: config.candidateId ?? null,
   roundNumber: config.roundNumber ?? null,
   fitQuestionId: config.fitQuestionId ?? null,
+  processStartedAt: config.processStartedAt ?? null,
   interviews: config.interviews.map((slot) => ({
     ...slot,
     caseFolderId: slot.caseFolderId ?? null,
@@ -175,9 +200,68 @@ const serializeEvaluation = (config: EvaluationConfig) => ({
   forms: config.forms.map((form) => ({
     ...form,
     submittedAt: form.submittedAt ?? null,
+    fitScore: form.fitScore ?? null,
+    caseScore: form.caseScore ?? null,
     notes: form.notes ?? null
   }))
 });
+
+const normalizeAssignment = (value: unknown): InterviewerAssignment | null => {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const payload = value as Partial<InterviewerAssignment> & {
+    evaluationId?: unknown;
+    slotId?: unknown;
+    interviewerName?: unknown;
+    interviewerEmail?: unknown;
+    evaluationStatus?: unknown;
+    evaluationVersion?: unknown;
+    roundNumber?: unknown;
+    processStartedAt?: unknown;
+    candidate?: unknown;
+    caseFolder?: unknown;
+    fitQuestion?: unknown;
+    form?: unknown;
+  };
+
+  const evaluationId = normalizeString(payload.evaluationId);
+  const slotId = normalizeString(payload.slotId);
+  const evaluationStatus = normalizeStatus(payload.evaluationStatus);
+  const evaluationVersion = normalizeNumber(payload.evaluationVersion);
+  if (!evaluationId || !slotId || !evaluationStatus || evaluationVersion === undefined) {
+    return null;
+  }
+
+  const form = normalizeForm(payload.form);
+  if (!form) {
+    return null;
+  }
+
+  return {
+    evaluationId,
+    slotId,
+    interviewerName: normalizeString(payload.interviewerName) ?? 'Interviewer',
+    interviewerEmail: normalizeString(payload.interviewerEmail) ?? '',
+    evaluationStatus,
+    evaluationVersion,
+    roundNumber: normalizeNumber(payload.roundNumber),
+    processStartedAt: normalizeIsoString(payload.processStartedAt),
+    candidate: payload.candidate as InterviewerAssignment['candidate'],
+    caseFolder: payload.caseFolder as InterviewerAssignment['caseFolder'],
+    fitQuestion: payload.fitQuestion as InterviewerAssignment['fitQuestion'],
+    form
+  };
+};
+
+const ensureAssignments = (value: unknown): InterviewerAssignment[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((item) => normalizeAssignment(item))
+    .filter((assignment): assignment is InterviewerAssignment => Boolean(assignment));
+};
 
 export const evaluationsApi = {
   list: async () => ensureEvaluationList(await apiRequest<unknown>('/evaluations')),
@@ -198,5 +282,32 @@ export const evaluationsApi = {
   remove: async (id: string) =>
     apiRequest<{ id?: unknown }>(`/evaluations/${id}`, {
       method: 'DELETE'
-    }).then((result) => (typeof result.id === 'string' ? result.id : id))
+    }).then((result) => (typeof result.id === 'string' ? result.id : id)),
+  startProcess: async (id: string, expectedVersion: number) =>
+    ensureEvaluation(
+      await apiRequest<unknown>(`/evaluations/${id}/start`, {
+        method: 'POST',
+        body: { expectedVersion }
+      })
+    ),
+  listAssignments: async (email: string) => {
+    if (!email.trim()) {
+      return [] as InterviewerAssignment[];
+    }
+    const query = `/evaluations/interviewer/assignments?email=${encodeURIComponent(email.trim())}`;
+    return ensureAssignments(await apiRequest<unknown>(query));
+  },
+  submitForm: async (
+    evaluationId: string,
+    slotId: string,
+    email: string,
+    payload: { fitScore?: number; caseScore?: number; notes?: string; submitted?: boolean },
+    expectedVersion: number
+  ) =>
+    ensureEvaluation(
+      await apiRequest<unknown>(`/evaluations/${evaluationId}/forms/${slotId}`, {
+        method: 'POST',
+        body: { email, expectedVersion, ...payload }
+      })
+    )
 };

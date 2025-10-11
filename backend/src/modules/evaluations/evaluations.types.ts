@@ -1,3 +1,5 @@
+export type EvaluationStatus = 'draft' | 'in-progress' | 'completed';
+
 export interface InterviewSlotModel {
   id: string;
   interviewerName: string;
@@ -9,8 +11,11 @@ export interface InterviewSlotModel {
 export interface InterviewStatusModel {
   slotId: string;
   interviewerName: string;
+  interviewerEmail: string;
   submitted: boolean;
   submittedAt?: string;
+  fitScore?: number;
+  caseScore?: number;
   notes?: string;
 }
 
@@ -21,6 +26,8 @@ export interface EvaluationRecord {
   interviewCount: number;
   interviews: InterviewSlotModel[];
   fitQuestionId?: string;
+  status: EvaluationStatus;
+  processStartedAt?: string;
   version: number;
   createdAt: string;
   updatedAt: string;
@@ -34,5 +41,8 @@ export interface EvaluationWriteModel {
   interviewCount: number;
   interviews: InterviewSlotModel[];
   fitQuestionId?: string;
+  status: EvaluationStatus;
+  processStartedAt?: string;
   forms: InterviewStatusModel[];
 }
+
