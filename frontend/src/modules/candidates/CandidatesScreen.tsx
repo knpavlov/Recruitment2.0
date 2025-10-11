@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import styles from '../../styles/CandidatesScreen.module.css';
 import { CandidateModal } from './components/CandidateModal';
-import { CandidateCard } from './components/CandidateCard';
+import { CandidatesTable, CandidatesTableRow } from './components/CandidatesTable';
 import { useCandidatesState } from '../../app/state/AppStateContext';
 import { CandidateProfile } from '../../shared/types/candidate';
 
@@ -16,34 +16,61 @@ export const CandidatesScreen = () => {
   const [modalCandidate, setModalCandidate] = useState<CandidateProfile | null>(null);
   const [modalBanner, setModalBanner] = useState<Banner>(null);
   const [sortMode, setSortMode] = useState<SortMode>('updated');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
-  const sortedCandidates = useMemo(
-    () => {
-      const copy = [...list];
+  const sortedCandidates = useMemo(() => {
+    const copy = [...list];
+
+    copy.sort((a, b) => {
       if (sortMode === 'name') {
-        return copy.sort((a, b) =>
-          `${a.lastName}${a.firstName}`.localeCompare(`${b.lastName}${b.firstName}`, 'en-US')
+        const compare = `${a.lastName}${a.firstName}`.localeCompare(
+          `${b.lastName}${b.firstName}`,
+          'en-US',
+          { sensitivity: 'base' }
         );
+        return sortDirection === 'asc' ? compare : -compare;
       }
+
       if (sortMode === 'position') {
-        return copy.sort((a, b) => {
-          const aPosition = a.desiredPosition?.toLowerCase() ?? '';
-          const bPosition = b.desiredPosition?.toLowerCase() ?? '';
-          if (aPosition && bPosition) {
-            const compare = aPosition.localeCompare(bPosition, 'en-US');
-            if (compare !== 0) {
-              return compare;
-            }
-          } else if (aPosition || bPosition) {
-            return aPosition ? -1 : 1;
-          }
-          return `${a.lastName}${a.firstName}`.localeCompare(`${b.lastName}${b.firstName}`, 'en-US');
-        });
+        const aPosition = a.desiredPosition?.trim().toLowerCase() ?? '';
+        const bPosition = b.desiredPosition?.trim().toLowerCase() ?? '';
+        const compare = aPosition.localeCompare(bPosition, 'en-US');
+        if (compare !== 0) {
+          return sortDirection === 'asc' ? compare : -compare;
+        }
+        const fallback = `${a.lastName}${a.firstName}`.localeCompare(
+          `${b.lastName}${b.firstName}`,
+          'en-US',
+          { sensitivity: 'base' }
+        );
+        return sortDirection === 'asc' ? fallback : -fallback;
       }
-      return copy.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-    },
-    [list, sortMode]
+
+      const updatedDiff = new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
+      return sortDirection === 'asc' ? updatedDiff : -updatedDiff;
+    });
+
+    return copy;
+  }, [list, sortDirection, sortMode]);
+
+  const dateFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat('en-US', {
+        dateStyle: 'medium',
+        timeStyle: 'short'
+      }),
+    []
   );
+
+  const tableRows = useMemo<CandidatesTableRow[]>(() => {
+    return sortedCandidates.map((candidate) => ({
+      id: candidate.id,
+      displayName: `${candidate.firstName} ${candidate.lastName}`.trim(),
+      desiredPosition: candidate.desiredPosition?.trim() || 'Position not specified',
+      city: candidate.city?.trim() || 'City not specified',
+      updatedAtLabel: dateFormatter.format(new Date(candidate.updatedAt))
+    }));
+  }, [dateFormatter, sortedCandidates]);
 
   const handleCreate = () => {
     setModalCandidate(null);
@@ -133,6 +160,13 @@ export const CandidatesScreen = () => {
               <option value="position">Desired position</option>
             </select>
           </label>
+          <button
+            className={styles.sortToggle}
+            onClick={() => setSortDirection((value) => (value === 'asc' ? 'desc' : 'asc'))}
+            type="button"
+          >
+            {sortDirection === 'asc' ? 'Asc' : 'Desc'}
+          </button>
           <button className={styles.primaryButton} onClick={handleCreate}>
             Create profile
           </button>
@@ -143,24 +177,24 @@ export const CandidatesScreen = () => {
         <div className={banner.type === 'info' ? styles.infoBanner : styles.errorBanner}>{banner.text}</div>
       )}
 
-      <div className={styles.cardsGrid}>
-        {sortedCandidates.length === 0 ? (
+      <div className={styles.contentArea}>
+        {tableRows.length === 0 ? (
           <div className={styles.emptyState}>
             <h2>No candidates yet</h2>
             <p>Use the “Create profile” button to add the first candidate.</p>
           </div>
         ) : (
-          sortedCandidates.map((candidate) => (
-            <CandidateCard
-              key={candidate.id}
-              profile={candidate}
-              onOpen={() => {
+          <CandidatesTable
+            rows={tableRows}
+            onOpen={(id) => {
+              const candidate = list.find((item) => item.id === id);
+              if (candidate) {
                 setModalCandidate(candidate);
                 setModalBanner(null);
                 setIsModalOpen(true);
-              }}
-            />
-          ))
+              }
+            }}
+          />
         )}
       </div>
 

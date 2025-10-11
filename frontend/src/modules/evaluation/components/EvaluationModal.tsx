@@ -3,6 +3,7 @@ import styles from '../../../styles/EvaluationModal.module.css';
 import { EvaluationConfig, InterviewSlot, InterviewStatusRecord } from '../../../shared/types/evaluation';
 import { CandidateProfile } from '../../../shared/types/candidate';
 import { CaseFolder } from '../../../shared/types/caseLibrary';
+import { FitQuestion } from '../../../shared/types/fitQuestion';
 import { generateId } from '../../../shared/ui/generateId';
 
 interface EvaluationModalProps {
@@ -12,6 +13,7 @@ interface EvaluationModalProps {
   onClose: () => void;
   candidates: CandidateProfile[];
   folders: CaseFolder[];
+  fitQuestions: FitQuestion[];
 }
 
 const createInterviewSlot = (): InterviewSlot => ({
@@ -42,13 +44,44 @@ const createDefaultConfig = (): EvaluationConfig => {
   };
 };
 
+const shuffleArray = <T,>(source: T[]): T[] => {
+  const items = [...source];
+  for (let index = items.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    const temp = items[index];
+    items[index] = items[swapIndex];
+    items[swapIndex] = temp;
+  }
+  return items;
+};
+
+const buildUniqueAssignments = <T,>(source: T[], count: number): (T | undefined)[] => {
+  if (count <= 0) {
+    return [];
+  }
+  if (source.length === 0) {
+    return Array.from({ length: count }, () => undefined);
+  }
+  const shuffled = shuffleArray(source);
+  const result: (T | undefined)[] = [];
+  for (let index = 0; index < count; index += 1) {
+    if (index < shuffled.length) {
+      result.push(shuffled[index]);
+    } else {
+      result.push(undefined);
+    }
+  }
+  return result;
+};
+
 export const EvaluationModal = ({
   initialConfig,
   onSave,
   onDelete,
   onClose,
   candidates,
-  folders
+  folders,
+  fitQuestions
 }: EvaluationModalProps) => {
   const [config, setConfig] = useState<EvaluationConfig>(createDefaultConfig());
 
@@ -81,13 +114,37 @@ export const EvaluationModal = ({
     );
   };
 
-  const changeInterviewCount = (count: number) => {
+  const handleAddInterview = () => {
+    updateInterviews((current) => [...current, createInterviewSlot()]);
+  };
+
+  const handleRemoveInterview = (slotId: string) => {
     updateInterviews((current) => {
-      if (count > current.length) {
-        const additions = Array.from({ length: count - current.length }, () => createInterviewSlot());
-        return [...current, ...additions];
+      if (current.length <= 1) {
+        return current;
       }
-      return current.slice(0, count);
+      return current.filter((slot) => slot.id !== slotId);
+    });
+  };
+
+  const handleAssignRandomly = () => {
+    updateInterviews((current) => {
+      if (current.length === 0) {
+        return current;
+      }
+      const caseAssignments = buildUniqueAssignments(
+        folders.map((folder) => folder.id),
+        current.length
+      );
+      const fitAssignments = buildUniqueAssignments(
+        fitQuestions.map((question) => question.id),
+        current.length
+      );
+      return current.map((slot, index) => ({
+        ...slot,
+        caseFolderId: caseAssignments[index] ?? slot.caseFolderId,
+        fitQuestionId: fitAssignments[index] ?? slot.fitQuestionId
+      }));
     });
   };
 
@@ -110,6 +167,15 @@ export const EvaluationModal = ({
         label: `${candidate.lastName} ${candidate.firstName}`.trim() || 'No name'
       })),
     [candidates]
+  );
+
+  const fitQuestionOptions = useMemo(
+    () =>
+      fitQuestions.map((question) => ({
+        id: question.id,
+        label: question.shortTitle.trim() || question.content.trim() || question.id
+      })),
+    [fitQuestions]
   );
 
   return (
@@ -150,31 +216,32 @@ export const EvaluationModal = ({
             />
           </label>
 
-          <label>
-            <span>Interview count</span>
-            <input
-              type="number"
-              min={1}
-              value={config.interviewCount}
-              onChange={(e) => changeInterviewCount(Number(e.target.value) || 1)}
-            />
-          </label>
-
-          <label className={styles.fullWidth}>
-            <span>Fit question</span>
-            <select
-              value={config.fitQuestionId || ''}
-              onChange={(e) => setConfig((prev) => ({ ...prev, fitQuestionId: e.target.value || undefined }))}
-            >
-              <option value="">Not selected</option>
-              <option value="culture">Standard culture question</option>
-            </select>
-          </label>
+          <div className={`${styles.fullWidth} ${styles.toolbar}`}>
+            <h3 className={styles.toolbarTitle}>Interviews</h3>
+            <div className={styles.toolbarActions}>
+              <button type="button" className={styles.toolbarPrimaryButton} onClick={handleAssignRandomly}>
+                Assign randomly
+              </button>
+              <button type="button" className={styles.toolbarSecondaryButton} onClick={handleAddInterview}>
+                Add interview
+              </button>
+            </div>
+          </div>
 
           <div className={styles.interviewsList}>
             {config.interviews.map((slot, index) => (
               <div key={slot.id} className={styles.interviewBlock}>
-                <h3>Interview {index + 1}</h3>
+                <div className={styles.interviewHeader}>
+                  <h3>Interview {index + 1}</h3>
+                  <button
+                    type="button"
+                    className={styles.removeInterviewButton}
+                    onClick={() => handleRemoveInterview(slot.id)}
+                    disabled={config.interviews.length <= 1}
+                  >
+                    Delete
+                  </button>
+                </div>
                 <label>
                   <span>Interviewer name</span>
                   <input
@@ -209,8 +276,12 @@ export const EvaluationModal = ({
                     value={slot.fitQuestionId || ''}
                     onChange={(e) => updateInterview(slot.id, { fitQuestionId: e.target.value || undefined })}
                   >
-                    <option value="">Default</option>
-                    <option value="culture">Standard question</option>
+                    <option value="">Not selected</option>
+                    {fitQuestionOptions.map((question) => (
+                      <option key={question.id} value={question.id}>
+                        {question.label}
+                      </option>
+                    ))}
                   </select>
                 </label>
               </div>

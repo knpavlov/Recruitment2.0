@@ -61,6 +61,20 @@
   font-size: 14px;
 }
 
+.sortToggle {
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: rgba(148, 163, 184, 0.15);
+  color: #0f172a;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.sortToggle:hover {
+  transform: translateY(-1px);
+}
+
 .infoBanner,
 .errorBanner {
   padding: 16px 20px;
@@ -78,9 +92,10 @@
   color: #b91c1c;
 }
 
-.cardsGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+
+.contentArea {
+  display: flex;
+  flex-direction: column;
   gap: 24px;
 }
 
