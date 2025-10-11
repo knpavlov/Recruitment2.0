@@ -19,6 +19,8 @@ export interface CandidateProfile {
   desiredPosition?: string;
   phone?: string;
   email?: string;
+  targetPractice?: 'PI' | 'PEPI' | 'ET' | 'Tax' | 'Restructuring';
+  targetOffice?: string;
   experienceSummary?: string;
   totalExperienceYears?: number;
   consultingExperienceYears?: number;

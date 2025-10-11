@@ -10,6 +10,22 @@ const readOptionalString = (value: unknown): string | undefined => {
   return trimmed ? trimmed : undefined;
 };
 
+const readPractice = (
+  value: unknown
+): CandidateWriteModel['targetPractice'] | undefined => {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  const allowed: CandidateWriteModel['targetPractice'][] = ['PI', 'PEPI', 'ET', 'Tax', 'Restructuring'];
+  return allowed.includes(trimmed as CandidateWriteModel['targetPractice'])
+    ? (trimmed as CandidateWriteModel['targetPractice'])
+    : undefined;
+};
+
 const readOptionalNumber = (value: unknown): number | undefined => {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return value;
@@ -93,6 +109,8 @@ const buildWriteModel = (payload: unknown): CandidateWriteModel => {
     age: readOptionalNumber(source.age),
     city: readOptionalString(source.city),
     desiredPosition: readOptionalString(source.desiredPosition),
+    targetPractice: readPractice(source.targetPractice),
+    targetOffice: readOptionalString(source.targetOffice),
     phone: readOptionalString(source.phone),
     email: readOptionalString(source.email),
     experienceSummary: readOptionalString(source.experienceSummary),
