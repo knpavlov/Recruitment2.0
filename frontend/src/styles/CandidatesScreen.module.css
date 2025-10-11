@@ -41,26 +41,6 @@
   transform: translateY(-1px);
 }
 
-.sortControl {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  color: #475569;
-}
-
-.sortControl span {
-  font-weight: 500;
-}
-
-.sortControl select {
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(148, 163, 184, 0.4);
-  background: white;
-  font-size: 14px;
-}
-
 .infoBanner,
 .errorBanner {
   padding: 16px 20px;
@@ -97,12 +77,39 @@
   border-bottom: 1px solid rgba(148, 163, 184, 0.25);
 }
 
+.sortButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.sortButtonActive {
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.sortIcon {
+  font-size: 12px;
+}
+
 .actionsHeader {
   width: 160px;
 }
 
 .actionsCell {
   display: flex;
+  gap: 12px;
+}
+
+.resumeCell {
+  display: flex;
+  align-items: center;
   gap: 12px;
 }
 
@@ -113,6 +120,11 @@
   background: rgba(148, 163, 184, 0.2);
   color: #0f172a;
   cursor: pointer;
+}
+
+.tableHint {
+  color: #94a3b8;
+  font-size: 13px;
 }
 
 .emptyState {

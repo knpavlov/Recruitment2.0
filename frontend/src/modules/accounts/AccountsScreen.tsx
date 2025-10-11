@@ -5,6 +5,8 @@ import { useAuth } from '../auth/AuthContext';
 
 type Banner = { type: 'info' | 'error'; text: string } | null;
 
+type SortKey = 'email' | 'status' | 'role' | 'invitation';
+
 export const AccountsScreen = () => {
   const { session } = useAuth();
   const role = session?.role ?? 'user';
@@ -12,11 +14,66 @@ export const AccountsScreen = () => {
   const [email, setEmail] = useState('');
   const [targetRole, setTargetRole] = useState<'admin' | 'user'>('admin');
   const [banner, setBanner] = useState<Banner>(null);
+  const [sortKey, setSortKey] = useState<SortKey>('email');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
-  const sortedAccounts = useMemo(
-    () => [...list].sort((a, b) => a.email.localeCompare(b.email)),
-    [list]
-  );
+  const sortedAccounts = useMemo(() => {
+    // сортируем копию, чтобы не изменять исходное состояние
+    const copy = [...list];
+
+    const compareStrings = (a: string, b: string) => a.localeCompare(b, 'en-US', { sensitivity: 'base' });
+    const compareStatuses = (a: string, b: string) => {
+      const weight = (status: string) => (status === 'active' ? 1 : 0);
+      return weight(a) - weight(b);
+    };
+
+    copy.sort((a, b) => {
+      let result = 0;
+
+      if (sortKey === 'email') {
+        result = compareStrings(a.email, b.email);
+      } else if (sortKey === 'status') {
+        result = compareStatuses(a.status, b.status);
+        if (result === 0) {
+          result = compareStrings(a.email, b.email);
+        }
+      } else if (sortKey === 'role') {
+        result = compareStrings(a.role, b.role);
+        if (result === 0) {
+          result = compareStrings(a.email, b.email);
+        }
+      } else if (sortKey === 'invitation') {
+        const aToken = a.invitationToken ?? '';
+        const bToken = b.invitationToken ?? '';
+        result = compareStrings(aToken, bToken);
+        if (result === 0) {
+          result = compareStrings(a.email, b.email);
+        }
+      }
+
+      return sortDirection === 'asc' ? result : -result;
+    });
+
+    return copy;
+  }, [list, sortDirection, sortKey]);
+
+  const handleSortChange = (key: SortKey) => {
+    setSortKey((currentKey) => {
+      if (currentKey === key) {
+        setSortDirection((currentDirection) => (currentDirection === 'asc' ? 'desc' : 'asc'));
+        return currentKey;
+      }
+      setSortDirection('asc');
+      return key;
+    });
+  };
+
+  const renderSortIcon = (key: SortKey) => {
+    if (sortKey !== key) {
+      return null;
+    }
+    return <span className={styles.sortIcon}>{sortDirection === 'asc' ? '▲' : '▼'}</span>;
+  };
 
   if (role !== 'super-admin') {
     return (
@@ -125,10 +182,46 @@ export const AccountsScreen = () => {
         <table className={styles.table}>
           <thead>
             <tr>
-              <th>Email</th>
-              <th>Status</th>
-              <th>Role</th>
-              <th>Invitation</th>
+              <th>
+                <button
+                  className={`${styles.sortButton} ${sortKey === 'email' ? styles.sortButtonActive : ''}`}
+                  onClick={() => handleSortChange('email')}
+                  type="button"
+                >
+                  Email
+                  {renderSortIcon('email')}
+                </button>
+              </th>
+              <th>
+                <button
+                  className={`${styles.sortButton} ${sortKey === 'status' ? styles.sortButtonActive : ''}`}
+                  onClick={() => handleSortChange('status')}
+                  type="button"
+                >
+                  Status
+                  {renderSortIcon('status')}
+                </button>
+              </th>
+              <th>
+                <button
+                  className={`${styles.sortButton} ${sortKey === 'role' ? styles.sortButtonActive : ''}`}
+                  onClick={() => handleSortChange('role')}
+                  type="button"
+                >
+                  Role
+                  {renderSortIcon('role')}
+                </button>
+              </th>
+              <th>
+                <button
+                  className={`${styles.sortButton} ${sortKey === 'invitation' ? styles.sortButtonActive : ''}`}
+                  onClick={() => handleSortChange('invitation')}
+                  type="button"
+                >
+                  Invitation
+                  {renderSortIcon('invitation')}
+                </button>
+              </th>
               <th>Actions</th>
             </tr>
           </thead>
