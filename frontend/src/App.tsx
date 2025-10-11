@@ -9,6 +9,7 @@ import { PlaceholderScreen } from './shared/ui/PlaceholderScreen';
 import { AuthProvider, useAuth } from './modules/auth/AuthContext';
 import { AppStateProvider } from './app/state/AppStateContext';
 import { LoginScreen } from './modules/auth/LoginScreen';
+import { FitQuestionsScreen } from './modules/questions/FitQuestionsScreen';
 
 const AppContent = () => {
   const { session } = useAuth();
@@ -49,12 +50,7 @@ const AppContent = () => {
       case 'cases':
         return <CasesScreen />;
       case 'questions':
-        return (
-          <PlaceholderScreen
-            title="Fit questions database"
-            description="This section is under development."
-          />
-        );
+        return <FitQuestionsScreen />;
       case 'candidates':
         return <CandidatesScreen />;
       case 'evaluation':
