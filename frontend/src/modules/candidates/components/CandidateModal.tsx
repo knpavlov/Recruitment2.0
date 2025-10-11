@@ -7,8 +7,11 @@ import { parseResumeText } from '../services/resumeParser';
 
 interface CandidateModalProps {
   initialProfile: CandidateProfile | null;
-  onSave: (profile: CandidateProfile, options: { closeAfterSave: boolean; expectedVersion: number | null }) => void;
-  onDelete: (id: string) => void;
+  onSave: (
+    profile: CandidateProfile,
+    options: { closeAfterSave: boolean; expectedVersion: number | null }
+  ) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
   onClose: () => void;
 }
 
@@ -17,6 +20,7 @@ const createEmptyProfile = (): CandidateProfile => ({
   version: 1,
   firstName: '',
   lastName: '',
+  gender: undefined,
   age: undefined,
   city: '',
   desiredPosition: '',
@@ -81,7 +85,7 @@ export const CandidateModal = ({ initialProfile, onSave, onDelete, onClose }: Ca
   };
 
   const submitSave = (closeAfterSave: boolean) => {
-    onSave({ ...profile, resume }, { closeAfterSave, expectedVersion });
+    void onSave({ ...profile, resume }, { closeAfterSave, expectedVersion });
   };
 
   const handleDelete = () => {
@@ -89,7 +93,7 @@ export const CandidateModal = ({ initialProfile, onSave, onDelete, onClose }: Ca
       onClose();
       return;
     }
-    onDelete(initialProfile.id);
+    void onDelete(initialProfile.id);
   };
 
   return (
@@ -115,7 +119,14 @@ export const CandidateModal = ({ initialProfile, onSave, onDelete, onClose }: Ca
           <div className={styles.uploadZone}>
             {resume ? (
               <>
-                <p className={styles.resumeName}>{resume.fileName}</p>
+                <a
+                  className={styles.resumeLink}
+                  href={resume.dataUrl}
+                  download={resume.fileName}
+                  rel="noopener noreferrer"
+                >
+                  <p className={styles.resumeName}>{resume.fileName}</p>
+                </a>
                 <p className={styles.resumeMeta}>
                   Uploaded {new Date(resume.uploadedAt).toLocaleString('en-US')} · {(resume.size / 1024).toFixed(1)} KB
                 </p>
@@ -153,6 +164,19 @@ export const CandidateModal = ({ initialProfile, onSave, onDelete, onClose }: Ca
           <label>
             <span>Last name</span>
             <input value={profile.lastName} onChange={(e) => handleChange('lastName', e.target.value)} />
+          </label>
+          <label>
+            <span>Gender</span>
+            <select
+              value={profile.gender ?? ''}
+              onChange={(e) => handleChange('gender', e.target.value ? e.target.value : undefined)}
+            >
+              <option value="">Not specified</option>
+              <option value="female">Female</option>
+              <option value="male">Male</option>
+              <option value="non-binary">Non-binary</option>
+              <option value="prefer-not-to-say">Prefer not to say</option>
+            </select>
           </label>
           <label>
             <span>Age</span>

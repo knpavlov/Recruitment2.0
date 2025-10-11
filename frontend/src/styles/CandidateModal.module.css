@@ -66,6 +66,15 @@
   color: #0f172a;
 }
 
+.resumeLink {
+  text-decoration: none;
+  color: inherit;
+}
+
+.resumeLink:hover .resumeName {
+  text-decoration: underline;
+}
+
 .resumeMeta {
   margin: 0;
   font-size: 14px;
@@ -104,7 +113,8 @@
 }
 
 .formGrid input,
-.formGrid textarea {
+.formGrid textarea,
+.formGrid select {
   border-radius: 12px;
   border: 1px solid rgba(148, 163, 184, 0.4);
   padding: 12px;

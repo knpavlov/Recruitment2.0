@@ -13,6 +13,7 @@ export interface CandidateProfile {
   version: number;
   firstName: string;
   lastName: string;
+  gender?: string;
   age?: number;
   city?: string;
   desiredPosition?: string;
