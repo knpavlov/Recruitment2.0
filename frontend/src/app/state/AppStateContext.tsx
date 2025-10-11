@@ -9,6 +9,8 @@ import { candidatesApi } from '../../modules/candidates/services/candidatesApi';
 import { accountsApi } from '../../modules/accounts/services/accountsApi';
 import { ApiError } from '../../shared/api/httpClient';
 import { useAuth } from '../../modules/auth/AuthContext';
+import { FitQuestion, FitQuestionRatingKey } from '../../shared/types/fitQuestion';
+import { fitQuestionsApi } from '../../modules/questions/services/fitQuestionsApi';
 
 interface AppStateContextValue {
   cases: {
@@ -34,6 +36,14 @@ interface AppStateContextValue {
       expectedVersion: number | null
     ) => Promise<DomainResult<CandidateProfile>>;
     removeProfile: (id: string) => Promise<DomainResult<string>>;
+  };
+  questions: {
+    list: FitQuestion[];
+    saveQuestion: (
+      question: FitQuestion,
+      expectedVersion: number | null
+    ) => Promise<DomainResult<FitQuestion>>;
+    removeQuestion: (id: string) => Promise<DomainResult<string>>;
   };
   evaluations: {
     list: EvaluationConfig[];
@@ -63,6 +73,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [candidates, setCandidates] = useState<CandidateProfile[]>([]);
   const [evaluations, setEvaluations] = useState<EvaluationConfig[]>([]);
   const [accounts, setAccounts] = useState<AccountRecord[]>([]);
+  const [questions, setQuestions] = useState<FitQuestion[]>([]);
   const { session } = useAuth();
 
   const syncFolders = useCallback(async (): Promise<CaseFolder[] | null> => {
@@ -104,6 +115,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     if (!session) {
       setCandidates([]);
       setEvaluations([]);
+      setQuestions([]);
     }
   }, [session]);
 
@@ -120,6 +132,21 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       }
     };
     void loadCandidates();
+  }, [session]);
+
+  useEffect(() => {
+    if (!session) {
+      return;
+    }
+    const loadQuestions = async () => {
+      try {
+        const remote = await fitQuestionsApi.list();
+        setQuestions(remote);
+      } catch (error) {
+        console.error('Failed to load fit questions:', error);
+      }
+    };
+    void loadQuestions();
   }, [session]);
 
   const value = useMemo<AppStateContextValue>(() => ({
@@ -312,6 +339,99 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
         }
       }
     },
+    questions: {
+      list: questions,
+      saveQuestion: async (question, expectedVersion) => {
+        const shortTitle = question.shortTitle.trim();
+        const content = question.content.trim();
+        if (!shortTitle || !content) {
+          return { ok: false, error: 'invalid-input' };
+        }
+
+        const ratingKeys: FitQuestionRatingKey[] = ['1', '2', '3', '4', '5'];
+        let hasInvalidCriterion = false;
+        const sanitizedCriteria = question.criteria.map((criterion) => {
+          const title = criterion.title.trim();
+          if (!title) {
+            hasInvalidCriterion = true;
+          }
+          const sanitizedRatings: FitQuestion['criteria'][number]['ratings'] = {};
+          for (const score of ratingKeys) {
+            const value = criterion.ratings[score];
+            if (typeof value === 'string') {
+              const trimmed = value.trim();
+              if (trimmed) {
+                sanitizedRatings[score] = trimmed;
+              }
+            }
+          }
+          return {
+            ...criterion,
+            title,
+            ratings: sanitizedRatings
+          };
+        });
+
+        if (hasInvalidCriterion) {
+          return { ok: false, error: 'invalid-input' };
+        }
+
+        const normalized: FitQuestion = {
+          ...question,
+          shortTitle,
+          content,
+          criteria: sanitizedCriteria
+        };
+
+        try {
+          const exists = questions.some((item) => item.id === normalized.id);
+          const saved = exists && expectedVersion !== null
+            ? await fitQuestionsApi.update(normalized.id, normalized, expectedVersion)
+            : await fitQuestionsApi.create(normalized);
+          setQuestions((prev) => {
+            const index = prev.findIndex((item) => item.id === saved.id);
+            if (index === -1) {
+              return [saved, ...prev];
+            }
+            const copy = [...prev];
+            copy[index] = saved;
+            return copy;
+          });
+          return { ok: true, data: saved };
+        } catch (error) {
+          if (error instanceof ApiError) {
+            if (error.code === 'version-conflict') {
+              return { ok: false, error: 'version-conflict' };
+            }
+            if (error.code === 'invalid-input') {
+              return { ok: false, error: 'invalid-input' };
+            }
+            if (error.code === 'not-found' || error.status === 404) {
+              return { ok: false, error: 'not-found' };
+            }
+          }
+          console.error('Failed to save fit question:', error);
+          return { ok: false, error: 'unknown' };
+        }
+      },
+      removeQuestion: async (id) => {
+        const exists = questions.some((item) => item.id === id);
+        if (!exists) {
+          return { ok: false, error: 'not-found' };
+        }
+        try {
+          await fitQuestionsApi.remove(id);
+          setQuestions((prev) => prev.filter((item) => item.id !== id));
+          return { ok: true, data: id };
+        } catch (error) {
+          if (error instanceof ApiError && (error.code === 'not-found' || error.status === 404)) {
+            return { ok: false, error: 'not-found' };
+          }
+          console.error('Failed to delete fit question:', error);
+          return { ok: false, error: 'unknown' };
+        }
+      }
+    },
     evaluations: {
       list: evaluations,
       saveEvaluation: (config, expectedVersion) => {
@@ -412,7 +532,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
         }
       }
     }
-  }), [folders, candidates, evaluations, accounts, syncFolders]);
+  }), [folders, candidates, evaluations, accounts, questions, syncFolders]);
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;
 };
@@ -427,5 +547,6 @@ export const useAppState = () => {
 
 export const useCasesState = () => useAppState().cases;
 export const useCandidatesState = () => useAppState().candidates;
+export const useQuestionsState = () => useAppState().questions;
 export const useEvaluationsState = () => useAppState().evaluations;
 export const useAccountsState = () => useAppState().accounts;

@@ -11,6 +11,18 @@ declare module 'pg' {
 
   export interface QueryResult<R extends Record<string, unknown> = Record<string, unknown>> {
     rows: R[];
+    rowCount: number;
+  }
+
+  export interface PoolClient {
+    query<R extends Record<string, unknown> = Record<string, unknown>>(
+      queryText: string,
+      values?: unknown[]
+    ): Promise<QueryResult<R>>;
+    query<R extends Record<string, unknown> = Record<string, unknown>>(
+      config: { text: string; values?: unknown[] }
+    ): Promise<QueryResult<R>>;
+    release(): void;
   }
 
   export class Pool {
@@ -24,5 +36,6 @@ declare module 'pg' {
     ): Promise<QueryResult<R>>;
     end(): Promise<void>;
     on(event: 'error', listener: (err: Error) => void): this;
+    connect(): Promise<PoolClient>;
   }
 }

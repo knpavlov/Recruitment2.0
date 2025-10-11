@@ -142,8 +142,20 @@ const createTables = async () => {
       title TEXT NOT NULL,
       category TEXT,
       difficulty TEXT,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      content TEXT NOT NULL DEFAULT '',
+      criteria JSONB NOT NULL DEFAULT '[]'::jsonb,
+      version INTEGER NOT NULL DEFAULT 1,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+  `);
+
+  await postgresPool.query(`
+    ALTER TABLE questions
+      ADD COLUMN IF NOT EXISTS content TEXT NOT NULL DEFAULT '',
+      ADD COLUMN IF NOT EXISTS criteria JSONB NOT NULL DEFAULT '[]'::jsonb,
+      ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1,
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
   `);
 };
 

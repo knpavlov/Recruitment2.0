@@ -1,0 +1,226 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 40px 24px;
+}
+
+.modal {
+  width: min(960px, 100%);
+  max-height: 100%;
+  background: #f8fafc;
+  border-radius: 28px;
+  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.25);
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 28px 32px 16px;
+}
+
+.header h2 {
+  margin: 0;
+  font-size: 28px;
+  color: #0f172a;
+}
+
+.subtitle {
+  margin: 8px 0 0 0;
+  color: #475569;
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  font-size: 32px;
+  line-height: 1;
+  cursor: pointer;
+  color: #0f172a;
+}
+
+.feedbackInfo,
+.feedbackError {
+  margin: 0 32px;
+  padding: 14px 18px;
+  border-radius: 16px;
+  font-weight: 500;
+}
+
+.feedbackInfo {
+  background: rgba(59, 130, 246, 0.16);
+  color: #1d4ed8;
+}
+
+.feedbackError {
+  background: rgba(248, 113, 113, 0.2);
+  color: #b91c1c;
+}
+
+.body {
+  padding: 0 32px 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.field span {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.field input,
+.field textarea {
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  border-radius: 14px;
+  padding: 12px 14px;
+  font-size: 15px;
+  background: white;
+  color: #0f172a;
+  resize: vertical;
+}
+
+.criteriaSection {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.criteriaHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.criteriaHeader h3 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.addButton {
+  padding: 10px 16px;
+  border-radius: 14px;
+  border: none;
+  background: linear-gradient(135deg, #34d399, #22d3ee);
+  color: white;
+  cursor: pointer;
+}
+
+.criteriaHint {
+  margin: 0;
+  color: #64748b;
+  font-style: italic;
+}
+
+.criterionCard {
+  padding: 20px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.criterionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.criterionHeader h4 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.removeCriterion {
+  border: none;
+  background: none;
+  color: #ef4444;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ratingsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px;
+}
+
+.ratingField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ratingField span {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 32px 28px;
+  border-top: 1px solid rgba(148, 163, 184, 0.3);
+  background: rgba(248, 250, 252, 0.9);
+}
+
+.secondaryButton,
+.dangerButton,
+.primaryButton {
+  border-radius: 14px;
+  padding: 12px 20px;
+  font-size: 15px;
+  cursor: pointer;
+  border: none;
+}
+
+.secondaryButton {
+  background: white;
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  color: #0f172a;
+}
+
+.dangerButton {
+  background: rgba(248, 113, 113, 0.2);
+  color: #b91c1c;
+}
+
+.dangerButton:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.primaryButton {
+  background: linear-gradient(135deg, #6366f1, #22d3ee);
+  color: white;
+}
+
+.primaryButton:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.footerGap {
+  flex: 1;
+}
