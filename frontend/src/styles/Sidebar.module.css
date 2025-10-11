@@ -47,6 +47,16 @@
   flex: 1;
 }
 
+.emptyMenu {
+  margin: 0;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: rgba(148, 163, 184, 0.18);
+  color: rgba(226, 232, 240, 0.8);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
 .menuItem,
 .activeItem {
   border: none;

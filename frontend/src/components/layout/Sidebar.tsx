@@ -21,15 +21,19 @@ export const Sidebar = ({ navigationItems, activeItem, onNavigate }: SidebarProp
         </div>
       </div>
       <nav className={styles.menu}>
-        {navigationItems.map((item) => (
-          <button
-            key={item.key}
-            className={item.key === activeItem ? styles.activeItem : styles.menuItem}
-            onClick={() => onNavigate(item.key)}
-          >
-            {item.label}
-          </button>
-        ))}
+        {navigationItems.length === 0 ? (
+          <p className={styles.emptyMenu}>No sections assigned to your role yet.</p>
+        ) : (
+          navigationItems.map((item) => (
+            <button
+              key={item.key}
+              className={item.key === activeItem ? styles.activeItem : styles.menuItem}
+              onClick={() => onNavigate(item.key)}
+            >
+              {item.label}
+            </button>
+          ))
+        )}
       </nav>
       <div className={styles.logoutBlock}>
         {session && <p className={styles.sessionInfo}>{session.email}</p>}

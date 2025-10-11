@@ -25,6 +25,8 @@ export const AppLayout = ({ navigationItems, activeItem, onNavigate, children }:
     return null;
   }
 
+  const roleLabel = roleLabels[session.role] ?? 'Account';
+
   return (
     <div className={styles.container}>
       <Sidebar
@@ -38,7 +40,7 @@ export const AppLayout = ({ navigationItems, activeItem, onNavigate, children }:
             <p className={styles.topbarGreeting}>Welcome back</p>
             <p className={styles.topbarHint}>Signed in as {session.email}</p>
           </div>
-          <span className={styles.roleBadge}>{roleLabels[session.role]}</span>
+          <span className={styles.roleBadge}>{roleLabel}</span>
         </div>
         <div className={styles.pageContainer}>{children}</div>
       </main>

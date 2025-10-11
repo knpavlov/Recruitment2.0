@@ -9,14 +9,15 @@ import { PlaceholderScreen } from './shared/ui/PlaceholderScreen';
 import { AuthProvider, useAuth } from './modules/auth/AuthContext';
 import { AppStateProvider } from './app/state/AppStateContext';
 import { LoginScreen } from './modules/auth/LoginScreen';
+import { NoAccessScreen } from './modules/auth/NoAccessScreen';
 
 const AppContent = () => {
   const { session } = useAuth();
-  const [activePage, setActivePage] = useState<NavigationKey>('cases');
+  const [activePage, setActivePage] = useState<NavigationKey>('evaluation');
 
   useEffect(() => {
     if (!session) {
-      setActivePage('cases');
+      setActivePage('evaluation');
     }
   }, [session]);
 
@@ -29,14 +30,16 @@ const AppContent = () => {
     [session.role]
   );
 
-  useEffect(() => {
-    if (!accessibleItems.find((item) => item.key === activePage)) {
-      setActivePage(accessibleItems[0]?.key ?? 'evaluation');
-    }
-  }, [accessibleItems, activePage]);
+  const fallbackPage = accessibleItems[0]?.key ?? 'evaluation';
 
-  const renderContent = () => {
-    switch (activePage) {
+  useEffect(() => {
+    setActivePage((current) =>
+      accessibleItems.some((item) => item.key === current) ? current : fallbackPage
+    );
+  }, [accessibleItems, fallbackPage]);
+
+  const renderContent = (page: NavigationKey) => {
+    switch (page) {
       case 'cases':
         return <CasesScreen />;
       case 'questions':
@@ -60,17 +63,20 @@ const AppContent = () => {
       case 'accounts':
         return <AccountsScreen />;
       default:
-        return null;
+        return <NoAccessScreen />;
     }
   };
+
+  const hasNavigation = accessibleItems.length > 0;
+  const resolvedPage = hasNavigation ? activePage : fallbackPage;
 
   return (
     <AppLayout
       navigationItems={accessibleItems}
-      activeItem={activePage}
+      activeItem={resolvedPage}
       onNavigate={setActivePage}
     >
-      {renderContent()}
+      {hasNavigation ? renderContent(resolvedPage) : <NoAccessScreen />}
     </AppLayout>
   );
 };

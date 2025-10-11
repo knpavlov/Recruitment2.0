@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import type { AccountsService } from '../accounts/accounts.service.js';
+import type { AccountRecord, AccountsService } from '../accounts/accounts.service.js';
 import { MailerService, MAILER_NOT_CONFIGURED } from '../../shared/mailer.service.js';
 import { OtpService } from '../../shared/otp.service.js';
 import { AccessCodesRepository } from './accessCodes.repository.js';
@@ -13,17 +13,19 @@ export class AuthService {
   ) {}
 
   async requestAccessCode(email: string) {
-    const account = await this.accountsService.findByEmail(email.trim().toLowerCase());
+    const normalizedEmail = email.trim().toLowerCase();
+    const account = await this.accountsService.findByEmail(normalizedEmail);
     if (!account) {
       throw new Error('ACCOUNT_NOT_FOUND');
     }
-    if (account.role !== 'admin' && account.role !== 'super-admin') {
+    const allowedStatuses: Array<AccountRecord['status']> = ['pending', 'active'];
+    if (!allowedStatuses.includes(account.status)) {
       throw new Error('ACCESS_DENIED');
     }
     const code = this.otp.generateCode();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
     await this.codesRepository.saveCode({
-      email: account.email,
+      email: normalizedEmail,
       code,
       expiresAt
     });
