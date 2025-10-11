@@ -83,6 +83,7 @@
   background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(16px);
   padding: 24px;
+  overflow-x: auto;
 }
 
 .table {
@@ -95,6 +96,27 @@
   padding: 16px;
   text-align: left;
   border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.sortButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.sortButtonActive {
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.sortIcon {
+  font-size: 12px;
 }
 
 .actionsHeader {
@@ -113,6 +135,11 @@
   background: rgba(148, 163, 184, 0.2);
   color: #0f172a;
   cursor: pointer;
+}
+
+.resumePlaceholder {
+  color: #64748b;
+  font-size: 13px;
 }
 
 .emptyState {

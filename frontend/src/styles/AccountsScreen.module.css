@@ -76,6 +76,27 @@
   border-bottom: 1px solid rgba(148, 163, 184, 0.25);
 }
 
+.sortButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.sortButtonActive {
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.sortIcon {
+  font-size: 12px;
+}
+
 .statusBadgePending,
 .statusBadgeActive {
   padding: 6px 12px;
