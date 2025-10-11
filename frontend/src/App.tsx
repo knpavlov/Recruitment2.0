@@ -20,20 +20,38 @@ const AppContent = () => {
     }
   }, [session]);
 
+  const accessibleItems = useMemo(() => {
+    if (!session) {
+      return [];
+    }
+
+    return navigationItems.filter((item) => item.roleAccess.includes(session.role));
+  }, [session]);
+
+  useEffect(() => {
+    if (!session || accessibleItems.length === 0) {
+      return;
+    }
+
+    if (!accessibleItems.some((item) => item.key === activePage)) {
+      setActivePage(accessibleItems[0].key);
+    }
+  }, [session, accessibleItems, activePage]);
+
   if (!session) {
     return <LoginScreen />;
   }
 
-  const accessibleItems = useMemo(
-    () => navigationItems.filter((item) => item.roleAccess.includes(session.role)),
-    [session.role]
-  );
-
-  useEffect(() => {
-    if (!accessibleItems.find((item) => item.key === activePage)) {
-      setActivePage(accessibleItems[0]?.key ?? 'evaluation');
-    }
-  }, [accessibleItems, activePage]);
+  if (accessibleItems.length === 0) {
+    return (
+      <AppLayout navigationItems={[]} activeItem={activePage} onNavigate={setActivePage}>
+        <PlaceholderScreen
+          title="No sections available"
+          description="Your role does not grant access to any sections yet. Contact the administrator to enable modules."
+        />
+      </AppLayout>
+    );
+  }
 
   const renderContent = () => {
     switch (activePage) {
