@@ -3,10 +3,12 @@ import { CaseFolder, CaseFileUploadDto } from '../../shared/types/caseLibrary';
 import { CandidateProfile } from '../../shared/types/candidate';
 import { EvaluationConfig } from '../../shared/types/evaluation';
 import { AccountRecord, AccountRole } from '../../shared/types/account';
+import { FitQuestion } from '../../shared/types/fitQuestion';
 import { DomainResult } from '../../shared/types/results';
 import { casesApi } from '../../modules/cases/services/casesApi';
 import { candidatesApi } from '../../modules/candidates/services/candidatesApi';
 import { accountsApi } from '../../modules/accounts/services/accountsApi';
+import { fitQuestionsApi } from '../../modules/questions/services/fitQuestionsApi';
 import { ApiError } from '../../shared/api/httpClient';
 import { useAuth } from '../../modules/auth/AuthContext';
 
@@ -26,6 +28,14 @@ interface AppStateContextValue {
       fileId: string,
       expectedVersion: number
     ) => Promise<DomainResult<CaseFolder>>;
+  };
+  fitQuestions: {
+    list: FitQuestion[];
+    saveQuestion: (
+      question: FitQuestion,
+      expectedVersion: number | null
+    ) => Promise<DomainResult<FitQuestion>>;
+    removeQuestion: (id: string) => Promise<DomainResult<string>>;
   };
   candidates: {
     list: CandidateProfile[];
@@ -61,6 +71,7 @@ const touchEvaluation = (config: EvaluationConfig, shouldIncrement = true): Eval
 export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [folders, setFolders] = useState<CaseFolder[]>([]);
   const [candidates, setCandidates] = useState<CandidateProfile[]>([]);
+  const [fitQuestions, setFitQuestions] = useState<FitQuestion[]>([]);
   const [evaluations, setEvaluations] = useState<EvaluationConfig[]>([]);
   const [accounts, setAccounts] = useState<AccountRecord[]>([]);
   const { session } = useAuth();
@@ -103,6 +114,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (!session) {
       setCandidates([]);
+      setFitQuestions([]);
       setEvaluations([]);
     }
   }, [session]);
@@ -121,6 +133,24 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     };
     void loadCandidates();
   }, [session]);
+
+  useEffect(() => {
+    if (!session) {
+      return;
+    }
+    const loadQuestions = async () => {
+      try {
+        const remote = await fitQuestionsApi.list();
+        setFitQuestions(remote);
+      } catch (error) {
+        console.error('Failed to load fit questions:', error);
+      }
+    };
+    void loadQuestions();
+  }, [session]);
+
+  const sortQuestionsByUpdated = (items: FitQuestion[]) =>
+    [...items].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 
   const value = useMemo<AppStateContextValue>(() => ({
     cases: {
@@ -243,6 +273,75 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
             }
           }
           console.error('Failed to delete file from folder:', error);
+          return { ok: false, error: 'unknown' };
+        }
+      }
+    },
+    fitQuestions: {
+      list: fitQuestions,
+      saveQuestion: async (question, expectedVersion) => {
+        const trimmedId = question.id.trim();
+        if (!trimmedId) {
+          return { ok: false, error: 'invalid-input' };
+        }
+
+        const sanitized: FitQuestion = {
+          ...question,
+          id: trimmedId,
+          shortTitle: question.shortTitle.trim(),
+          content: question.content.trim()
+        };
+
+        const exists = fitQuestions.some((item) => item.id === trimmedId);
+
+        try {
+          if (exists) {
+            if (expectedVersion === null || expectedVersion === undefined) {
+              return { ok: false, error: 'invalid-input' };
+            }
+            const updated = await fitQuestionsApi.update(trimmedId, sanitized, expectedVersion);
+            setFitQuestions((prev) =>
+              sortQuestionsByUpdated([
+                ...prev.filter((item) => item.id !== trimmedId),
+                updated
+              ])
+            );
+            return { ok: true, data: updated };
+          }
+
+          const created = await fitQuestionsApi.create(sanitized);
+          setFitQuestions((prev) => sortQuestionsByUpdated([...prev, created]));
+          return { ok: true, data: created };
+        } catch (error) {
+          if (error instanceof ApiError) {
+            if (error.code === 'version-conflict') {
+              return { ok: false, error: 'version-conflict' };
+            }
+            if (error.code === 'invalid-input') {
+              return { ok: false, error: 'invalid-input' };
+            }
+            if (error.code === 'not-found' || error.status === 404) {
+              return { ok: false, error: 'not-found' };
+            }
+          }
+          console.error('Failed to save fit question:', error);
+          return { ok: false, error: 'unknown' };
+        }
+      },
+      removeQuestion: async (id) => {
+        const trimmed = id.trim();
+        if (!trimmed) {
+          return { ok: false, error: 'invalid-input' };
+        }
+        try {
+          await fitQuestionsApi.remove(trimmed);
+          setFitQuestions((prev) => prev.filter((item) => item.id !== trimmed));
+          return { ok: true, data: trimmed };
+        } catch (error) {
+          if (error instanceof ApiError && (error.code === 'not-found' || error.status === 404)) {
+            return { ok: false, error: 'not-found' };
+          }
+          console.error('Failed to delete fit question:', error);
           return { ok: false, error: 'unknown' };
         }
       }
@@ -412,7 +511,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
         }
       }
     }
-  }), [folders, candidates, evaluations, accounts, syncFolders]);
+  }), [folders, fitQuestions, candidates, evaluations, accounts, syncFolders]);
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;
 };
@@ -426,6 +525,7 @@ export const useAppState = () => {
 };
 
 export const useCasesState = () => useAppState().cases;
+export const useFitQuestionsState = () => useAppState().fitQuestions;
 export const useCandidatesState = () => useAppState().candidates;
 export const useEvaluationsState = () => useAppState().evaluations;
 export const useAccountsState = () => useAppState().accounts;
