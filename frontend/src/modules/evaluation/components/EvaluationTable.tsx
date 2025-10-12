@@ -10,11 +10,22 @@ export interface EvaluationTableRow {
   avgFitScore: number | null;
   avgCaseScore: number | null;
   offerSummary: string;
+  offerSummaryTooltip?: string;
   processStatus: 'draft' | 'in-progress' | 'completed';
   onStartProcess: () => void;
   startDisabled: boolean;
+  startTooltip?: string;
   onEdit: () => void;
   onOpenStatus: () => void;
+  offerActionDisabled: boolean;
+  offerActionTooltip?: string;
+  rejectActionDisabled: boolean;
+  rejectActionTooltip?: string;
+  advanceActionDisabled: boolean;
+  advanceActionTooltip?: string;
+  onOffer: () => void;
+  onReject: () => void;
+  onAdvance: () => void;
 }
 
 export interface EvaluationTableProps {
@@ -36,6 +47,43 @@ const SORTABLE_COLUMNS: Array<{
 ];
 
 const getSortLabel = (direction: 'asc' | 'desc') => (direction === 'asc' ? '▲' : '▼');
+
+type ButtonVariant =
+  | 'primary'
+  | 'secondary'
+  | 'info'
+  | 'danger'
+  | 'success'
+  | 'warning';
+
+interface ActionButtonProps {
+  label: string;
+  variant: ButtonVariant;
+  disabled?: boolean;
+  tooltip?: string;
+  onClick: () => void;
+}
+
+const ActionButton = ({ label, variant, disabled, tooltip, onClick }: ActionButtonProps) => {
+  const baseClass = `${styles.actionButton} ${styles[`button${variant[0].toUpperCase()}${variant.slice(1)}`]}`;
+  const className = disabled ? `${baseClass} ${styles.buttonDisabled}` : baseClass;
+  const button = (
+    <button type="button" className={className} onClick={onClick} disabled={disabled}>
+      {label}
+    </button>
+  );
+
+  if (!tooltip) {
+    return button;
+  }
+
+  return (
+    <div className={styles.tooltipWrapper} data-disabled={disabled ? 'true' : 'false'}>
+      {button}
+      <span className={styles.tooltip}>{tooltip}</span>
+    </div>
+  );
+};
 
 export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: EvaluationTableProps) => {
   if (rows.length === 0) {
@@ -70,7 +118,17 @@ export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: 
               );
             })}
             <th>Forms</th>
-            <th>Offer votes (Yes, priority / Yes, meets high bar / Turndown, stay in contact / Turndown)</th>
+            <th>
+              <span className={styles.headerWithHint}>
+                Offer votes
+                <span className={styles.hintWrapper}>
+                  <span className={styles.hintIcon}>?</span>
+                  <span className={styles.hintTooltip}>
+                    Yes, priority / Yes, meets high bar / Turndown, stay in contact / Turndown
+                  </span>
+                </span>
+              </span>
+            </th>
             <th>Process</th>
             <th className={styles.actionsHeader}>Actions</th>
           </tr>
@@ -95,22 +153,50 @@ export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: 
                 <td>{avgFitLabel}</td>
                 <td>{avgCaseLabel}</td>
                 <td>{formsLabel}</td>
-                <td>{row.offerSummary}</td>
+                <td>
+                  <span
+                    className={row.offerSummaryTooltip ? styles.valueWithTooltip : undefined}
+                    title={row.offerSummaryTooltip}
+                  >
+                    {row.offerSummary}
+                  </span>
+                </td>
                 <td>{processLabel}</td>
                 <td className={styles.actionsCell}>
-                  <button
-                    className={styles.tablePrimaryButton}
-                    onClick={row.onStartProcess}
-                    disabled={row.startDisabled}
-                  >
-                    Start process
-                  </button>
-                  <button className={styles.tableSecondaryButton} onClick={row.onEdit}>
-                    Edit
-                  </button>
-                  <button className={styles.tablePrimaryButton} onClick={row.onOpenStatus}>
-                    Status
-                  </button>
+                  <div className={styles.actionsGroup}>
+                    <ActionButton
+                      label="Start process"
+                      variant="primary"
+                      disabled={row.startDisabled}
+                      tooltip={row.startTooltip}
+                      onClick={row.onStartProcess}
+                    />
+                    <ActionButton label="Edit" variant="secondary" onClick={row.onEdit} />
+                    <ActionButton label="Status" variant="info" onClick={row.onOpenStatus} />
+                  </div>
+                  <div className={styles.actionsGroup}>
+                    <ActionButton
+                      label="Reject"
+                      variant="danger"
+                      disabled={row.rejectActionDisabled}
+                      tooltip={row.rejectActionTooltip}
+                      onClick={row.onReject}
+                    />
+                    <ActionButton
+                      label="Offer"
+                      variant="success"
+                      disabled={row.offerActionDisabled}
+                      tooltip={row.offerActionTooltip}
+                      onClick={row.onOffer}
+                    />
+                    <ActionButton
+                      label="Progress to next round"
+                      variant="warning"
+                      disabled={row.advanceActionDisabled}
+                      tooltip={row.advanceActionTooltip}
+                      onClick={row.onAdvance}
+                    />
+                  </div>
                 </td>
               </tr>
             );
