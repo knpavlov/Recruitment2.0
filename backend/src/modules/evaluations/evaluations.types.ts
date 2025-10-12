@@ -1,3 +1,17 @@
+import type { CandidateRecord } from '../candidates/candidates.types.js';
+import type { CaseFolder } from '../cases/cases.types.js';
+import type { FitQuestionRecord } from '../questions/questions.types.js';
+
+export interface InterviewCriterionScore {
+  criterionId: string;
+  score?: number;
+  notes?: string;
+}
+
+export type OfferRecommendation = 'yes-priority' | 'yes' | 'hold' | 'no';
+
+export type OverallImpression = 'top-choice' | 'strong' | 'mixed' | 'concerns';
+
 export interface InterviewSlotModel {
   id: string;
   interviewerName: string;
@@ -12,6 +26,34 @@ export interface InterviewStatusModel {
   submitted: boolean;
   submittedAt?: string;
   notes?: string;
+  fitScore?: number;
+  caseScore?: number;
+  fitNotes?: string;
+  caseNotes?: string;
+  fitCriteria: InterviewCriterionScore[];
+  caseCriteria: InterviewCriterionScore[];
+  interestLevel?: string;
+  issuesToTest?: string;
+  overallImpression?: OverallImpression;
+  offerRecommendation?: OfferRecommendation;
+  followUpPlan?: string;
+}
+
+export type EvaluationProcessStatus = 'draft' | 'in-progress' | 'completed';
+
+export interface InterviewAssignmentModel {
+  slotId: string;
+  interviewerEmail: string;
+  interviewerName: string;
+  caseFolderId: string;
+  fitQuestionId: string;
+}
+
+export interface InterviewAssignmentRecord extends InterviewAssignmentModel {
+  id: string;
+  evaluationId: string;
+  invitationSentAt: string;
+  createdAt: string;
 }
 
 export interface EvaluationRecord {
@@ -25,6 +67,8 @@ export interface EvaluationRecord {
   createdAt: string;
   updatedAt: string;
   forms: InterviewStatusModel[];
+  processStatus: EvaluationProcessStatus;
+  processStartedAt?: string;
 }
 
 export interface EvaluationWriteModel {
@@ -35,4 +79,19 @@ export interface EvaluationWriteModel {
   interviews: InterviewSlotModel[];
   fitQuestionId?: string;
   forms: InterviewStatusModel[];
+  processStatus?: EvaluationProcessStatus;
+}
+
+export interface InterviewerAssignmentView {
+  evaluationId: string;
+  slotId: string;
+  interviewerEmail: string;
+  interviewerName: string;
+  invitationSentAt: string;
+  evaluationUpdatedAt: string;
+  evaluationProcessStatus: EvaluationProcessStatus;
+  candidate?: CandidateRecord;
+  caseFolder?: CaseFolder;
+  fitQuestion?: FitQuestionRecord;
+  form: InterviewStatusModel | null;
 }

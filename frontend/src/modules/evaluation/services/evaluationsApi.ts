@@ -1,5 +1,11 @@
 import { apiRequest } from '../../../shared/api/httpClient';
-import { EvaluationConfig, InterviewSlot, InterviewStatusRecord } from '../../../shared/types/evaluation';
+import {
+  EvaluationConfig,
+  EvaluationProcessStatus,
+  InterviewCriterionScore,
+  InterviewSlot,
+  InterviewStatusRecord
+} from '../../../shared/types/evaluation';
 
 const normalizeString = (value: unknown): string | undefined => {
   if (typeof value === 'string') {
@@ -40,6 +46,19 @@ const normalizeBoolean = (value: unknown): boolean | undefined => {
   return undefined;
 };
 
+const normalizeScore = (value: unknown): number | undefined => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value);
+    if (!Number.isNaN(parsed)) {
+      return parsed;
+    }
+  }
+  return undefined;
+};
+
 const normalizeSlot = (value: unknown): InterviewSlot | null => {
   if (!value || typeof value !== 'object') {
     return null;
@@ -66,6 +85,27 @@ const normalizeSlot = (value: unknown): InterviewSlot | null => {
   };
 };
 
+const normalizeCriteria = (value: unknown): InterviewCriterionScore[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const list: InterviewCriterionScore[] = [];
+  for (const entry of value) {
+    if (!entry || typeof entry !== 'object') {
+      continue;
+    }
+    const payload = entry as Partial<InterviewCriterionScore> & { criterionId?: unknown };
+    const criterionId = normalizeString(payload.criterionId)?.trim();
+    if (!criterionId) {
+      continue;
+    }
+    const score = normalizeScore((payload as Record<string, unknown>).score);
+    const notes = normalizeString((payload as Record<string, unknown>).notes) ?? undefined;
+    list.push({ criterionId, score, notes });
+  }
+  return list;
+};
+
 const normalizeForm = (value: unknown): InterviewStatusRecord | null => {
   if (!value || typeof value !== 'object') {
     return null;
@@ -88,7 +128,26 @@ const normalizeForm = (value: unknown): InterviewStatusRecord | null => {
     interviewerName: normalizeString(payload.interviewerName) ?? 'Interviewer',
     submitted: normalizeBoolean(payload.submitted) ?? false,
     submittedAt: normalizeIsoString(payload.submittedAt),
-    notes: normalizeString(payload.notes) ?? undefined
+    notes: normalizeString(payload.notes) ?? undefined,
+    fitScore: normalizeScore(payload.fitScore),
+    caseScore: normalizeScore(payload.caseScore),
+    fitNotes: normalizeString(payload.fitNotes) ?? undefined,
+    caseNotes: normalizeString(payload.caseNotes) ?? undefined,
+    fitCriteria: normalizeCriteria((payload as Record<string, unknown>).fitCriteria),
+    caseCriteria: normalizeCriteria((payload as Record<string, unknown>).caseCriteria),
+    interestLevel: normalizeString((payload as Record<string, unknown>).interestLevel) ?? undefined,
+    issuesToTest: normalizeString((payload as Record<string, unknown>).issuesToTest) ?? undefined,
+    overallImpression: (() => {
+      const value = normalizeString((payload as Record<string, unknown>).overallImpression);
+      return value === 'top-choice' || value === 'strong' || value === 'mixed' || value === 'concerns'
+        ? value
+        : undefined;
+    })(),
+    offerRecommendation: (() => {
+      const value = normalizeString((payload as Record<string, unknown>).offerRecommendation);
+      return value === 'yes-priority' || value === 'yes' || value === 'hold' || value === 'no' ? value : undefined;
+    })(),
+    followUpPlan: normalizeString((payload as Record<string, unknown>).followUpPlan) ?? undefined
   };
 };
 
@@ -108,6 +167,8 @@ const normalizeEvaluation = (value: unknown): EvaluationConfig | null => {
     createdAt?: unknown;
     updatedAt?: unknown;
     forms?: unknown;
+    processStatus?: unknown;
+    processStartedAt?: unknown;
   };
 
   const id = normalizeString(payload.id)?.trim();
@@ -141,7 +202,9 @@ const normalizeEvaluation = (value: unknown): EvaluationConfig | null => {
     version,
     createdAt,
     updatedAt,
-    forms
+    forms,
+    processStatus: (normalizeString(payload.processStatus) as EvaluationProcessStatus | undefined) ?? 'draft',
+    processStartedAt: normalizeIsoString(payload.processStartedAt)
   };
 };
 
@@ -175,7 +238,26 @@ const serializeEvaluation = (config: EvaluationConfig) => ({
   forms: config.forms.map((form) => ({
     ...form,
     submittedAt: form.submittedAt ?? null,
-    notes: form.notes ?? null
+    notes: form.notes ?? null,
+    fitScore: form.fitScore ?? null,
+    caseScore: form.caseScore ?? null,
+    fitNotes: form.fitNotes ?? null,
+    caseNotes: form.caseNotes ?? null,
+    interestLevel: form.interestLevel ?? null,
+    issuesToTest: form.issuesToTest ?? null,
+    overallImpression: form.overallImpression ?? null,
+    offerRecommendation: form.offerRecommendation ?? null,
+    followUpPlan: form.followUpPlan ?? null,
+    fitCriteria: form.fitCriteria.map((criterion) => ({
+      ...criterion,
+      score: criterion.score ?? null,
+      notes: criterion.notes ?? null
+    })),
+    caseCriteria: form.caseCriteria.map((criterion) => ({
+      ...criterion,
+      score: criterion.score ?? null,
+      notes: criterion.notes ?? null
+    }))
   }))
 });
 
@@ -195,6 +277,10 @@ export const evaluationsApi = {
         body: { config: serializeEvaluation(config), expectedVersion }
       })
     ),
+  start: async (id: string) =>
+    apiRequest<{ id: string }>(`/evaluations/${id}/start`, {
+      method: 'POST'
+    }),
   remove: async (id: string) =>
     apiRequest<{ id?: unknown }>(`/evaluations/${id}`, {
       method: 'DELETE'
