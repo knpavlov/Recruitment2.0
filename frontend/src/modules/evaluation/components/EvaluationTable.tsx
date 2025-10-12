@@ -111,10 +111,10 @@ export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: 
                 <td>{row.offerSummary}</td>
                 <td>{processLabel}</td>
                 <td className={styles.actionsCell}>
-                  <div className={styles.primaryActions}>
+                  <div className={styles.actionGroup}>
                     <button
                       type="button"
-                      className={`${styles.actionButton} ${styles.startButton}`}
+                      className={`${styles.actionButton} ${styles.neutralButton}`}
                       onClick={row.onStartProcess}
                       disabled={row.startDisabled}
                       data-tooltip={row.startDisabled ? row.startTooltip : undefined}
@@ -123,20 +123,20 @@ export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: 
                     </button>
                     <button
                       type="button"
-                      className={`${styles.actionButton} ${styles.editButton}`}
+                      className={`${styles.actionButton} ${styles.neutralButton}`}
                       onClick={row.onEdit}
                     >
                       Edit
                     </button>
                     <button
                       type="button"
-                      className={`${styles.actionButton} ${styles.statusButton}`}
+                      className={`${styles.actionButton} ${styles.neutralButton}`}
                       onClick={row.onOpenStatus}
                     >
                       Status
                     </button>
                   </div>
-                  <div className={styles.decisionActions}>
+                  <div className={`${styles.actionGroup} ${styles.decisionGroup}`}>
                     <button
                       type="button"
                       className={`${styles.actionButton} ${styles.offerButton}`}
