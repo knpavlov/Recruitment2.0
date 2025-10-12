@@ -226,6 +226,25 @@
   gap: 16px;
 }
 
+.statusScores {
+  display: flex;
+  gap: 24px;
+  margin: 12px 0 0;
+}
+
+.statusScore {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+  color: #475569;
+}
+
+.statusScore strong {
+  font-size: 18px;
+  color: #0f172a;
+}
+
 .statusRow {
   display: flex;
   justify-content: space-between;

@@ -1,0 +1,394 @@
+import { MailerService, MAILER_NOT_CONFIGURED } from '../../shared/mailer.service.js';
+import { EvaluationsRepository } from './evaluations.repository.js';
+import {
+  EvaluationRecord,
+  EvaluationWriteModel,
+  InterviewAssignmentModel,
+  InterviewerAssignmentView,
+  EvaluationCriterionScore,
+  OfferRecommendationValue
+} from './evaluations.types.js';
+import type { AccountsService } from '../accounts/accounts.service.js';
+import type { CandidatesService } from '../candidates/candidates.service.js';
+import type { CasesService } from '../cases/cases.service.js';
+import type { QuestionsService } from '../questions/questions.service.js';
+
+const normalizeEmail = (value: string): string => value.trim().toLowerCase();
+
+const resolvePortalBaseUrl = (override?: string): string => {
+  const candidates = [override, process.env.INTERVIEW_PORTAL_URL].map((value) => value?.trim()).filter(Boolean) as string[];
+  for (const value of candidates) {
+    try {
+      const parsed = new URL(value);
+      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+        continue;
+      }
+      return parsed.toString().replace(/\/$/, '');
+    } catch {
+      continue;
+    }
+  }
+  throw new Error('INVALID_PORTAL_URL');
+};
+
+const buildPortalLink = (baseUrl: string, evaluationId: string, slotId: string) => {
+  const url = new URL(baseUrl);
+  url.searchParams.set('evaluation', evaluationId);
+  url.searchParams.set('slot', slotId);
+  return url.toString();
+};
+
+const buildWriteModelFromRecord = (record: EvaluationRecord): EvaluationWriteModel => ({
+  id: record.id,
+  candidateId: record.candidateId,
+  roundNumber: record.roundNumber,
+  interviewCount: record.interviewCount,
+  interviews: record.interviews,
+  fitQuestionId: record.fitQuestionId,
+  forms: record.forms,
+  processStatus: record.processStatus
+});
+
+const readScore = (value: unknown): number | undefined => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return undefined;
+};
+
+const readCriteriaList = (value: unknown): EvaluationCriterionScore[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const result: EvaluationCriterionScore[] = [];
+  for (const entry of value) {
+    if (!entry || typeof entry !== 'object') {
+      continue;
+    }
+    const payload = entry as Record<string, unknown>;
+    const criterionId = typeof payload.criterionId === 'string' ? payload.criterionId.trim() : '';
+    if (!criterionId) {
+      continue;
+    }
+    const scoreValue = readScore(payload.score);
+    result.push({ criterionId, score: scoreValue });
+  }
+  return result;
+};
+
+const computeAverageFromCriteria = (criteria: EvaluationCriterionScore[]): number | undefined => {
+  const numericScores = criteria
+    .map((item) => (typeof item.score === 'number' && Number.isFinite(item.score) ? item.score : null))
+    .filter((value): value is number => value != null);
+  if (!numericScores.length) {
+    return undefined;
+  }
+  const sum = numericScores.reduce((total, current) => total + current, 0);
+  return Math.round((sum / numericScores.length) * 10) / 10;
+};
+
+const readOfferRecommendation = (value: unknown): OfferRecommendationValue | undefined => {
+  if (value === 'yes_priority' || value === 'yes_strong' || value === 'yes_keep_warm' || value === 'no_offer') {
+    return value;
+  }
+  return undefined;
+};
+
+export class EvaluationWorkflowService {
+  constructor(
+    private readonly evaluations: EvaluationsRepository,
+    private readonly accounts: AccountsService,
+    private readonly candidates: CandidatesService,
+    private readonly cases: CasesService,
+    private readonly questions: QuestionsService,
+    private readonly mailer = new MailerService()
+  ) {}
+
+  private buildAssignments(evaluation: EvaluationRecord): InterviewAssignmentModel[] {
+    if (!evaluation.interviews.length) {
+      throw new Error('INVALID_INPUT');
+    }
+    const assignments: InterviewAssignmentModel[] = [];
+    for (const slot of evaluation.interviews) {
+      const email = slot.interviewerEmail?.trim().toLowerCase() ?? '';
+      const caseId = slot.caseFolderId?.trim() ?? '';
+      const questionId = slot.fitQuestionId?.trim() ?? '';
+      if (!email || !caseId || !questionId) {
+        throw new Error('MISSING_ASSIGNMENT_DATA');
+      }
+      assignments.push({
+        slotId: slot.id,
+        interviewerEmail: email,
+        interviewerName: slot.interviewerName || 'Interviewer',
+        caseFolderId: caseId,
+        fitQuestionId: questionId
+      });
+    }
+    return assignments;
+  }
+
+  private async ensureAccounts(assignments: InterviewAssignmentModel[]) {
+    for (const assignment of assignments) {
+      await this.accounts.ensureUserAccount(assignment.interviewerEmail);
+    }
+  }
+
+  private async loadContext(assignments: InterviewAssignmentModel[], evaluation: EvaluationRecord) {
+    const candidate = evaluation.candidateId ? await this.candidates.getCandidate(evaluation.candidateId) : null;
+
+    const uniqueCaseIds = Array.from(new Set(assignments.map((item) => item.caseFolderId)));
+    const uniqueQuestionIds = Array.from(new Set(assignments.map((item) => item.fitQuestionId)));
+
+    const caseMap = new Map<string, Awaited<ReturnType<CasesService['getFolder']>> | null>();
+    for (const id of uniqueCaseIds) {
+      caseMap.set(id, await this.cases.getFolder(id));
+    }
+
+    const questionMap = new Map<string, Awaited<ReturnType<QuestionsService['getQuestion']>> | null>();
+    for (const id of uniqueQuestionIds) {
+      questionMap.set(id, await this.questions.getQuestion(id));
+    }
+
+    return { candidate, caseMap, questionMap };
+  }
+
+  private async sendInvitations(
+    assignments: InterviewAssignmentModel[],
+    evaluation: EvaluationRecord,
+    portalBaseUrl: string,
+    context: {
+      candidate: Awaited<ReturnType<CandidatesService['getCandidate']>> | null;
+      caseMap: Map<string, Awaited<ReturnType<CasesService['getFolder']>> | null>;
+      questionMap: Map<string, Awaited<ReturnType<QuestionsService['getQuestion']>> | null>;
+    }
+  ) {
+    const candidateName = context.candidate
+      ? `${context.candidate.lastName} ${context.candidate.firstName}`.trim() || context.candidate.id
+      : 'candidate';
+
+    for (const assignment of assignments) {
+      const caseFolder = context.caseMap.get(assignment.caseFolderId);
+      const question = context.questionMap.get(assignment.fitQuestionId);
+      const link = buildPortalLink(portalBaseUrl, evaluation.id, assignment.slotId);
+      await this.mailer.sendInterviewAssignment(assignment.interviewerEmail, {
+        candidateName,
+        interviewerName: assignment.interviewerName,
+        caseTitle: caseFolder?.name ?? 'Case',
+        fitQuestionTitle: question?.shortTitle ?? 'Fit question',
+        link
+      });
+    }
+  }
+
+  async startProcess(id: string, options?: { portalBaseUrl?: string }) {
+    const trimmed = id.trim();
+    if (!trimmed) {
+      throw new Error('INVALID_INPUT');
+    }
+    const evaluation = await this.evaluations.findEvaluation(trimmed);
+    if (!evaluation) {
+      throw new Error('NOT_FOUND');
+    }
+    if (evaluation.processStatus !== 'draft') {
+      throw new Error('PROCESS_ALREADY_STARTED');
+    }
+
+    const assignments = this.buildAssignments(evaluation);
+    await this.ensureAccounts(assignments);
+    const context = await this.loadContext(assignments, evaluation);
+    const portalBaseUrl = resolvePortalBaseUrl(options?.portalBaseUrl);
+
+    try {
+      await this.sendInvitations(assignments, evaluation, portalBaseUrl, context);
+    } catch (error) {
+      if (error instanceof Error && error.message === MAILER_NOT_CONFIGURED) {
+        throw new Error('MAILER_UNAVAILABLE');
+      }
+      throw error;
+    }
+
+    await this.evaluations.replaceAssignments(trimmed, assignments, 'in-progress');
+    return { id: trimmed };
+  }
+
+  async listAssignmentsForInterviewer(email: string): Promise<InterviewerAssignmentView[]> {
+    const normalized = normalizeEmail(email);
+    if (!normalized) {
+      return [];
+    }
+    const assignments = await this.evaluations.listAssignmentsByEmail(normalized);
+    if (assignments.length === 0) {
+      return [];
+    }
+
+    const evaluationMap = new Map<string, EvaluationRecord>();
+    for (const assignment of assignments) {
+      if (!evaluationMap.has(assignment.evaluationId)) {
+        const record = await this.evaluations.findEvaluation(assignment.evaluationId);
+        if (record) {
+          evaluationMap.set(assignment.evaluationId, record);
+        }
+      }
+    }
+
+    const candidateMap = new Map<string, Awaited<ReturnType<CandidatesService['getCandidate']>> | null>();
+    const caseMap = new Map<string, Awaited<ReturnType<CasesService['getFolder']>> | null>();
+    const questionMap = new Map<string, Awaited<ReturnType<QuestionsService['getQuestion']>> | null>();
+
+    for (const assignment of assignments) {
+      const evaluation = evaluationMap.get(assignment.evaluationId);
+      if (!evaluation) {
+        continue;
+      }
+      if (evaluation.candidateId && !candidateMap.has(evaluation.candidateId)) {
+        try {
+          candidateMap.set(evaluation.candidateId, await this.candidates.getCandidate(evaluation.candidateId));
+        } catch (error) {
+          console.warn('Failed to load candidate', evaluation.candidateId, error);
+          candidateMap.set(evaluation.candidateId, null);
+        }
+      }
+      if (!caseMap.has(assignment.caseFolderId)) {
+        try {
+          caseMap.set(assignment.caseFolderId, await this.cases.getFolder(assignment.caseFolderId));
+        } catch (error) {
+          console.warn('Failed to load case folder', assignment.caseFolderId, error);
+          caseMap.set(assignment.caseFolderId, null);
+        }
+      }
+      if (!questionMap.has(assignment.fitQuestionId)) {
+        try {
+          questionMap.set(assignment.fitQuestionId, await this.questions.getQuestion(assignment.fitQuestionId));
+        } catch (error) {
+          console.warn('Failed to load fit question', assignment.fitQuestionId, error);
+          questionMap.set(assignment.fitQuestionId, null);
+        }
+      }
+    }
+
+    return assignments.map((assignment) => {
+      const evaluation = evaluationMap.get(assignment.evaluationId);
+      const form = evaluation?.forms.find((item) => item.slotId === assignment.slotId) ?? null;
+      const candidate = evaluation?.candidateId ? candidateMap.get(evaluation.candidateId) ?? undefined : undefined;
+      return {
+        evaluationId: assignment.evaluationId,
+        slotId: assignment.slotId,
+        interviewerEmail: assignment.interviewerEmail,
+        interviewerName: assignment.interviewerName,
+        invitationSentAt: assignment.invitationSentAt,
+        evaluationUpdatedAt: evaluation?.updatedAt ?? assignment.createdAt,
+        evaluationProcessStatus: evaluation?.processStatus ?? 'draft',
+        candidate: candidate ?? undefined,
+        caseFolder: caseMap.get(assignment.caseFolderId) ?? undefined,
+        fitQuestion: questionMap.get(assignment.fitQuestionId) ?? undefined,
+        form
+      } satisfies InterviewerAssignmentView;
+    });
+  }
+
+  async submitInterviewForm(
+    evaluationId: string,
+    slotId: string,
+    email: string,
+    payload: {
+      submitted?: boolean;
+      notes?: string;
+      fitScore?: number | string;
+      caseScore?: number | string;
+      fitNotes?: string;
+      caseNotes?: string;
+      fitCriteria?: unknown;
+      caseCriteria?: unknown;
+      interestNotes?: string;
+      issuesToTest?: string;
+      offerRecommendation?: unknown;
+    }
+  ): Promise<EvaluationRecord> {
+    const trimmedEvaluation = evaluationId.trim();
+    const trimmedSlot = slotId.trim();
+    if (!trimmedEvaluation || !trimmedSlot) {
+      throw new Error('INVALID_INPUT');
+    }
+    const normalizedEmail = normalizeEmail(email);
+    if (!normalizedEmail) {
+      throw new Error('INVALID_INPUT');
+    }
+    const assignment = await this.evaluations.findAssignment(trimmedEvaluation, trimmedSlot);
+    if (!assignment || normalizeEmail(assignment.interviewerEmail) !== normalizedEmail) {
+      throw new Error('ACCESS_DENIED');
+    }
+    const evaluation = await this.evaluations.findEvaluation(trimmedEvaluation);
+    if (!evaluation) {
+      throw new Error('NOT_FOUND');
+    }
+
+    const currentForm = evaluation.forms.find((form) => form.slotId === trimmedSlot);
+    if (!currentForm) {
+      throw new Error('NOT_FOUND');
+    }
+    if (currentForm.submitted) {
+      throw new Error('FORM_ALREADY_SUBMITTED');
+    }
+
+    const submitted = payload.submitted === true;
+    const submittedAt = submitted ? new Date().toISOString() : currentForm.submittedAt;
+    const updatedForms = evaluation.forms.map((form) => {
+      if (form.slotId !== trimmedSlot) {
+        return form;
+      }
+      const nextFitCriteria = Array.isArray(payload.fitCriteria)
+        ? readCriteriaList(payload.fitCriteria)
+        : form.fitCriteria ?? [];
+      const nextCaseCriteria = Array.isArray(payload.caseCriteria)
+        ? readCriteriaList(payload.caseCriteria)
+        : form.caseCriteria ?? [];
+      const averageFitScore = computeAverageFromCriteria(nextFitCriteria);
+      const averageCaseScore = computeAverageFromCriteria(nextCaseCriteria);
+      const providedFitScore = readScore(payload.fitScore);
+      const providedCaseScore = readScore(payload.caseScore);
+
+      return {
+        ...form,
+        interviewerName: assignment.interviewerName,
+        submitted,
+        submittedAt,
+        notes: typeof payload.notes === 'string' ? payload.notes : form.notes,
+        fitScore: averageFitScore ?? providedFitScore ?? form.fitScore,
+        caseScore: averageCaseScore ?? providedCaseScore ?? form.caseScore,
+        fitNotes: typeof payload.fitNotes === 'string' ? payload.fitNotes : form.fitNotes,
+        caseNotes: typeof payload.caseNotes === 'string' ? payload.caseNotes : form.caseNotes,
+        fitCriteria: nextFitCriteria,
+        caseCriteria: nextCaseCriteria,
+        interestNotes:
+          typeof payload.interestNotes === 'string' ? payload.interestNotes : form.interestNotes,
+        issuesToTest: typeof payload.issuesToTest === 'string' ? payload.issuesToTest : form.issuesToTest,
+        offerRecommendation:
+          payload.offerRecommendation !== undefined
+            ? readOfferRecommendation(payload.offerRecommendation) ?? form.offerRecommendation
+            : form.offerRecommendation
+      };
+    });
+
+    const allSubmitted = updatedForms.length > 0 && updatedForms.every((form) => form.submitted);
+    const nextStatus = allSubmitted ? 'completed' : evaluation.processStatus;
+    const writeModel = buildWriteModelFromRecord({
+      ...evaluation,
+      forms: updatedForms,
+      processStatus: nextStatus
+    });
+    const result = await this.evaluations.updateEvaluation(writeModel, evaluation.version);
+    if (result === 'version-conflict') {
+      throw new Error('VERSION_CONFLICT');
+    }
+    if (!result) {
+      throw new Error('NOT_FOUND');
+    }
+    return result;
+  }
+}
