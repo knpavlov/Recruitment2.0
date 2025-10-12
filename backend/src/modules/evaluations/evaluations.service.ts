@@ -22,6 +22,19 @@ const readOptionalPositiveInteger = (value: unknown): number | undefined => {
   return undefined;
 };
 
+const readOptionalPositiveScore = (value: unknown): number | undefined => {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+    return Math.round(value * 10) / 10;
+  }
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return Math.round(parsed * 10) / 10;
+    }
+  }
+  return undefined;
+};
+
 const readOptionalIsoDate = (value: unknown): string | undefined => {
   if (typeof value !== 'string') {
     return undefined;
@@ -71,6 +84,35 @@ const sanitizeForms = (
     return [];
   }
 
+  const sanitizeCriteria = (input: unknown): EvaluationWriteModel['forms'][number]['fitCriteria'] => {
+    if (!Array.isArray(input)) {
+      return [];
+    }
+    const result: EvaluationWriteModel['forms'][number]['fitCriteria'] = [];
+    for (const entry of input) {
+      if (!entry || typeof entry !== 'object') {
+        continue;
+      }
+      const payload = entry as Record<string, unknown>;
+      const criterionId = readOptionalString(payload.criterionId);
+      if (!criterionId) {
+        continue;
+      }
+      const score = readOptionalPositiveScore(payload.score);
+      result.push({ criterionId, score });
+    }
+    return result;
+  };
+
+  const sanitizeOfferRecommendation = (
+    input: unknown
+  ): EvaluationWriteModel['forms'][number]['offerRecommendation'] | undefined => {
+    if (input === 'yes_priority' || input === 'yes_strong' || input === 'yes_keep_warm' || input === 'no_offer') {
+      return input;
+    }
+    return undefined;
+  };
+
   const forms: EvaluationWriteModel['forms'] = [];
   for (const entry of value) {
     if (!entry || typeof entry !== 'object') {
@@ -85,10 +127,36 @@ const sanitizeForms = (
     const submitted = typeof payload.submitted === 'boolean' ? payload.submitted : false;
     const submittedAt = readOptionalIsoDate(payload.submittedAt);
     const notes = readOptionalString(payload.notes);
+    const fitScore = readOptionalPositiveScore(payload.fitScore);
+    const caseScore = readOptionalPositiveScore(payload.caseScore);
+    const fitNotes = readOptionalString(payload.fitNotes);
+    const caseNotes = readOptionalString(payload.caseNotes);
 
-    forms.push({ slotId, interviewerName, submitted, submittedAt, notes });
+    forms.push({
+      slotId,
+      interviewerName,
+      submitted,
+      submittedAt,
+      notes,
+      fitScore,
+      caseScore,
+      fitNotes,
+      caseNotes,
+      fitCriteria: sanitizeCriteria(payload.fitCriteria),
+      caseCriteria: sanitizeCriteria(payload.caseCriteria),
+      interestNotes: readOptionalString(payload.interestNotes),
+      issuesToTest: readOptionalString(payload.issuesToTest),
+      offerRecommendation: sanitizeOfferRecommendation(payload.offerRecommendation)
+    });
   }
   return forms;
+};
+
+const readProcessStatus = (value: unknown): EvaluationRecord['processStatus'] => {
+  if (value === 'in-progress' || value === 'completed' || value === 'draft') {
+    return value;
+  }
+  return 'draft';
 };
 
 const ensurePositiveInteger = (value: unknown): number | null => {
@@ -124,7 +192,8 @@ const buildWriteModel = (payload: unknown): EvaluationWriteModel => {
     interviewCount: interviews.length,
     interviews,
     fitQuestionId: readOptionalString(source.fitQuestionId),
-    forms
+    forms,
+    processStatus: readProcessStatus(source.processStatus)
   };
 };
 
