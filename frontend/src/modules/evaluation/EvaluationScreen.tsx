@@ -95,6 +95,7 @@ export const EvaluationScreen = () => {
       const candidatePosition = metadata?.position ?? '—';
       const completedForms = evaluation.forms.filter((form) => form.submitted).length;
       const submittedForms = evaluation.forms.filter((form) => form.submitted);
+      const formsBySlot = new Map(evaluation.forms.map((form) => [form.slotId, form]));
       const fitScores = submittedForms
         .map((form) => form.fitScore)
         .filter((score): score is number => typeof score === 'number' && Number.isFinite(score));
@@ -120,20 +121,53 @@ export const EvaluationScreen = () => {
         }
       }
       const totalOffers = offerResponses.length;
-      const offerSummary = totalOffers
+      const offerPercentages = totalOffers
         ? (['yes_priority', 'yes_strong', 'yes_keep_warm', 'no_offer'] as const)
             .map((key) => `${Math.round((offerTotals[key] / totalOffers) * 100)}%`)
             .join(' / ')
         : '—';
+      const offerSummaryTooltip = totalOffers
+        ? [
+            `Yes, priority — ${offerTotals.yes_priority}`,
+            `Yes, meets high bar — ${offerTotals.yes_strong}`,
+            `Turndown, stay in contact — ${offerTotals.yes_keep_warm}`,
+            `Turndown — ${offerTotals.no_offer}`
+          ].join('\n')
+        : undefined;
       const roundNumber = evaluation.roundNumber ?? null;
-      const slotsReady = evaluation.interviews.every((slot) => {
-        const nameReady = slot.interviewerName.trim().length > 0;
-        const emailReady = slot.interviewerEmail.trim().length > 0;
-        const caseReady = Boolean(slot.caseFolderId?.trim());
-        const fitReady = Boolean(slot.fitQuestionId?.trim());
-        return nameReady && emailReady && caseReady && fitReady;
-      });
-      const startDisabled = evaluation.processStatus !== 'draft' || !slotsReady;
+      const nameReady = evaluation.interviews.every((slot) => slot.interviewerName.trim().length > 0);
+      const emailReady = evaluation.interviews.every((slot) => slot.interviewerEmail.trim().length > 0);
+      const caseReady = evaluation.interviews.every((slot) => Boolean(slot.caseFolderId?.trim()));
+      const fitReady = evaluation.interviews.every((slot) => Boolean(slot.fitQuestionId?.trim()));
+
+      let startTooltip: string | undefined;
+      let startDisabled = false;
+      if (evaluation.processStatus !== 'draft') {
+        startDisabled = true;
+        startTooltip = 'Invitations have already been sent to interviewers.';
+      } else if (!emailReady) {
+        startDisabled = true;
+        startTooltip = 'Fill in every interviewer email before starting the process.';
+      } else if (!nameReady || !caseReady || !fitReady) {
+        startDisabled = true;
+        startTooltip = 'Assign interviewers, cases, and fit questions to every slot.';
+      }
+
+      const allScoresCompleted =
+        evaluation.interviews.length > 0 &&
+        evaluation.interviews.every((slot) => {
+          const form = formsBySlot.get(slot.id);
+          if (!form) {
+            return false;
+          }
+          const fitScoreReady = typeof form.fitScore === 'number' && Number.isFinite(form.fitScore);
+          const caseScoreReady = typeof form.caseScore === 'number' && Number.isFinite(form.caseScore);
+          return form.submitted && fitScoreReady && caseScoreReady;
+        });
+      const finalActionsDisabled = !allScoresCompleted;
+      const finalActionsTooltip = finalActionsDisabled
+        ? 'Wait until every interviewer submits both fit and case scores.'
+        : undefined;
 
       return {
         id: evaluation.id,
@@ -144,15 +178,26 @@ export const EvaluationScreen = () => {
         formsPlanned: evaluation.interviewCount,
         avgFitScore,
         avgCaseScore,
-        offerSummary,
+        offerSummary: offerPercentages,
+        offerSummaryTooltip,
         processStatus: evaluation.processStatus,
         onStartProcess: () => handleStartProcess(evaluation),
         startDisabled,
+        startTooltip,
         onEdit: () => {
           setModalEvaluation(evaluation);
           setIsModalOpen(true);
         },
-        onOpenStatus: () => setStatusEvaluation(evaluation)
+        onOpenStatus: () => setStatusEvaluation(evaluation),
+        offerActionDisabled: finalActionsDisabled,
+        offerActionTooltip: finalActionsTooltip,
+        rejectActionDisabled: finalActionsDisabled,
+        rejectActionTooltip: finalActionsTooltip,
+        advanceActionDisabled: finalActionsDisabled,
+        advanceActionTooltip: finalActionsTooltip,
+        onOffer: () => undefined,
+        onReject: () => undefined,
+        onAdvance: () => undefined
       };
     });
   }, [candidateIndex, list, handleStartProcess]);
@@ -296,7 +341,12 @@ export const EvaluationScreen = () => {
       )}
 
       {statusEvaluation && (
-        <EvaluationStatusModal evaluation={statusEvaluation} onClose={() => setStatusEvaluation(null)} />
+        <EvaluationStatusModal
+          evaluation={statusEvaluation}
+          onClose={() => setStatusEvaluation(null)}
+          folders={folders}
+          fitQuestions={fitQuestions}
+        />
       )}
     </section>
   );
