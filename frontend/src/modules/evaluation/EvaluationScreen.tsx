@@ -10,15 +10,12 @@ import {
 } from '../../app/state/AppStateContext';
 import { EvaluationConfig } from '../../shared/types/evaluation';
 import { EvaluationTable, EvaluationTableRow } from './components/EvaluationTable';
-import { useAuth } from '../auth/AuthContext';
-import { InterviewerScreen } from './InterviewerScreen';
 
 type Banner = { type: 'info' | 'error'; text: string } | null;
 
 type SortKey = 'name' | 'position' | 'round' | 'avgFit' | 'avgCase';
 
 export const EvaluationScreen = () => {
-  const { session } = useAuth();
   const { list, saveEvaluation, removeEvaluation, startProcess } = useEvaluationsState();
   const { list: candidates } = useCandidatesState();
   const { folders } = useCasesState();
@@ -26,13 +23,16 @@ export const EvaluationScreen = () => {
   const [banner, setBanner] = useState<Banner>(null);
   const [modalEvaluation, setModalEvaluation] = useState<EvaluationConfig | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [statusEvaluation, setStatusEvaluation] = useState<EvaluationConfig | null>(null);
+  const [statusContext, setStatusContext] = useState<
+    | {
+        evaluation: EvaluationConfig;
+        candidateName: string;
+        candidatePosition: string;
+      }
+    | null
+  >(null);
   const [sortKey, setSortKey] = useState<SortKey>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-
-  if (session?.role === 'user') {
-    return <InterviewerScreen />;
-  }
 
   const candidateIndex = useMemo(() => {
     const map = new Map<
@@ -49,6 +49,42 @@ export const EvaluationScreen = () => {
     });
     return map;
   }, [candidates]);
+
+  const fitCriteriaIndex = useMemo(() => {
+    const map = new Map<string, { title: string; ratings: Partial<Record<1 | 2 | 3 | 4 | 5, string>> }>();
+    fitQuestions.forEach((question) => {
+      question.criteria.forEach((criterion) => {
+        map.set(criterion.id, { title: criterion.title, ratings: criterion.ratings });
+      });
+    });
+    return map;
+  }, [fitQuestions]);
+
+  const caseCriteriaIndex = useMemo(() => {
+    const map = new Map<string, { title: string; ratings: Partial<Record<1 | 2 | 3 | 4 | 5, string>> }>();
+    folders.forEach((folder) => {
+      folder.evaluationCriteria.forEach((criterion) => {
+        map.set(criterion.id, { title: criterion.title, ratings: criterion.ratings });
+      });
+    });
+    return map;
+  }, [folders]);
+
+  const caseFolderNameIndex = useMemo(() => {
+    const map = new Map<string, string>();
+    folders.forEach((folder) => {
+      map.set(folder.id, folder.name);
+    });
+    return map;
+  }, [folders]);
+
+  const fitQuestionTitleIndex = useMemo(() => {
+    const map = new Map<string, string>();
+    fitQuestions.forEach((question) => {
+      map.set(question.id, question.shortTitle);
+    });
+    return map;
+  }, [fitQuestions]);
 
   const handleStartProcess = useCallback(
     async (evaluation: EvaluationConfig) => {
@@ -89,6 +125,7 @@ export const EvaluationScreen = () => {
   );
 
   const tableRows = useMemo<EvaluationTableRow[]>(() => {
+    const noop = () => {};
     return list.map((evaluation) => {
       const metadata = evaluation.candidateId ? candidateIndex.get(evaluation.candidateId) : undefined;
       const candidateName = metadata?.name ?? 'Not selected';
@@ -126,14 +163,20 @@ export const EvaluationScreen = () => {
             .join(' / ')
         : '—';
       const roundNumber = evaluation.roundNumber ?? null;
-      const slotsReady = evaluation.interviews.every((slot) => {
-        const nameReady = slot.interviewerName.trim().length > 0;
-        const emailReady = slot.interviewerEmail.trim().length > 0;
-        const caseReady = Boolean(slot.caseFolderId?.trim());
-        const fitReady = Boolean(slot.fitQuestionId?.trim());
-        return nameReady && emailReady && caseReady && fitReady;
-      });
-      const startDisabled = evaluation.processStatus !== 'draft' || !slotsReady;
+      const emailsReady = evaluation.interviews.every((slot) => slot.interviewerEmail.trim().length > 0);
+      const invitationsSent = evaluation.processStatus !== 'draft';
+      const startDisabled = invitationsSent || !emailsReady;
+      const startTooltip = invitationsSent
+        ? 'Invitations have already been sent to interviewers.'
+        : emailsReady
+          ? null
+          : 'Provide email addresses for every interviewer to start the process.';
+      const formsMap = new Map(evaluation.forms.map((form) => [form.slotId, form]));
+      const allFormsCompleted = evaluation.interviews.every((slot) => formsMap.get(slot.id)?.submitted);
+      const decisionDisabled = !allFormsCompleted;
+      const decisionTooltip = allFormsCompleted
+        ? null
+        : 'Collect submitted feedback from every interviewer to enable decisions.';
 
       return {
         id: evaluation.id,
@@ -148,11 +191,18 @@ export const EvaluationScreen = () => {
         processStatus: evaluation.processStatus,
         onStartProcess: () => handleStartProcess(evaluation),
         startDisabled,
+        startTooltip,
         onEdit: () => {
           setModalEvaluation(evaluation);
           setIsModalOpen(true);
         },
-        onOpenStatus: () => setStatusEvaluation(evaluation)
+        onOpenStatus: () =>
+          setStatusContext({ evaluation, candidateName, candidatePosition }),
+        onReject: noop,
+        onOffer: noop,
+        onProgress: noop,
+        decisionDisabled,
+        decisionTooltip
       };
     });
   }, [candidateIndex, list, handleStartProcess]);
@@ -261,8 +311,10 @@ export const EvaluationScreen = () => {
     <section className={styles.wrapper}>
       <header className={styles.header}>
         <div>
-          <h1>Candidate evaluation</h1>
-          <p className={styles.subtitle}>Configure interviews and track the status of evaluation forms.</p>
+          <h1>Candidate evaluations</h1>
+          <p className={styles.subtitle}>
+            Configure interview panels, send invitations, and track interviewer feedback in one place.
+          </p>
         </div>
         <button className={styles.primaryButton} onClick={handleCreate}>
           Create evaluation
@@ -295,8 +347,17 @@ export const EvaluationScreen = () => {
         />
       )}
 
-      {statusEvaluation && (
-        <EvaluationStatusModal evaluation={statusEvaluation} onClose={() => setStatusEvaluation(null)} />
+      {statusContext && (
+        <EvaluationStatusModal
+          evaluation={statusContext.evaluation}
+          candidateName={statusContext.candidateName}
+          candidatePosition={statusContext.candidatePosition}
+          onClose={() => setStatusContext(null)}
+          fitCriteriaIndex={fitCriteriaIndex}
+          caseCriteriaIndex={caseCriteriaIndex}
+          caseFolderNames={caseFolderNameIndex}
+          fitQuestionTitles={fitQuestionTitleIndex}
+        />
       )}
     </section>
   );

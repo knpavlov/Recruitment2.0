@@ -93,30 +93,164 @@
 }
 
 .actionsHeader {
-  width: 200px;
+  width: 220px;
 }
 
 .actionsCell {
   display: flex;
   gap: 12px;
+  align-items: center;
 }
 
-.tablePrimaryButton {
+.decisionsHeader {
+  width: 320px;
+}
+
+.decisionsCell {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.actionPrimaryButton,
+.actionSecondaryButton,
+.actionInfoButton,
+.decisionPositiveButton,
+.decisionProgressButton,
+.decisionNegativeButton {
   padding: 10px 16px;
   border-radius: 12px;
   border: none;
-  background: linear-gradient(135deg, #f97316, #f43f5e);
-  color: white;
+  font-weight: 600;
   cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.tableSecondaryButton {
-  padding: 10px 16px;
-  border-radius: 12px;
-  border: none;
+.actionPrimaryButton {
+  background: linear-gradient(135deg, #38bdf8, #6366f1);
+  color: white;
+}
+
+.actionSecondaryButton {
   background: rgba(148, 163, 184, 0.2);
   color: #0f172a;
-  cursor: pointer;
+}
+
+.actionInfoButton {
+  background: rgba(96, 165, 250, 0.18);
+  color: #1d4ed8;
+}
+
+.decisionPositiveButton {
+  background: rgba(134, 239, 172, 0.25);
+  color: #166534;
+}
+
+.decisionProgressButton {
+  background: rgba(129, 140, 248, 0.2);
+  color: #4338ca;
+}
+
+.decisionNegativeButton {
+  background: rgba(248, 113, 113, 0.25);
+  color: #b91c1c;
+}
+
+.actionPrimaryButton:not(:disabled):hover,
+.actionSecondaryButton:not(:disabled):hover,
+.actionInfoButton:not(:disabled):hover,
+.decisionPositiveButton:not(:disabled):hover,
+.decisionProgressButton:not(:disabled):hover,
+.decisionNegativeButton:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 18px rgba(15, 23, 42, 0.12);
+}
+
+.actionPrimaryButton:disabled,
+.actionSecondaryButton:disabled,
+.actionInfoButton:disabled,
+.decisionPositiveButton:disabled,
+.decisionProgressButton:disabled,
+.decisionNegativeButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.buttonWithTooltip {
+  position: relative;
+  display: inline-flex;
+}
+
+.buttonWithTooltip[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(15, 23, 42, 0.95);
+  color: #ffffff;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  width: max-content;
+  max-width: 220px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  z-index: 3;
+}
+
+.buttonWithTooltip[data-tooltip]:hover::after,
+.buttonWithTooltip[data-tooltip]:focus-within::after {
+  opacity: 1;
+}
+
+.tooltipAnchor {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+  font-weight: 600;
+}
+
+.tooltipBadge {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.8);
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.tooltipContent {
+  position: absolute;
+  top: 26px;
+  left: 0;
+  transform: translateY(8px);
+  background: rgba(15, 23, 42, 0.95);
+  color: #ffffff;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  max-width: 260px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 3;
+}
+
+.tooltipAnchor:hover .tooltipContent,
+.tooltipAnchor:focus-within .tooltipContent {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .emptyState {

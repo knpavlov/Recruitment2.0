@@ -4,7 +4,8 @@ export type NavigationKey =
   | 'cases'
   | 'questions'
   | 'candidates'
-  | 'evaluation'
+  | 'evaluations'
+  | 'interviews'
   | 'stats'
   | 'accounts';
 
@@ -18,7 +19,8 @@ export const navigationItems: NavigationItem[] = [
   { key: 'cases', label: 'Case library', roleAccess: ['super-admin', 'admin'] },
   { key: 'questions', label: 'Fit questions', roleAccess: ['super-admin', 'admin'] },
   { key: 'candidates', label: 'Candidate database', roleAccess: ['super-admin', 'admin'] },
-  { key: 'evaluation', label: 'Evaluation', roleAccess: ['super-admin', 'admin', 'user'] },
+  { key: 'evaluations', label: 'Evaluations', roleAccess: ['super-admin', 'admin'] },
+  { key: 'interviews', label: 'Interviews', roleAccess: ['super-admin', 'admin', 'user'] },
   { key: 'stats', label: 'Analytics', roleAccess: ['super-admin', 'admin'] },
   { key: 'accounts', label: 'Account management', roleAccess: ['super-admin'] }
 ];
