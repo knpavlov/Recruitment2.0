@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import styles from '../../../styles/EvaluationStatusModal.module.css';
 import { EvaluationConfig, OfferRecommendationValue } from '../../../shared/types/evaluation';
 import { FitQuestion } from '../../../shared/types/fitQuestion';
@@ -36,6 +37,30 @@ const OFFER_LABELS: Record<OfferRecommendationValue, string> = {
   no_offer: 'Turndown'
 };
 
+type SummaryCellTone = 'success' | 'warning';
+
+interface SummaryTableCell {
+  primary: string;
+  secondary?: string | null;
+  tone?: SummaryCellTone;
+}
+
+interface SummaryTableRowData {
+  label: string;
+  cells: SummaryTableCell[];
+}
+
+interface SummaryTableSection {
+  title: string;
+  rows: SummaryTableRowData[];
+}
+
+interface InterviewerColumn {
+  id: string;
+  label: string;
+  form?: EvaluationConfig['forms'][number];
+}
+
 const buildCriteriaTitleMap = (fitQuestions: FitQuestion[], caseFolders: CaseFolder[]) => {
   const fitMap = new Map<string, string>();
   for (const question of fitQuestions) {
@@ -73,6 +98,109 @@ const formatProcessStatus = (status: EvaluationConfig['processStatus']) => {
   return 'Draft';
 };
 
+const buildInterviewerColumns = (evaluation: EvaluationConfig): InterviewerColumn[] => {
+  const columns: InterviewerColumn[] = evaluation.interviews.map((slot) => {
+    const trimmedName = slot.interviewerName.trim();
+    const form = evaluation.forms.find((item) => item.slotId === slot.id);
+    return {
+      id: slot.id,
+      label: trimmedName.length > 0 ? trimmedName : 'Interviewer',
+      form
+    };
+  });
+
+  const knownIds = new Set(columns.map((column) => column.id));
+  evaluation.forms.forEach((form, index) => {
+    if (!knownIds.has(form.slotId)) {
+      const fallbackName = form.interviewerName?.trim();
+      columns.push({
+        id: `detached-${index}-${form.slotId}`,
+        label: fallbackName && fallbackName.length > 0 ? fallbackName : 'Interviewer',
+        form
+      });
+    }
+  });
+
+  return columns;
+};
+
+const buildGeneralRows = (columns: InterviewerColumn[]): SummaryTableRowData[] => {
+  const statusRow: SummaryTableRowData = {
+    label: 'Status',
+    cells: columns.map((column) => {
+      const submitted = column.form?.submitted ?? false;
+      return {
+        primary: submitted ? 'Complete' : 'Pending',
+        secondary: submitted
+          ? column.form?.submittedAt
+            ? `Submitted ${formatDateTime(column.form.submittedAt)}`
+            : null
+          : 'Awaiting submission',
+        tone: submitted ? 'success' : 'warning'
+      };
+    })
+  };
+
+  const fitScoreRow: SummaryTableRowData = {
+    label: 'Fit score',
+    cells: columns.map((column) => ({ primary: formatScore(column.form?.fitScore) }))
+  };
+
+  const caseScoreRow: SummaryTableRowData = {
+    label: 'Case score',
+    cells: columns.map((column) => ({ primary: formatScore(column.form?.caseScore) }))
+  };
+
+  const offerRow: SummaryTableRowData = {
+    label: 'Offer decision',
+    cells: columns.map((column) => ({
+      primary: column.form?.offerRecommendation
+        ? OFFER_LABELS[column.form.offerRecommendation]
+        : '—'
+    }))
+  };
+
+  return [statusRow, fitScoreRow, caseScoreRow, offerRow];
+};
+
+const buildCriteriaRows = (
+  columns: InterviewerColumn[],
+  getCriteria: (form: EvaluationConfig['forms'][number] | undefined) =>
+    | EvaluationConfig['forms'][number]['fitCriteria']
+    | EvaluationConfig['forms'][number]['caseCriteria'],
+  titleMap: Map<string, string>,
+  fallbackTitle: string
+): SummaryTableRowData[] => {
+  const rows = new Map<string, SummaryTableRowData>();
+  const columnIndex = new Map(columns.map((column, index) => [column.id, index]));
+
+  columns.forEach((column) => {
+    const criteria = getCriteria(column.form) ?? [];
+    criteria.forEach((criterion) => {
+      const existing = rows.get(criterion.criterionId);
+      const label = titleMap.get(criterion.criterionId) ?? fallbackTitle;
+      if (!existing) {
+        const row: SummaryTableRowData = {
+          label,
+          cells: columns.map(() => ({ primary: '—' }))
+        };
+        rows.set(criterion.criterionId, row);
+      }
+      const targetRow = rows.get(criterion.criterionId);
+      if (targetRow) {
+        const idx = columnIndex.get(column.id);
+        if (idx != null) {
+          targetRow.cells[idx] = {
+            primary: formatScore(criterion.score)
+          };
+        }
+      }
+    });
+  });
+
+  return Array.from(rows.values());
+};
+
 export const EvaluationStatusModal = ({
   evaluation,
   candidateName,
@@ -87,6 +215,32 @@ export const EvaluationStatusModal = ({
   const avgCaseScore = computeAverageScore(submittedForms.map((form) => form.caseScore));
   const formsPlanned = evaluation.interviews.length || evaluation.interviewCount;
   const { fitMap, caseMap } = buildCriteriaTitleMap(fitQuestions, caseFolders);
+  const interviewerColumns = buildInterviewerColumns(evaluation);
+
+  const summarySections: SummaryTableSection[] = [];
+  if (interviewerColumns.length > 0) {
+    summarySections.push({ title: 'Overall summary', rows: buildGeneralRows(interviewerColumns) });
+
+    const fitCriteriaRows = buildCriteriaRows(
+      interviewerColumns,
+      (form) => form?.fitCriteria,
+      fitMap,
+      'Fit criterion'
+    );
+    if (fitCriteriaRows.length > 0) {
+      summarySections.push({ title: 'Fit criteria', rows: fitCriteriaRows });
+    }
+
+    const caseCriteriaRows = buildCriteriaRows(
+      interviewerColumns,
+      (form) => form?.caseCriteria,
+      caseMap,
+      'Case criterion'
+    );
+    if (caseCriteriaRows.length > 0) {
+      summarySections.push({ title: 'Case criteria', rows: caseCriteriaRows });
+    }
+  }
 
   return (
     <div className={styles.overlay}>
@@ -131,6 +285,60 @@ export const EvaluationStatusModal = ({
             <p className={styles.sectionSubtitle}>
               Review detailed scores, notes and offer recommendations for every interviewer.
             </p>
+            {summarySections.length > 0 && (
+              <div className={styles.summaryTableSection}>
+                <div className={styles.summaryTableWrapper}>
+                  <table className={styles.summaryTable}>
+                    <thead>
+                      <tr>
+                        <th scope="col">Criteria</th>
+                        {interviewerColumns.map((column) => (
+                          <th scope="col" key={column.id}>
+                            {column.label}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {summarySections.map((section) => (
+                        <Fragment key={section.title}>
+                          <tr className={styles.summaryTableGroupRow}>
+                            <td colSpan={interviewerColumns.length + 1}>{section.title}</td>
+                          </tr>
+                          {section.rows.map((row) => (
+                            <tr key={row.label}>
+                              <th scope="row">{row.label}</th>
+                              {row.cells.map((cell, index) => (
+                                <td key={`${section.title}-${row.label}-${interviewerColumns[index].id}`}>
+                                  <div className={styles.summaryTableCell}>
+                                    {cell.tone ? (
+                                      <span
+                                        className={
+                                          cell.tone === 'success'
+                                            ? styles.statusBadgeSuccess
+                                            : styles.statusBadgePending
+                                        }
+                                      >
+                                        {cell.primary}
+                                      </span>
+                                    ) : (
+                                      <span className={styles.summaryTablePrimary}>{cell.primary}</span>
+                                    )}
+                                    {cell.secondary && (
+                                      <span className={styles.summaryTableSecondary}>{cell.secondary}</span>
+                                    )}
+                                  </div>
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </Fragment>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
             {evaluation.forms.length === 0 ? (
               <p className={styles.emptyState}>No interviewer feedback has been recorded yet.</p>
             ) : (
