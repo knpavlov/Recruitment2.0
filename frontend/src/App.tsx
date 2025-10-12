@@ -10,10 +10,13 @@ import { AuthProvider, useAuth } from './modules/auth/AuthContext';
 import { AppStateProvider } from './app/state/AppStateContext';
 import { LoginScreen } from './modules/auth/LoginScreen';
 import { FitQuestionsScreen } from './modules/questions/FitQuestionsScreen';
+import { InterviewerScreen } from './modules/evaluation/InterviewerScreen';
+import { useHasInterviewerAssignments } from './app/hooks/useHasInterviewerAssignments';
 
 const AppContent = () => {
   const { session } = useAuth();
   const [activePage, setActivePage] = useState<NavigationKey>('cases');
+  const hasInterviewerAssignments = useHasInterviewerAssignments(session?.email);
 
   useEffect(() => {
     if (!session) {
@@ -25,8 +28,22 @@ const AppContent = () => {
     if (!session) {
       return [];
     }
-    return navigationItems.filter((item) => item.roleAccess.includes(session.role));
-  }, [session]);
+
+    return navigationItems.filter((item) => {
+      if (!item.roleAccess.includes(session.role)) {
+        return false;
+      }
+
+      if (item.key === 'interviews') {
+        if (session.role === 'user') {
+          return true;
+        }
+        return hasInterviewerAssignments;
+      }
+
+      return true;
+    });
+  }, [session, hasInterviewerAssignments]);
 
   useEffect(() => {
     if (!session) {
@@ -55,6 +72,8 @@ const AppContent = () => {
         return <CandidatesScreen />;
       case 'evaluation':
         return <EvaluationScreen />;
+      case 'interviews':
+        return <InterviewerScreen />;
       case 'stats':
         return (
           <PlaceholderScreen
