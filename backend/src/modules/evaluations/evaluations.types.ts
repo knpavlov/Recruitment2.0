@@ -1,3 +1,7 @@
+import type { CandidateRecord } from '../candidates/candidates.types.js';
+import type { CaseFolder } from '../cases/cases.types.js';
+import type { FitQuestionRecord } from '../questions/questions.types.js';
+
 export interface InterviewSlotModel {
   id: string;
   interviewerName: string;
@@ -12,6 +16,43 @@ export interface InterviewStatusModel {
   submitted: boolean;
   submittedAt?: string;
   notes?: string;
+  fitScore?: number;
+  caseScore?: number;
+  fitNotes?: string;
+  caseNotes?: string;
+  fitCriteria?: EvaluationCriterionScore[];
+  caseCriteria?: EvaluationCriterionScore[];
+  interestNotes?: string;
+  issuesToTest?: string;
+  offerRecommendation?: OfferRecommendationValue;
+}
+
+export interface EvaluationCriterionScore {
+  criterionId: string;
+  score?: number;
+}
+
+export type OfferRecommendationValue =
+  | 'yes_priority'
+  | 'yes_strong'
+  | 'yes_keep_warm'
+  | 'no_offer';
+
+export type EvaluationProcessStatus = 'draft' | 'in-progress' | 'completed';
+
+export interface InterviewAssignmentModel {
+  slotId: string;
+  interviewerEmail: string;
+  interviewerName: string;
+  caseFolderId: string;
+  fitQuestionId: string;
+}
+
+export interface InterviewAssignmentRecord extends InterviewAssignmentModel {
+  id: string;
+  evaluationId: string;
+  invitationSentAt: string;
+  createdAt: string;
 }
 
 export interface EvaluationRecord {
@@ -25,6 +66,8 @@ export interface EvaluationRecord {
   createdAt: string;
   updatedAt: string;
   forms: InterviewStatusModel[];
+  processStatus: EvaluationProcessStatus;
+  processStartedAt?: string;
 }
 
 export interface EvaluationWriteModel {
@@ -35,4 +78,19 @@ export interface EvaluationWriteModel {
   interviews: InterviewSlotModel[];
   fitQuestionId?: string;
   forms: InterviewStatusModel[];
+  processStatus?: EvaluationProcessStatus;
+}
+
+export interface InterviewerAssignmentView {
+  evaluationId: string;
+  slotId: string;
+  interviewerEmail: string;
+  interviewerName: string;
+  invitationSentAt: string;
+  evaluationUpdatedAt: string;
+  evaluationProcessStatus: EvaluationProcessStatus;
+  candidate?: CandidateRecord;
+  caseFolder?: CaseFolder;
+  fitQuestion?: FitQuestionRecord;
+  form: InterviewStatusModel | null;
 }
