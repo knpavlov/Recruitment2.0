@@ -28,7 +28,9 @@ const createInterviewSlot = (): InterviewSlot => ({
 const createStatusRecord = (slot: InterviewSlot): InterviewStatusRecord => ({
   slotId: slot.id,
   interviewerName: slot.interviewerName || 'Interviewer',
-  submitted: false
+  submitted: false,
+  fitCriteria: [],
+  caseCriteria: []
 });
 
 const createDefaultConfig = (): EvaluationConfig => {
@@ -43,7 +45,8 @@ const createDefaultConfig = (): EvaluationConfig => {
     version: 1,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    forms: interviews.map((slot) => createStatusRecord(slot))
+    forms: interviews.map((slot) => createStatusRecord(slot)),
+    processStatus: 'draft'
   };
 };
 

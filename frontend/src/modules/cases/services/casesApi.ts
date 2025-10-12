@@ -1,5 +1,10 @@
 import { apiRequest } from '../../../shared/api/httpClient';
-import { CaseFileRecord, CaseFileUploadDto, CaseFolder } from '../../../shared/types/caseLibrary';
+import {
+  CaseEvaluationCriterion,
+  CaseFileRecord,
+  CaseFileUploadDto,
+  CaseFolder
+} from '../../../shared/types/caseLibrary';
 
 type CaseFolderPayload = Partial<CaseFolder> & {
   id?: unknown;
@@ -7,6 +12,7 @@ type CaseFolderPayload = Partial<CaseFolder> & {
   createdAt?: unknown;
   updatedAt?: unknown;
   files?: unknown;
+  evaluationCriteria?: unknown;
 };
 
 type CaseFilePayload = Partial<CaseFileRecord> & {
@@ -85,6 +91,33 @@ const normalizeFolder = (payload: unknown): CaseFolder | null => {
     .map((file) => normalizeFile(file))
     .filter((item): item is CaseFileRecord => Boolean(item));
 
+  const criteriaSource = Array.isArray(record.evaluationCriteria) ? record.evaluationCriteria : [];
+  const evaluationCriteria = criteriaSource
+    .map((entry) => {
+      if (!entry || typeof entry !== 'object') {
+        return null;
+      }
+      const payloadEntry = entry as Partial<CaseEvaluationCriterion> & { id?: unknown };
+      const id = typeof payloadEntry.id === 'string' && payloadEntry.id.trim() ? payloadEntry.id : null;
+      const title = typeof payloadEntry.title === 'string' && payloadEntry.title.trim() ? payloadEntry.title : null;
+      if (!id || !title) {
+        return null;
+      }
+      const ratings: CaseEvaluationCriterion['ratings'] = {};
+      const source = payloadEntry.ratings && typeof payloadEntry.ratings === 'object' ? payloadEntry.ratings : {};
+      for (const score of [1, 2, 3, 4, 5] as const) {
+        const valueRaw = (source as Record<string, unknown>)[String(score)];
+        if (typeof valueRaw === 'string') {
+          const trimmed = valueRaw.trim();
+          if (trimmed) {
+            ratings[score] = trimmed;
+          }
+        }
+      }
+      return { id, title, ratings };
+    })
+    .filter((item): item is CaseEvaluationCriterion => Boolean(item));
+
   if (!id || !name || version === null || !createdAt || !updatedAt) {
     return null;
   }
@@ -95,7 +128,8 @@ const normalizeFolder = (payload: unknown): CaseFolder | null => {
     version,
     createdAt,
     updatedAt,
-    files
+    files,
+    evaluationCriteria
   };
 };
 

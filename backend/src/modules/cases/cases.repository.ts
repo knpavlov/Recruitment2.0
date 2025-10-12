@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { postgresPool } from '../../shared/database/postgres.client.js';
-import { CaseFileRecord, CaseFileUpload, CaseFolder } from './cases.types.js';
+import { CaseEvaluationCriterion, CaseFileRecord, CaseFileUpload, CaseFolder } from './cases.types.js';
 
 interface CaseJoinedRow extends Record<string, unknown> {
   folder_id: string;
@@ -8,6 +8,7 @@ interface CaseJoinedRow extends Record<string, unknown> {
   folder_version: number;
   folder_created_at: Date;
   folder_updated_at: Date;
+  folder_evaluation_criteria: unknown;
   file_id: string | null;
   file_name: string | null;
   file_mime_type: string | null;
@@ -15,6 +16,42 @@ interface CaseJoinedRow extends Record<string, unknown> {
   file_data_url: string | null;
   file_uploaded_at: Date | null;
 }
+
+const mapCriteria = (value: unknown): CaseEvaluationCriterion[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const result: CaseEvaluationCriterion[] = [];
+
+  for (const entry of value) {
+    if (!entry || typeof entry !== 'object') {
+      continue;
+    }
+    const payload = entry as Record<string, unknown>;
+    const idRaw = typeof payload.id === 'string' ? payload.id.trim() : '';
+    const titleRaw = typeof payload.title === 'string' ? payload.title.trim() : '';
+    if (!idRaw || !titleRaw) {
+      continue;
+    }
+
+    const ratings: CaseEvaluationCriterion['ratings'] = {};
+    const ratingsSource = payload.ratings && typeof payload.ratings === 'object' ? (payload.ratings as Record<string, unknown>) : {};
+    for (const score of [1, 2, 3, 4, 5] as const) {
+      const valueRaw = ratingsSource[String(score)];
+      if (typeof valueRaw === 'string') {
+        const trimmed = valueRaw.trim();
+        if (trimmed) {
+          ratings[score] = trimmed;
+        }
+      }
+    }
+
+    result.push({ id: idRaw, title: titleRaw, ratings });
+  }
+
+  return result;
+};
 
 const mapRowsToFolder = (rows: CaseJoinedRow[]): CaseFolder | null => {
   if (rows.length === 0) {
@@ -44,7 +81,8 @@ const mapRowsToFolder = (rows: CaseJoinedRow[]): CaseFolder | null => {
     version: Number(first.folder_version),
     createdAt: new Date(first.folder_created_at).toISOString(),
     updatedAt: new Date(first.folder_updated_at).toISOString(),
-    files
+    files,
+    evaluationCriteria: mapCriteria(first.folder_evaluation_criteria)
   };
 };
 
@@ -55,6 +93,7 @@ const fetchFolderRows = async (client: any, folderId: string) => {
             f.version AS folder_version,
             f.created_at AS folder_created_at,
             f.updated_at AS folder_updated_at,
+            f.evaluation_criteria AS folder_evaluation_criteria,
             cf.id AS file_id,
             cf.file_name,
             cf.mime_type AS file_mime_type,
@@ -95,6 +134,7 @@ interface CaseFolderRow {
   version: number;
   created_at: Date;
   updated_at: Date;
+  evaluation_criteria: unknown;
 }
 
 export class CasesRepository {
@@ -128,23 +168,24 @@ export class CasesRepository {
   }
 
   async createFolder(name: string): Promise<CaseFolder> {
-    const result = await postgresPool.query(
-      `INSERT INTO case_folders (id, name)
-       VALUES ($1, $2)
-       RETURNING id, name, version, created_at, updated_at;`,
-      [randomUUID(), name]
-    );
+  const result = await postgresPool.query(
+    `INSERT INTO case_folders (id, name)
+     VALUES ($1, $2)
+     RETURNING id, name, version, created_at, updated_at, evaluation_criteria;`,
+    [randomUUID(), name]
+  );
 
-    const row = result.rows[0] as unknown as CaseFolderRow;
-    return {
-      id: row.id,
-      name: row.name,
-      version: Number(row.version),
-      createdAt: new Date(row.created_at).toISOString(),
-      updatedAt: new Date(row.updated_at).toISOString(),
-      files: []
-    };
-  }
+  const row = result.rows[0] as unknown as CaseFolderRow;
+  return {
+    id: row.id,
+    name: row.name,
+    version: Number(row.version),
+    createdAt: new Date(row.created_at).toISOString(),
+    updatedAt: new Date(row.updated_at).toISOString(),
+    files: [],
+    evaluationCriteria: mapCriteria(row.evaluation_criteria)
+  };
+}
 
   async renameFolder(
     id: string,
