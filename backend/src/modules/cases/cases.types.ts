@@ -14,6 +14,7 @@ export interface CaseFolder {
   createdAt: string;
   updatedAt: string;
   files: CaseFileRecord[];
+  evaluationCriteria: CaseEvaluationCriterion[];
 }
 
 export interface CaseFileUpload {
@@ -21,4 +22,10 @@ export interface CaseFileUpload {
   mimeType: string;
   size: number;
   dataUrl: string;
+}
+
+export interface CaseEvaluationCriterion {
+  id: string;
+  title: string;
+  ratings: Partial<Record<1 | 2 | 3 | 4 | 5, string>>;
 }

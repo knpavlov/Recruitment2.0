@@ -1,5 +1,11 @@
 import { apiRequest } from '../../../shared/api/httpClient';
-import { EvaluationConfig, InterviewSlot, InterviewStatusRecord } from '../../../shared/types/evaluation';
+import {
+  EvaluationConfig,
+  EvaluationProcessStatus,
+  InterviewSlot,
+  InterviewStatusRecord,
+  EvaluationCriterionScore
+} from '../../../shared/types/evaluation';
 
 const normalizeString = (value: unknown): string | undefined => {
   if (typeof value === 'string') {
@@ -40,6 +46,19 @@ const normalizeBoolean = (value: unknown): boolean | undefined => {
   return undefined;
 };
 
+const normalizeScore = (value: unknown): number | undefined => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value);
+    if (!Number.isNaN(parsed)) {
+      return parsed;
+    }
+  }
+  return undefined;
+};
+
 const normalizeSlot = (value: unknown): InterviewSlot | null => {
   if (!value || typeof value !== 'object') {
     return null;
@@ -66,6 +85,46 @@ const normalizeSlot = (value: unknown): InterviewSlot | null => {
   };
 };
 
+const normalizeCriterion = (value: unknown): EvaluationCriterionScore | null => {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const payload = value as Record<string, unknown>;
+  const criterionId = normalizeString(payload.criterionId)?.trim();
+  if (!criterionId) {
+    return null;
+  }
+  const rawScore = payload.score;
+  let score: number | undefined;
+  if (typeof rawScore === 'number' && Number.isFinite(rawScore)) {
+    score = rawScore;
+  } else if (typeof rawScore === 'string' && rawScore.trim()) {
+    const parsed = Number(rawScore);
+    if (!Number.isNaN(parsed)) {
+      score = parsed;
+    }
+  }
+  return { criterionId, score };
+};
+
+const normalizeCriteriaList = (value: unknown): EvaluationCriterionScore[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((item) => normalizeCriterion(item))
+    .filter((entry): entry is EvaluationCriterionScore => Boolean(entry));
+};
+
+const normalizeOfferRecommendation = (
+  value: unknown
+): InterviewStatusRecord['offerRecommendation'] | undefined => {
+  if (value === 'yes_priority' || value === 'yes_strong' || value === 'yes_keep_warm' || value === 'no_offer') {
+    return value;
+  }
+  return undefined;
+};
+
 const normalizeForm = (value: unknown): InterviewStatusRecord | null => {
   if (!value || typeof value !== 'object') {
     return null;
@@ -88,7 +147,16 @@ const normalizeForm = (value: unknown): InterviewStatusRecord | null => {
     interviewerName: normalizeString(payload.interviewerName) ?? 'Interviewer',
     submitted: normalizeBoolean(payload.submitted) ?? false,
     submittedAt: normalizeIsoString(payload.submittedAt),
-    notes: normalizeString(payload.notes) ?? undefined
+    notes: normalizeString(payload.notes) ?? undefined,
+    fitScore: normalizeScore(payload.fitScore),
+    caseScore: normalizeScore(payload.caseScore),
+    fitNotes: normalizeString(payload.fitNotes) ?? undefined,
+    caseNotes: normalizeString(payload.caseNotes) ?? undefined,
+    fitCriteria: normalizeCriteriaList(payload.fitCriteria),
+    caseCriteria: normalizeCriteriaList(payload.caseCriteria),
+    interestNotes: normalizeString(payload.interestNotes) ?? undefined,
+    issuesToTest: normalizeString(payload.issuesToTest) ?? undefined,
+    offerRecommendation: normalizeOfferRecommendation(payload.offerRecommendation)
   };
 };
 
@@ -108,6 +176,8 @@ const normalizeEvaluation = (value: unknown): EvaluationConfig | null => {
     createdAt?: unknown;
     updatedAt?: unknown;
     forms?: unknown;
+    processStatus?: unknown;
+    processStartedAt?: unknown;
   };
 
   const id = normalizeString(payload.id)?.trim();
@@ -141,7 +211,9 @@ const normalizeEvaluation = (value: unknown): EvaluationConfig | null => {
     version,
     createdAt,
     updatedAt,
-    forms
+    forms,
+    processStatus: (normalizeString(payload.processStatus) as EvaluationProcessStatus | undefined) ?? 'draft',
+    processStartedAt: normalizeIsoString(payload.processStartedAt)
   };
 };
 
@@ -175,7 +247,22 @@ const serializeEvaluation = (config: EvaluationConfig) => ({
   forms: config.forms.map((form) => ({
     ...form,
     submittedAt: form.submittedAt ?? null,
-    notes: form.notes ?? null
+    notes: form.notes ?? null,
+    fitCriteria: Array.isArray(form.fitCriteria)
+      ? form.fitCriteria.map((criterion) => ({
+          criterionId: criterion.criterionId,
+          score: typeof criterion.score === 'number' ? criterion.score : null
+        }))
+      : [],
+    caseCriteria: Array.isArray(form.caseCriteria)
+      ? form.caseCriteria.map((criterion) => ({
+          criterionId: criterion.criterionId,
+          score: typeof criterion.score === 'number' ? criterion.score : null
+        }))
+      : [],
+    interestNotes: form.interestNotes ?? null,
+    issuesToTest: form.issuesToTest ?? null,
+    offerRecommendation: form.offerRecommendation ?? null
   }))
 });
 
@@ -195,6 +282,21 @@ export const evaluationsApi = {
         body: { config: serializeEvaluation(config), expectedVersion }
       })
     ),
+  start: async (id: string) => {
+    let portalUrl: string | undefined;
+    if (typeof window !== 'undefined' && window.location?.origin) {
+      try {
+        portalUrl = new URL(window.location.origin).toString();
+      } catch {
+        portalUrl = window.location.origin;
+      }
+    }
+
+    return apiRequest<{ id: string }>(`/evaluations/${id}/start`, {
+      method: 'POST',
+      body: portalUrl ? { portalUrl } : undefined
+    });
+  },
   remove: async (id: string) =>
     apiRequest<{ id?: unknown }>(`/evaluations/${id}`, {
       method: 'DELETE'

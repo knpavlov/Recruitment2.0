@@ -9,6 +9,10 @@ export interface EvaluationTableRow {
   formsPlanned: number;
   avgFitScore: number | null;
   avgCaseScore: number | null;
+  offerSummary: string;
+  processStatus: 'draft' | 'in-progress' | 'completed';
+  onStartProcess: () => void;
+  startDisabled: boolean;
   onEdit: () => void;
   onOpenStatus: () => void;
 }
@@ -66,6 +70,8 @@ export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: 
               );
             })}
             <th>Forms</th>
+            <th>Offer votes (Yes, priority / Yes, meets high bar / Turndown, stay in contact / Turndown)</th>
+            <th>Process</th>
             <th className={styles.actionsHeader}>Actions</th>
           </tr>
         </thead>
@@ -75,6 +81,12 @@ export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: 
             const formsLabel = `${row.formsCompleted}/${row.formsPlanned}`;
             const avgFitLabel = row.avgFitScore != null ? row.avgFitScore.toFixed(1) : '—';
             const avgCaseLabel = row.avgCaseScore != null ? row.avgCaseScore.toFixed(1) : '—';
+            const processLabel =
+              row.processStatus === 'in-progress'
+                ? 'In progress'
+                : row.processStatus === 'completed'
+                  ? 'Completed'
+                  : 'Draft';
             return (
               <tr key={row.id}>
                 <td>{row.candidateName}</td>
@@ -83,7 +95,16 @@ export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: 
                 <td>{avgFitLabel}</td>
                 <td>{avgCaseLabel}</td>
                 <td>{formsLabel}</td>
+                <td>{row.offerSummary}</td>
+                <td>{processLabel}</td>
                 <td className={styles.actionsCell}>
+                  <button
+                    className={styles.tablePrimaryButton}
+                    onClick={row.onStartProcess}
+                    disabled={row.startDisabled}
+                  >
+                    Start process
+                  </button>
                   <button className={styles.tableSecondaryButton} onClick={row.onEdit}>
                     Edit
                   </button>
