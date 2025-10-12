@@ -13,8 +13,14 @@ export interface EvaluationTableRow {
   processStatus: 'draft' | 'in-progress' | 'completed';
   onStartProcess: () => void;
   startDisabled: boolean;
+  startTooltip: string | null;
   onEdit: () => void;
   onOpenStatus: () => void;
+  onReject: () => void;
+  onOffer: () => void;
+  onProgress: () => void;
+  decisionDisabled: boolean;
+  decisionTooltip: string | null;
 }
 
 export interface EvaluationTableProps {
@@ -70,9 +76,18 @@ export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: 
               );
             })}
             <th>Forms</th>
-            <th>Offer votes (Yes, priority / Yes, meets high bar / Turndown, stay in contact / Turndown)</th>
+            <th>
+              <span className={styles.tooltipAnchor}>
+                Offer votes
+                <span className={styles.tooltipBadge}>i</span>
+                <span className={styles.tooltipContent}>
+                  Yes, priority / Yes, meets high bar / Turndown, stay in contact / Turndown
+                </span>
+              </span>
+            </th>
             <th>Process</th>
-            <th className={styles.actionsHeader}>Actions</th>
+            <th className={styles.actionsHeader}>Workflow</th>
+            <th className={styles.decisionsHeader}>Decisions</th>
           </tr>
         </thead>
         <tbody>
@@ -98,19 +113,54 @@ export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: 
                 <td>{row.offerSummary}</td>
                 <td>{processLabel}</td>
                 <td className={styles.actionsCell}>
-                  <button
-                    className={styles.tablePrimaryButton}
-                    onClick={row.onStartProcess}
-                    disabled={row.startDisabled}
-                  >
-                    Start process
-                  </button>
-                  <button className={styles.tableSecondaryButton} onClick={row.onEdit}>
+                  <div className={styles.buttonWithTooltip} data-tooltip={row.startTooltip ?? undefined}>
+                    <button
+                      type="button"
+                      className={styles.actionPrimaryButton}
+                      onClick={row.onStartProcess}
+                      disabled={row.startDisabled}
+                    >
+                      Start process
+                    </button>
+                  </div>
+                  <button type="button" className={styles.actionSecondaryButton} onClick={row.onEdit}>
                     Edit
                   </button>
-                  <button className={styles.tablePrimaryButton} onClick={row.onOpenStatus}>
+                  <button type="button" className={styles.actionInfoButton} onClick={row.onOpenStatus}>
                     Status
                   </button>
+                </td>
+                <td className={styles.decisionsCell}>
+                  <div className={styles.buttonWithTooltip} data-tooltip={row.decisionTooltip ?? undefined}>
+                    <button
+                      type="button"
+                      className={styles.decisionPositiveButton}
+                      onClick={row.onOffer}
+                      disabled={row.decisionDisabled}
+                    >
+                      Offer
+                    </button>
+                  </div>
+                  <div className={styles.buttonWithTooltip} data-tooltip={row.decisionTooltip ?? undefined}>
+                    <button
+                      type="button"
+                      className={styles.decisionProgressButton}
+                      onClick={row.onProgress}
+                      disabled={row.decisionDisabled}
+                    >
+                      Progress to next round
+                    </button>
+                  </div>
+                  <div className={styles.buttonWithTooltip} data-tooltip={row.decisionTooltip ?? undefined}>
+                    <button
+                      type="button"
+                      className={styles.decisionNegativeButton}
+                      onClick={row.onReject}
+                      disabled={row.decisionDisabled}
+                    >
+                      Reject
+                    </button>
+                  </div>
                 </td>
               </tr>
             );

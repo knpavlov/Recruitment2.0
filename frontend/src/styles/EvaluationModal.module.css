@@ -225,51 +225,10 @@
   flex-direction: column;
   gap: 16px;
 }
-
-.statusScores {
-  display: flex;
-  gap: 24px;
-  margin: 12px 0 0;
-}
-
-.statusScore {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 14px;
-  color: #475569;
-}
-
-.statusScore strong {
-  font-size: 18px;
-  color: #0f172a;
-}
-
-.statusRow {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-  padding: 16px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.85);
-  border: 1px solid rgba(148, 163, 184, 0.2);
-}
-
-.statusRow h3 {
-  margin: 0 0 4px;
-}
-
 .statusMeta {
   margin: 0;
   font-size: 14px;
   color: #64748b;
-}
-
-.statusNotes {
-  margin: 8px 0 0;
-  font-size: 14px;
-  color: #0f172a;
 }
 
 .statusBadgeSuccess,
@@ -288,4 +247,221 @@
 .statusBadgePending {
   background: rgba(251, 191, 36, 0.25);
   color: #92400e;
+}
+
+.statusMetaSecondary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.statusMetaSecondary span {
+  opacity: 0.4;
+}
+
+.statusSummary {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  padding: 8px 12px 4px;
+  border-radius: 16px;
+  background: rgba(148, 163, 184, 0.12);
+}
+
+.summaryTitle {
+  margin: 0 0 4px;
+  font-size: 20px;
+  color: #0f172a;
+}
+
+.summaryStats {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.summaryChip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 10px 16px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  font-size: 13px;
+  color: #475569;
+}
+
+.summaryChip strong {
+  font-size: 18px;
+  color: #0f172a;
+}
+
+.statusCard {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.statusCardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.statusCardTitle h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #0f172a;
+}
+
+.statusCardTitle p {
+  margin: 4px 0 0;
+}
+
+.statusBadgeGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.offerBadge {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(148, 163, 184, 0.2);
+  color: #334155;
+}
+
+.offerBadge_yes_priority {
+  background: rgba(134, 239, 172, 0.25);
+  color: #15803d;
+}
+
+.offerBadge_yes_strong {
+  background: rgba(129, 140, 248, 0.25);
+  color: #4338ca;
+}
+
+.offerBadge_yes_keep_warm {
+  background: rgba(96, 165, 250, 0.25);
+  color: #1d4ed8;
+}
+
+.offerBadge_no_offer {
+  background: rgba(248, 113, 113, 0.2);
+  color: #b91c1c;
+}
+
+.statusScoresRow {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.statusScoreCard {
+  flex: 1 1 160px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  border-radius: 16px;
+  background: rgba(226, 232, 240, 0.35);
+  color: #475569;
+}
+
+.statusScoreCard strong {
+  font-size: 22px;
+  color: #0f172a;
+}
+
+.criteriaGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.criteriaTitle {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.criteriaList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.criteriaRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+  color: #1e293b;
+}
+
+.criteriaName {
+  font-weight: 500;
+}
+
+.criteriaScore {
+  font-weight: 600;
+}
+
+.criteriaDescription {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.emptyCriteria {
+  margin: 0;
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.notesGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.noteBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(236, 252, 203, 0.25);
+  border: 1px solid rgba(163, 230, 53, 0.25);
+}
+
+.noteLabel {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #4d7c0f;
+}
+
+.noteValue {
+  margin: 0;
+  font-size: 13px;
+  color: #1f2937;
+  white-space: pre-wrap;
 }
