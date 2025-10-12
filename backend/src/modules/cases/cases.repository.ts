@@ -1,6 +1,11 @@
 import { randomUUID } from 'crypto';
 import { postgresPool } from '../../shared/database/postgres.client.js';
-import { CaseFileRecord, CaseFileUpload, CaseFolder } from './cases.types.js';
+import {
+  CaseEvaluationCriterionRecord,
+  CaseFileRecord,
+  CaseFileUpload,
+  CaseFolder
+} from './cases.types.js';
 
 interface CaseJoinedRow extends Record<string, unknown> {
   folder_id: string;
@@ -14,6 +19,13 @@ interface CaseJoinedRow extends Record<string, unknown> {
   file_size: number | null;
   file_data_url: string | null;
   file_uploaded_at: Date | null;
+  criterion_id: string | null;
+  criterion_title: string | null;
+  criterion_rating_1: string | null;
+  criterion_rating_2: string | null;
+  criterion_rating_3: string | null;
+  criterion_rating_4: string | null;
+  criterion_rating_5: string | null;
 }
 
 const mapRowsToFolder = (rows: CaseJoinedRow[]): CaseFolder | null => {
@@ -23,19 +35,40 @@ const mapRowsToFolder = (rows: CaseJoinedRow[]): CaseFolder | null => {
 
   const first = rows[0];
   const files: CaseFileRecord[] = [];
+  const criteriaMap = new Map<string, CaseEvaluationCriterionRecord>();
 
   for (const row of rows) {
-    if (!row.file_id) {
-      continue;
+    if (row.file_id && !files.some((file) => file.id === row.file_id)) {
+      files.push({
+        id: row.file_id,
+        fileName: row.file_name ?? 'File',
+        mimeType: row.file_mime_type ?? 'application/octet-stream',
+        size: Number(row.file_size ?? 0),
+        uploadedAt: row.file_uploaded_at
+          ? new Date(row.file_uploaded_at).toISOString()
+          : new Date().toISOString(),
+        dataUrl: row.file_data_url ?? ''
+      });
     }
-    files.push({
-      id: row.file_id,
-      fileName: row.file_name ?? 'File',
-      mimeType: row.file_mime_type ?? 'application/octet-stream',
-      size: Number(row.file_size ?? 0),
-      uploadedAt: row.file_uploaded_at ? new Date(row.file_uploaded_at).toISOString() : new Date().toISOString(),
-      dataUrl: row.file_data_url ?? ''
-    });
+
+    if (row.criterion_id && !criteriaMap.has(row.criterion_id)) {
+      const ratings: CaseEvaluationCriterionRecord['ratings'] = {};
+      const register = (score: 1 | 2 | 3 | 4 | 5, value: string | null) => {
+        if (typeof value === 'string' && value.trim()) {
+          ratings[score] = value.trim();
+        }
+      };
+      register(1, row.criterion_rating_1);
+      register(2, row.criterion_rating_2);
+      register(3, row.criterion_rating_3);
+      register(4, row.criterion_rating_4);
+      register(5, row.criterion_rating_5);
+      criteriaMap.set(row.criterion_id, {
+        id: row.criterion_id,
+        title: row.criterion_title ?? 'Criterion',
+        ratings
+      });
+    }
   }
 
   return {
@@ -44,7 +77,8 @@ const mapRowsToFolder = (rows: CaseJoinedRow[]): CaseFolder | null => {
     version: Number(first.folder_version),
     createdAt: new Date(first.folder_created_at).toISOString(),
     updatedAt: new Date(first.folder_updated_at).toISOString(),
-    files
+    files,
+    evaluationCriteria: Array.from(criteriaMap.values())
   };
 };
 
@@ -60,11 +94,21 @@ const fetchFolderRows = async (client: any, folderId: string) => {
             cf.mime_type AS file_mime_type,
             cf.file_size,
             cf.data_url AS file_data_url,
-            cf.uploaded_at AS file_uploaded_at
+            cf.uploaded_at AS file_uploaded_at,
+            cfc.id AS criterion_id,
+            cfc.title AS criterion_title,
+            cfc.rating_1 AS criterion_rating_1,
+            cfc.rating_2 AS criterion_rating_2,
+            cfc.rating_3 AS criterion_rating_3,
+            cfc.rating_4 AS criterion_rating_4,
+            cfc.rating_5 AS criterion_rating_5
        FROM case_folders f
   LEFT JOIN case_files cf ON cf.folder_id = f.id
+  LEFT JOIN case_folder_criteria cfc ON cfc.folder_id = f.id
       WHERE f.id = $1
-      ORDER BY cf.uploaded_at ASC, cf.created_at ASC;`,
+      ORDER BY cf.uploaded_at ASC,
+               cf.created_at ASC,
+               cfc.created_at ASC;`,
     [folderId]
   );
 
@@ -110,10 +154,21 @@ export class CasesRepository {
               cf.mime_type AS file_mime_type,
               cf.file_size,
               cf.data_url AS file_data_url,
-              cf.uploaded_at AS file_uploaded_at
+              cf.uploaded_at AS file_uploaded_at,
+              cfc.id AS criterion_id,
+              cfc.title AS criterion_title,
+              cfc.rating_1 AS criterion_rating_1,
+              cfc.rating_2 AS criterion_rating_2,
+              cfc.rating_3 AS criterion_rating_3,
+              cfc.rating_4 AS criterion_rating_4,
+              cfc.rating_5 AS criterion_rating_5
          FROM case_folders f
     LEFT JOIN case_files cf ON cf.folder_id = f.id
-     ORDER BY f.created_at DESC, cf.uploaded_at ASC, cf.created_at ASC;`
+LEFT JOIN case_folder_criteria cfc ON cfc.folder_id = f.id
+     ORDER BY f.created_at DESC,
+              cf.uploaded_at ASC,
+              cf.created_at ASC,
+              cfc.created_at ASC;`
     );
 
     return mapListRowsToFolders(result.rows);
@@ -142,7 +197,8 @@ export class CasesRepository {
       version: Number(row.version),
       createdAt: new Date(row.created_at).toISOString(),
       updatedAt: new Date(row.updated_at).toISOString(),
-      files: []
+      files: [],
+      evaluationCriteria: []
     };
   }
 

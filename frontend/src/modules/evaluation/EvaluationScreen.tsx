@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import styles from '../../styles/EvaluationScreen.module.css';
 import { EvaluationModal } from './components/EvaluationModal';
 import { EvaluationStatusModal } from './components/EvaluationStatusModal';
@@ -8,15 +8,22 @@ import {
   useCasesState,
   useFitQuestionsState
 } from '../../app/state/AppStateContext';
-import { EvaluationConfig } from '../../shared/types/evaluation';
+import {
+  EvaluationConfig,
+  OFFER_RECOMMENDATION_OPTIONS,
+  OfferRecommendation
+} from '../../shared/types/evaluation';
 import { EvaluationTable, EvaluationTableRow } from './components/EvaluationTable';
+import { useAuth } from '../auth/AuthContext';
+import { InterviewerScreen } from './InterviewerScreen';
 
 type Banner = { type: 'info' | 'error'; text: string } | null;
 
 type SortKey = 'name' | 'position' | 'round' | 'avgFit' | 'avgCase';
 
 export const EvaluationScreen = () => {
-  const { list, saveEvaluation, removeEvaluation } = useEvaluationsState();
+  const { session } = useAuth();
+  const { list, saveEvaluation, removeEvaluation, startProcess } = useEvaluationsState();
   const { list: candidates } = useCandidatesState();
   const { folders } = useCasesState();
   const { list: fitQuestions } = useFitQuestionsState();
@@ -26,6 +33,10 @@ export const EvaluationScreen = () => {
   const [statusEvaluation, setStatusEvaluation] = useState<EvaluationConfig | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  if (session?.role === 'user') {
+    return <InterviewerScreen />;
+  }
 
   const candidateIndex = useMemo(() => {
     const map = new Map<
@@ -43,13 +54,86 @@ export const EvaluationScreen = () => {
     return map;
   }, [candidates]);
 
+  const handleStartProcess = useCallback(
+    async (evaluation: EvaluationConfig) => {
+      const result = await startProcess(evaluation.id);
+      if (!result.ok) {
+        if (result.error === 'missing-assignment-data') {
+          setBanner({
+            type: 'error',
+            text: 'Assign interviewers, cases, and fit questions to every slot before starting the process.'
+          });
+          return;
+        }
+        if (result.error === 'process-already-started') {
+          setBanner({ type: 'error', text: 'This evaluation process has already been started.' });
+          return;
+        }
+        if (result.error === 'mailer-unavailable') {
+          setBanner({ type: 'error', text: 'Email delivery is not configured. Interviewers were not notified.' });
+          return;
+        }
+        if (result.error === 'invalid-portal-url') {
+          setBanner({
+            type: 'error',
+            text: 'Set a public INTERVIEW_PORTAL_URL so that email links point to the live interviewer site.'
+          });
+          return;
+        }
+        if (result.error === 'not-found') {
+          setBanner({ type: 'error', text: 'Evaluation not found. Refresh the page.' });
+          return;
+        }
+        setBanner({ type: 'error', text: 'Failed to start the evaluation process.' });
+        return;
+      }
+      setBanner({ type: 'info', text: 'Evaluation process started. Interviewers received an email invitation.' });
+    },
+    [startProcess]
+  );
+
   const tableRows = useMemo<EvaluationTableRow[]>(() => {
     return list.map((evaluation) => {
       const metadata = evaluation.candidateId ? candidateIndex.get(evaluation.candidateId) : undefined;
       const candidateName = metadata?.name ?? 'Not selected';
       const candidatePosition = metadata?.position ?? '—';
       const completedForms = evaluation.forms.filter((form) => form.submitted).length;
+      const submittedForms = evaluation.forms.filter((form) => form.submitted);
+      const fitScores = submittedForms
+        .map((form) => form.fitScore)
+        .filter((score): score is number => typeof score === 'number' && Number.isFinite(score));
+      const caseScores = submittedForms
+        .map((form) => form.caseScore)
+        .filter((score): score is number => typeof score === 'number' && Number.isFinite(score));
+      const recommendationResponses = submittedForms
+        .map((form) => form.offerRecommendation)
+        .filter((value): value is OfferRecommendation => Boolean(value));
+      const recommendationCounts = new Map<OfferRecommendation, number>();
+      recommendationResponses.forEach((value) => {
+        recommendationCounts.set(value, (recommendationCounts.get(value) ?? 0) + 1);
+      });
+      const offerBreakdown = recommendationResponses.length
+        ? OFFER_RECOMMENDATION_OPTIONS.map((option) => {
+            const count = recommendationCounts.get(option) ?? 0;
+            const percent = Math.round((count / recommendationResponses.length) * 100);
+            return `${percent}%`;
+          }).join(' / ')
+        : '—';
+      const avgFitScore = fitScores.length
+        ? fitScores.reduce((sum, value) => sum + value, 0) / fitScores.length
+        : null;
+      const avgCaseScore = caseScores.length
+        ? caseScores.reduce((sum, value) => sum + value, 0) / caseScores.length
+        : null;
       const roundNumber = evaluation.roundNumber ?? null;
+      const slotsReady = evaluation.interviews.every((slot) => {
+        const nameReady = slot.interviewerName.trim().length > 0;
+        const emailReady = slot.interviewerEmail.trim().length > 0;
+        const caseReady = Boolean(slot.caseFolderId?.trim());
+        const fitReady = Boolean(slot.fitQuestionId?.trim());
+        return nameReady && emailReady && caseReady && fitReady;
+      });
+      const startDisabled = evaluation.processStatus !== 'draft' || !slotsReady;
 
       return {
         id: evaluation.id,
@@ -58,8 +142,12 @@ export const EvaluationScreen = () => {
         roundNumber,
         formsCompleted: completedForms,
         formsPlanned: evaluation.interviewCount,
-        avgFitScore: null,
-        avgCaseScore: null,
+        avgFitScore,
+        avgCaseScore,
+        offerBreakdown,
+        processStatus: evaluation.processStatus,
+        onStartProcess: () => handleStartProcess(evaluation),
+        startDisabled,
         onEdit: () => {
           setModalEvaluation(evaluation);
           setIsModalOpen(true);
@@ -67,7 +155,7 @@ export const EvaluationScreen = () => {
         onOpenStatus: () => setStatusEvaluation(evaluation)
       };
     });
-  }, [candidateIndex, list]);
+  }, [candidateIndex, list, handleStartProcess]);
 
   const sortedRows = useMemo(() => {
     const copy = [...tableRows];
@@ -167,6 +255,7 @@ export const EvaluationScreen = () => {
     setModalEvaluation(null);
     setIsModalOpen(false);
   };
+
 
   return (
     <section className={styles.wrapper}>

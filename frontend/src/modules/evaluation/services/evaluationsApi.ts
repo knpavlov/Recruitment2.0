@@ -1,5 +1,10 @@
 import { apiRequest } from '../../../shared/api/httpClient';
-import { EvaluationConfig, InterviewSlot, InterviewStatusRecord } from '../../../shared/types/evaluation';
+import {
+  EvaluationConfig,
+  EvaluationProcessStatus,
+  InterviewSlot,
+  InterviewStatusRecord
+} from '../../../shared/types/evaluation';
 
 const normalizeString = (value: unknown): string | undefined => {
   if (typeof value === 'string') {
@@ -38,6 +43,57 @@ const normalizeBoolean = (value: unknown): boolean | undefined => {
     return value;
   }
   return undefined;
+};
+
+const normalizeScore = (value: unknown): number | undefined => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value);
+    if (!Number.isNaN(parsed)) {
+      return parsed;
+    }
+  }
+  return undefined;
+};
+
+const normalizeCriteriaMap = (value: unknown): Record<string, number> | undefined => {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+  const ratings: Record<string, number> = {};
+  for (const [rawKey, rawValue] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof rawKey !== 'string') {
+      continue;
+    }
+    const key = rawKey.trim();
+    if (!key) {
+      continue;
+    }
+    const numeric = normalizeNumber(rawValue);
+    if (typeof numeric === 'number') {
+      ratings[key] = numeric;
+    }
+  }
+  return Object.keys(ratings).length ? ratings : undefined;
+};
+
+const OFFER_OPTIONS: InterviewStatusRecord['offerRecommendation'][] = [
+  'yes-priority',
+  'yes-strong',
+  'yes-keep-warm',
+  'no'
+];
+
+const normalizeOfferRecommendation = (
+  value: unknown
+): InterviewStatusRecord['offerRecommendation'] | undefined => {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+  const trimmed = value.trim() as InterviewStatusRecord['offerRecommendation'];
+  return OFFER_OPTIONS.includes(trimmed) ? trimmed : undefined;
 };
 
 const normalizeSlot = (value: unknown): InterviewSlot | null => {
@@ -88,7 +144,18 @@ const normalizeForm = (value: unknown): InterviewStatusRecord | null => {
     interviewerName: normalizeString(payload.interviewerName) ?? 'Interviewer',
     submitted: normalizeBoolean(payload.submitted) ?? false,
     submittedAt: normalizeIsoString(payload.submittedAt),
-    notes: normalizeString(payload.notes) ?? undefined
+    notes: normalizeString(payload.notes) ?? undefined,
+    fitScore: normalizeScore(payload.fitScore),
+    caseScore: normalizeScore(payload.caseScore),
+    fitNotes: normalizeString(payload.fitNotes) ?? undefined,
+    caseNotes: normalizeString(payload.caseNotes) ?? undefined,
+    fitCriteria: normalizeCriteriaMap(payload.fitCriteria),
+    caseCriteria: normalizeCriteriaMap(payload.caseCriteria),
+    interestLevel: normalizeString(payload.interestLevel)?.trim() || undefined,
+    issuesToTest: normalizeString(payload.issuesToTest)?.trim() || undefined,
+    summary: normalizeString(payload.summary)?.trim() || undefined,
+    offerRecommendation: normalizeOfferRecommendation(payload.offerRecommendation),
+    offerRecommendationNotes: normalizeString(payload.offerRecommendationNotes)?.trim() || undefined
   };
 };
 
@@ -108,6 +175,8 @@ const normalizeEvaluation = (value: unknown): EvaluationConfig | null => {
     createdAt?: unknown;
     updatedAt?: unknown;
     forms?: unknown;
+    processStatus?: unknown;
+    processStartedAt?: unknown;
   };
 
   const id = normalizeString(payload.id)?.trim();
@@ -141,7 +210,9 @@ const normalizeEvaluation = (value: unknown): EvaluationConfig | null => {
     version,
     createdAt,
     updatedAt,
-    forms
+    forms,
+    processStatus: (normalizeString(payload.processStatus) as EvaluationProcessStatus | undefined) ?? 'draft',
+    processStartedAt: normalizeIsoString(payload.processStartedAt)
   };
 };
 
@@ -195,6 +266,10 @@ export const evaluationsApi = {
         body: { config: serializeEvaluation(config), expectedVersion }
       })
     ),
+  start: async (id: string) =>
+    apiRequest<{ id: string }>(`/evaluations/${id}/start`, {
+      method: 'POST'
+    }),
   remove: async (id: string) =>
     apiRequest<{ id?: unknown }>(`/evaluations/${id}`, {
       method: 'DELETE'
