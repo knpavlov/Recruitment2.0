@@ -10,15 +10,19 @@ import {
 } from '../../app/state/AppStateContext';
 import { EvaluationConfig } from '../../shared/types/evaluation';
 import { EvaluationTable, EvaluationTableRow } from './components/EvaluationTable';
-import { useAuth } from '../auth/AuthContext';
-import { InterviewerScreen } from './InterviewerScreen';
 
 type Banner = { type: 'info' | 'error'; text: string } | null;
 
 type SortKey = 'name' | 'position' | 'round' | 'avgFit' | 'avgCase';
 
+type StatusContext = {
+  evaluation: EvaluationConfig;
+  candidateName: string;
+  candidatePosition: string;
+  roundLabel: string;
+};
+
 export const EvaluationScreen = () => {
-  const { session } = useAuth();
   const { list, saveEvaluation, removeEvaluation, startProcess } = useEvaluationsState();
   const { list: candidates } = useCandidatesState();
   const { folders } = useCasesState();
@@ -26,13 +30,9 @@ export const EvaluationScreen = () => {
   const [banner, setBanner] = useState<Banner>(null);
   const [modalEvaluation, setModalEvaluation] = useState<EvaluationConfig | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [statusEvaluation, setStatusEvaluation] = useState<EvaluationConfig | null>(null);
+  const [statusContext, setStatusContext] = useState<StatusContext | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-
-  if (session?.role === 'user') {
-    return <InterviewerScreen />;
-  }
 
   const candidateIndex = useMemo(() => {
     const map = new Map<
@@ -133,7 +133,25 @@ export const EvaluationScreen = () => {
         const fitReady = Boolean(slot.fitQuestionId?.trim());
         return nameReady && emailReady && caseReady && fitReady;
       });
-      const startDisabled = evaluation.processStatus !== 'draft' || !slotsReady;
+      const emailsReady = evaluation.interviews.every((slot) => slot.interviewerEmail.trim().length > 0);
+      const processStarted = evaluation.processStatus !== 'draft';
+      const canStartProcess = !processStarted && slotsReady && emailsReady;
+      let startTooltip: string | undefined;
+      if (processStarted) {
+        startTooltip = 'Invitations have already been sent to interviewers.';
+      } else if (!emailsReady) {
+        startTooltip = 'Add email addresses for every interviewer before starting the process.';
+      } else if (!slotsReady) {
+        startTooltip = 'Complete all interviewer, case and fit question assignments before starting.';
+      }
+
+      const formsBySlot = new Map(evaluation.forms.map((form) => [form.slotId, form]));
+      const allFormsSubmitted =
+        evaluation.interviews.length > 0 &&
+        evaluation.interviews.every((slot) => formsBySlot.get(slot.id)?.submitted === true);
+      const decisionTooltip = allFormsSubmitted
+        ? 'All interview feedback is collected. You can decide on the next step.'
+        : 'Wait until every interviewer submits their evaluation to enable these actions.';
 
       return {
         id: evaluation.id,
@@ -147,12 +165,21 @@ export const EvaluationScreen = () => {
         offerSummary,
         processStatus: evaluation.processStatus,
         onStartProcess: () => handleStartProcess(evaluation),
-        startDisabled,
+        startDisabled: !canStartProcess,
+        startTooltip,
+        decisionDisabled: !allFormsSubmitted,
+        decisionTooltip,
         onEdit: () => {
           setModalEvaluation(evaluation);
           setIsModalOpen(true);
         },
-        onOpenStatus: () => setStatusEvaluation(evaluation)
+        onOpenStatus: () =>
+          setStatusContext({
+            evaluation,
+            candidateName,
+            candidatePosition,
+            roundLabel: roundNumber != null ? `Round ${roundNumber}` : '—'
+          })
       };
     });
   }, [candidateIndex, list, handleStartProcess]);
@@ -261,7 +288,7 @@ export const EvaluationScreen = () => {
     <section className={styles.wrapper}>
       <header className={styles.header}>
         <div>
-          <h1>Candidate evaluation</h1>
+          <h1>Evaluation management</h1>
           <p className={styles.subtitle}>Configure interviews and track the status of evaluation forms.</p>
         </div>
         <button className={styles.primaryButton} onClick={handleCreate}>
@@ -295,8 +322,16 @@ export const EvaluationScreen = () => {
         />
       )}
 
-      {statusEvaluation && (
-        <EvaluationStatusModal evaluation={statusEvaluation} onClose={() => setStatusEvaluation(null)} />
+      {statusContext && (
+        <EvaluationStatusModal
+          evaluation={statusContext.evaluation}
+          candidateName={statusContext.candidateName}
+          candidatePosition={statusContext.candidatePosition}
+          roundLabel={statusContext.roundLabel}
+          fitQuestions={fitQuestions}
+          caseFolders={folders}
+          onClose={() => setStatusContext(null)}
+        />
       )}
     </section>
   );
