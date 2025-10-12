@@ -111,59 +111,61 @@ export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: 
                 <td>{row.offerSummary}</td>
                 <td>{processLabel}</td>
                 <td className={styles.actionsCell}>
-                  <div className={styles.primaryActions}>
-                    <button
-                      type="button"
-                      className={`${styles.actionButton} ${styles.startButton}`}
-                      onClick={row.onStartProcess}
-                      disabled={row.startDisabled}
-                      data-tooltip={row.startDisabled ? row.startTooltip : undefined}
-                    >
-                      Start process
-                    </button>
-                    <button
-                      type="button"
-                      className={`${styles.actionButton} ${styles.editButton}`}
-                      onClick={row.onEdit}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      className={`${styles.actionButton} ${styles.statusButton}`}
-                      onClick={row.onOpenStatus}
-                    >
-                      Status
-                    </button>
-                  </div>
-                  <div className={styles.decisionActions}>
-                    <button
-                      type="button"
-                      className={`${styles.actionButton} ${styles.offerButton}`}
-                      disabled={row.decisionDisabled}
-                      data-tooltip={row.decisionDisabled ? row.decisionTooltip : undefined}
-                      onClick={() => {}}
-                    >
-                      Offer
-                    </button>
-                    <button
-                      type="button"
-                      className={`${styles.actionButton} ${styles.progressButton}`}
-                      disabled={row.decisionDisabled}
-                      data-tooltip={row.decisionDisabled ? row.decisionTooltip : undefined}
-                      onClick={() => {}}
-                    >
-                      Progress to next round
-                    </button>
-                    <button
-                      type="button"
-                      className={`${styles.actionButton} ${styles.rejectButton}`}
-                      disabled={row.decisionDisabled}
-                      data-tooltip={row.decisionDisabled ? row.decisionTooltip : undefined}
-                      onClick={() => {}}
-                    >
-                      Reject
-                    </button>
+                  <div className={styles.actionGroups}>
+                    <div className={styles.actionGroupPrimary}>
+                      <button
+                        type="button"
+                        className={`${styles.actionButton} ${styles.neutralButton}`}
+                        onClick={row.onStartProcess}
+                        disabled={row.startDisabled}
+                        data-tooltip={row.startDisabled ? row.startTooltip : undefined}
+                      >
+                        Start process
+                      </button>
+                      <button
+                        type="button"
+                        className={`${styles.actionButton} ${styles.neutralButton}`}
+                        onClick={row.onEdit}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        className={`${styles.actionButton} ${styles.neutralButton}`}
+                        onClick={row.onOpenStatus}
+                      >
+                        Status
+                      </button>
+                    </div>
+                    <div className={styles.actionGroupSecondary}>
+                      <button
+                        type="button"
+                        className={`${styles.actionButton} ${styles.offerButton}`}
+                        disabled={row.decisionDisabled}
+                        data-tooltip={row.decisionDisabled ? row.decisionTooltip : undefined}
+                        onClick={() => {}}
+                      >
+                        Offer
+                      </button>
+                      <button
+                        type="button"
+                        className={`${styles.actionButton} ${styles.progressButton}`}
+                        disabled={row.decisionDisabled}
+                        data-tooltip={row.decisionDisabled ? row.decisionTooltip : undefined}
+                        onClick={() => {}}
+                      >
+                        Progress to next round
+                      </button>
+                      <button
+                        type="button"
+                        className={`${styles.actionButton} ${styles.rejectButton}`}
+                        disabled={row.decisionDisabled}
+                        data-tooltip={row.decisionDisabled ? row.decisionTooltip : undefined}
+                        onClick={() => {}}
+                      >
+                        Reject
+                      </button>
+                    </div>
                   </div>
                 </td>
               </tr>

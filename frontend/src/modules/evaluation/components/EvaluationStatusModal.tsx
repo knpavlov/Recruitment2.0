@@ -1,3 +1,4 @@
+import { ReactNode } from 'react';
 import styles from '../../../styles/EvaluationStatusModal.module.css';
 import { EvaluationConfig, OfferRecommendationValue } from '../../../shared/types/evaluation';
 import { FitQuestion } from '../../../shared/types/fitQuestion';
@@ -28,6 +29,14 @@ const formatScore = (value: number | undefined | null) =>
   typeof value === 'number' && Number.isFinite(value)
     ? (Math.round(value * 10) / 10).toFixed(1)
     : '—';
+
+type EvaluationForm = EvaluationConfig['forms'][number];
+
+type ComparisonRow = {
+  id: string;
+  label: string;
+  renderCell: (form: EvaluationForm) => ReactNode;
+};
 
 const OFFER_LABELS: Record<OfferRecommendationValue, string> = {
   yes_priority: 'Yes, priority',
@@ -63,6 +72,39 @@ const computeAverageScore = (values: Array<number | undefined | null>) => {
   return Math.round((total / numeric.length) * 10) / 10;
 };
 
+const buildSubmittedLabel = (form: EvaluationForm) =>
+  form.submittedAt ? `Submitted ${formatDateTime(form.submittedAt)}` : 'Awaiting submission';
+
+const collectCriteriaRows = (
+  forms: EvaluationForm[],
+  type: 'fit' | 'case',
+  titleMap: Map<string, string>
+): ComparisonRow[] => {
+  const seen = new Set<string>();
+  const rows: ComparisonRow[] = [];
+
+  forms.forEach((form) => {
+    const criteria = type === 'fit' ? form.fitCriteria ?? [] : form.caseCriteria ?? [];
+    criteria.forEach((criterion) => {
+      if (!criterion.criterionId || seen.has(criterion.criterionId)) {
+        return;
+      }
+      seen.add(criterion.criterionId);
+      rows.push({
+        id: `${type}-${criterion.criterionId}`,
+        label: titleMap.get(criterion.criterionId) ?? (type === 'fit' ? 'Fit criterion' : 'Case criterion'),
+        renderCell: (currentForm) => {
+          const list = type === 'fit' ? currentForm.fitCriteria ?? [] : currentForm.caseCriteria ?? [];
+          const match = list.find((item) => item.criterionId === criterion.criterionId);
+          return formatScore(match?.score);
+        }
+      });
+    });
+  });
+
+  return rows;
+};
+
 const formatProcessStatus = (status: EvaluationConfig['processStatus']) => {
   if (status === 'in-progress') {
     return 'In progress';
@@ -87,6 +129,35 @@ export const EvaluationStatusModal = ({
   const avgCaseScore = computeAverageScore(submittedForms.map((form) => form.caseScore));
   const formsPlanned = evaluation.interviews.length || evaluation.interviewCount;
   const { fitMap, caseMap } = buildCriteriaTitleMap(fitQuestions, caseFolders);
+  const forms = evaluation.forms;
+  const comparisonRows: ComparisonRow[] = [
+    {
+      id: 'status',
+      label: 'Submission status',
+      renderCell: (form) => (
+        <span className={form.submitted ? styles.statusBadgeSuccess : styles.statusBadgePending}>
+          {form.submitted ? 'Complete' : 'Pending'}
+        </span>
+      )
+    },
+    {
+      id: 'fit-score',
+      label: 'Fit score',
+      renderCell: (form) => formatScore(form.fitScore)
+    },
+    {
+      id: 'case-score',
+      label: 'Case score',
+      renderCell: (form) => formatScore(form.caseScore)
+    },
+    {
+      id: 'offer-decision',
+      label: 'Offer decision',
+      renderCell: (form) => (form.offerRecommendation ? OFFER_LABELS[form.offerRecommendation] : '—')
+    }
+  ];
+  const fitCriteriaRows = collectCriteriaRows(forms, 'fit', fitMap);
+  const caseCriteriaRows = collectCriteriaRows(forms, 'case', caseMap);
 
   return (
     <div className={styles.overlay}>
@@ -131,16 +202,95 @@ export const EvaluationStatusModal = ({
             <p className={styles.sectionSubtitle}>
               Review detailed scores, notes and offer recommendations for every interviewer.
             </p>
-            {evaluation.forms.length === 0 ? (
+            {forms.length === 0 ? (
               <p className={styles.emptyState}>No interviewer feedback has been recorded yet.</p>
             ) : (
-              <ul className={styles.formList}>
-                {evaluation.forms.map((form) => {
-                  const submittedLabel = form.submittedAt
-                    ? `Submitted ${formatDateTime(form.submittedAt)}`
-                    : 'Awaiting submission';
-                  const offerLabel = form.offerRecommendation
-                    ? OFFER_LABELS[form.offerRecommendation]
+              <>
+                <div className={styles.overviewTableSection}>
+                  <div className={styles.tableIntro}>
+                    <h4 className={styles.overviewTitle}>Score comparison</h4>
+                    <p className={styles.overviewDescription}>
+                      Quickly compare scores, recommendations and criteria assessments across interviewers.
+                    </p>
+                  </div>
+                  <div className={styles.tableScroll}>
+                    <table className={styles.overviewTable}>
+                      <thead>
+                        <tr>
+                          <th className={styles.metricColumnHeader}>Metric</th>
+                          {forms.map((form) => (
+                            <th key={form.slotId}>
+                              <div className={styles.columnHeader}>
+                                <span className={styles.columnTitle}>{form.interviewerName || 'Interviewer'}</span>
+                                <span className={styles.columnSubtitle}>{buildSubmittedLabel(form)}</span>
+                              </div>
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {comparisonRows.map((row) => (
+                          <tr key={row.id}>
+                            <th scope="row" className={styles.metricCell}>
+                              {row.label}
+                            </th>
+                            {forms.map((form) => (
+                              <td key={`${row.id}-${form.slotId}`} className={styles.valueCell}>
+                                {row.renderCell(form)}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                        {fitCriteriaRows.length > 0 && (
+                          <>
+                            <tr className={styles.rowDivider}>
+                              <th colSpan={forms.length + 1}>Fit criteria</th>
+                            </tr>
+                            {fitCriteriaRows.map((row) => (
+                              <tr key={row.id}>
+                                <th scope="row" className={styles.metricCell}>
+                                  {row.label}
+                                </th>
+                                {forms.map((form) => (
+                                  <td key={`${row.id}-${form.slotId}`} className={styles.valueCell}>
+                                    {row.renderCell(form)}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </>
+                        )}
+                        {caseCriteriaRows.length > 0 && (
+                          <>
+                            <tr className={styles.rowDivider}>
+                              <th colSpan={forms.length + 1}>Case criteria</th>
+                            </tr>
+                            {caseCriteriaRows.map((row) => (
+                              <tr key={row.id}>
+                                <th scope="row" className={styles.metricCell}>
+                                  {row.label}
+                                </th>
+                                {forms.map((form) => (
+                                  <td key={`${row.id}-${form.slotId}`} className={styles.valueCell}>
+                                    {row.renderCell(form)}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <h4 className={styles.detailSectionTitle}>Detailed feedback</h4>
+                <ul className={styles.formList}>
+                  {forms.map((form) => {
+                    const submittedLabel = form.submittedAt
+                      ? `Submitted ${formatDateTime(form.submittedAt)}`
+                      : 'Awaiting submission';
+                    const offerLabel = form.offerRecommendation
+                      ? OFFER_LABELS[form.offerRecommendation]
                     : null;
 
                   const fitCriteria = (form.fitCriteria ?? []).map((criterion) => ({
@@ -155,8 +305,8 @@ export const EvaluationStatusModal = ({
                     score: formatScore(criterion.score)
                   }));
 
-                  return (
-                    <li key={form.slotId} className={styles.formCard}>
+                    return (
+                      <li key={form.slotId} className={styles.formCard}>
                       <div className={styles.formHeader}>
                         <div>
                           <h3>{form.interviewerName}</h3>
@@ -244,10 +394,11 @@ export const EvaluationStatusModal = ({
                           </p>
                         )}
                       </div>
-                    </li>
-                  );
-                })}
-              </ul>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
             )}
           </div>
         </div>
