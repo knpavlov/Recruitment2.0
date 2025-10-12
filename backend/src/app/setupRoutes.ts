@@ -3,6 +3,7 @@ import { accountsRouter } from '../modules/accounts/accounts.router.js';
 import { casesRouter } from '../modules/cases/cases.router.js';
 import { candidatesRouter } from '../modules/candidates/candidates.router.js';
 import { evaluationsRouter } from '../modules/evaluations/evaluations.router.js';
+import { interviewerRouter } from '../modules/evaluations/interviewer.router.js';
 import { questionsRouter } from '../modules/questions/questions.router.js';
 import { healthRouter } from '../shared/health.router.js';
 import { authRouter } from '../modules/auth/auth.router.js';
@@ -15,5 +16,6 @@ export const registerAppRoutes = (app: Application) => {
   app.use('/cases', casesRouter);
   app.use('/candidates', candidatesRouter);
   app.use('/evaluations', evaluationsRouter);
+  app.use('/interviewer', interviewerRouter);
   app.use('/questions', questionsRouter);
 };
