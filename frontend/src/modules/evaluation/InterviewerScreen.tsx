@@ -1,0 +1,715 @@
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import styles from '../../styles/InterviewerScreen.module.css';
+import { useAuth } from '../auth/AuthContext';
+import { interviewerApi } from './services/interviewerApi';
+import {
+  InterviewerAssignmentView,
+  OfferRecommendationValue,
+  EvaluationCriterionScore
+} from '../../shared/types/evaluation';
+import { CaseFolder } from '../../shared/types/caseLibrary';
+import { ApiError } from '../../shared/api/httpClient';
+
+interface Banner {
+  type: 'info' | 'error';
+  text: string;
+}
+
+type CriterionDefinition = {
+  id: string;
+  title: string;
+  ratings: Partial<Record<1 | 2 | 3 | 4 | 5, string>>;
+};
+
+interface FormState {
+  fitScore: string;
+  caseScore: string;
+  fitNotes: string;
+  caseNotes: string;
+  notes: string;
+  interestNotes: string;
+  issuesToTest: string;
+  offerRecommendation: OfferRecommendationValue | '';
+  fitCriteria: Record<string, string>;
+  caseCriteria: Record<string, string>;
+}
+
+interface CriterionSelectorProps {
+  criterion: CriterionDefinition;
+  value: string;
+  disabled: boolean;
+  onChange: (next: string) => void;
+}
+
+const CriterionSelector = ({ criterion, value, disabled, onChange }: CriterionSelectorProps) => {
+  const ratingEntries = (['1', '2', '3', '4', '5'] as const).map((score) => ({
+    score,
+    description: criterion.ratings[Number(score) as 1 | 2 | 3 | 4 | 5]
+  }));
+
+  return (
+    <div className={styles.criterionCard}>
+      <div className={styles.criterionHeaderRow}>
+        <span className={styles.criterionTitle}>{criterion.title}</span>
+        <span className={styles.tooltipWrapper}>
+          <span className={styles.tooltipIcon}>?</span>
+          <span className={styles.tooltipContent}>
+            {ratingEntries.map(({ score, description }) => (
+              <Fragment key={score}>
+                <strong>{score}</strong>
+                <span>{description ?? '—'}</span>
+              </Fragment>
+            ))}
+          </span>
+        </span>
+      </div>
+      <div className={styles.criterionScale}>
+        {ratingEntries.map(({ score }) => (
+          <label key={score} className={styles.criterionOption}>
+            <input
+              type="radio"
+              name={criterion.id}
+              value={score}
+              checked={value === score}
+              disabled={disabled}
+              onChange={(event) => onChange(event.target.value)}
+            />
+            <span>{score}</span>
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const CASE_CRITERIA_ORDER = [
+  'Conceptual problem solving / Problem Structuring and Framing',
+  'Analytical problem solving',
+  'Qualitative problem solving',
+  'Synthesis and recommendation'
+];
+
+const normalizeTitle = (value: string) => value.trim().toLowerCase();
+
+const orderCaseCriteria = (criteria: CriterionDefinition[]): CriterionDefinition[] => {
+  if (!criteria.length) {
+    return criteria;
+  }
+  const titleMap = new Map<string, CriterionDefinition>();
+  for (const item of criteria) {
+    titleMap.set(normalizeTitle(item.title), item);
+  }
+  const ordered: CriterionDefinition[] = [];
+  for (const title of CASE_CRITERIA_ORDER) {
+    const match = titleMap.get(normalizeTitle(title));
+    if (match) {
+      ordered.push(match);
+    }
+  }
+  for (const item of criteria) {
+    if (!ordered.includes(item)) {
+      ordered.push(item);
+    }
+  }
+  return ordered;
+};
+
+const calculateAverageScore = (values: Record<string, string>): number | null => {
+  const numericValues = Object.values(values)
+    .map((value) => {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+    })
+    .filter((value): value is number => value !== null);
+  if (!numericValues.length) {
+    return null;
+  }
+  const sum = numericValues.reduce((accumulator, current) => accumulator + current, 0);
+  return Math.round((sum / numericValues.length) * 10) / 10;
+};
+
+const resolveScoreValue = (average: number | null, fallback: string): number | undefined => {
+  if (average != null) {
+    return average;
+  }
+  if (fallback) {
+    const parsed = Number(fallback);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return parsed;
+    }
+  }
+  return undefined;
+};
+
+const formatScoreDisplay = (value: number | null): string => {
+  if (value == null) {
+    return '—';
+  }
+  return Number.isInteger(value) ? value.toString() : value.toFixed(1);
+};
+
+const createFormState = (assignment: InterviewerAssignmentView | null): FormState => {
+  if (!assignment?.form) {
+    return {
+      fitScore: '',
+      caseScore: '',
+      fitNotes: '',
+      caseNotes: '',
+      notes: '',
+      interestNotes: '',
+      issuesToTest: '',
+      offerRecommendation: '',
+      fitCriteria: {},
+      caseCriteria: {}
+    };
+  }
+  const toCriteriaMap = (entries: EvaluationCriterionScore[] | undefined): Record<string, string> => {
+    if (!entries) {
+      return {};
+    }
+    const map: Record<string, string> = {};
+    for (const item of entries) {
+      if (item.criterionId) {
+        map[item.criterionId] = item.score != null ? String(item.score) : '';
+      }
+    }
+    return map;
+  };
+  return {
+    fitScore: assignment.form.fitScore ? String(assignment.form.fitScore) : '',
+    caseScore: assignment.form.caseScore ? String(assignment.form.caseScore) : '',
+    fitNotes: assignment.form.fitNotes ?? '',
+    caseNotes: assignment.form.caseNotes ?? '',
+    notes: assignment.form.notes ?? '',
+    interestNotes: assignment.form.interestNotes ?? '',
+    issuesToTest: assignment.form.issuesToTest ?? '',
+    offerRecommendation: assignment.form.offerRecommendation ?? '',
+    fitCriteria: toCriteriaMap(assignment.form.fitCriteria),
+    caseCriteria: toCriteriaMap(assignment.form.caseCriteria)
+  };
+};
+
+const formatDateTime = (value: string | undefined) => {
+  if (!value) {
+    return '—';
+  }
+  try {
+    return new Date(value).toLocaleString('en-US');
+  } catch {
+    return value;
+  }
+};
+
+const OFFER_OPTIONS: Array<{ value: OfferRecommendationValue; label: string }> = [
+  { value: 'yes_priority', label: 'Yes, priority' },
+  { value: 'yes_strong', label: 'Yes, meets high bar' },
+  { value: 'yes_keep_warm', label: 'Turndown, stay in contact' },
+  { value: 'no_offer', label: 'Turndown' }
+];
+
+export const InterviewerScreen = () => {
+  const { session } = useAuth();
+  const [assignments, setAssignments] = useState<InterviewerAssignmentView[]>([]);
+  const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
+  const [banner, setBanner] = useState<Banner | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [formState, setFormState] = useState<FormState>(createFormState(null));
+
+  const fitAverage = useMemo(() => calculateAverageScore(formState.fitCriteria), [formState.fitCriteria]);
+  const caseAverage = useMemo(() => calculateAverageScore(formState.caseCriteria), [formState.caseCriteria]);
+  const storedFitScore = formState.fitScore ? Number(formState.fitScore) : null;
+  const storedCaseScore = formState.caseScore ? Number(formState.caseScore) : null;
+  const displayedFitScore = fitAverage ?? storedFitScore;
+  const displayedCaseScore = caseAverage ?? storedCaseScore;
+
+  const selectedAssignment = useMemo(() => {
+    if (!selectedSlot) {
+      return null;
+    }
+    return assignments.find((item) => item.slotId === selectedSlot) ?? null;
+  }, [assignments, selectedSlot]);
+
+  const isSubmitted = selectedAssignment?.form?.submitted ?? false;
+  const disableInputs = saving || isSubmitted;
+
+  useEffect(() => {
+    setFormState(createFormState(selectedAssignment));
+  }, [selectedAssignment]);
+
+  useEffect(() => {
+    if (!session?.email) {
+      setAssignments([]);
+      setSelectedSlot(null);
+      return;
+    }
+    const load = async () => {
+      setLoading(true);
+      try {
+        const items = await interviewerApi.listAssignments(session.email);
+        setAssignments(items);
+        if (items.length && !selectedSlot) {
+          setSelectedSlot(items[0].slotId);
+        } else if (items.length === 0) {
+          setSelectedSlot(null);
+        } else if (selectedSlot) {
+          const stillExists = items.some((item) => item.slotId === selectedSlot);
+          if (!stillExists) {
+            setSelectedSlot(items[0]?.slotId ?? null);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load interviewer assignments:', error);
+        setBanner({ type: 'error', text: 'Assignments could not be loaded. Please refresh the page later.' });
+      } finally {
+        setLoading(false);
+      }
+    };
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.email]);
+
+  const refreshAssignments = async () => {
+    if (!session?.email) {
+      return;
+    }
+    try {
+      const items = await interviewerApi.listAssignments(session.email);
+      setAssignments(items);
+      if (items.length === 0) {
+        setSelectedSlot(null);
+      } else if (selectedSlot) {
+        const exists = items.some((item) => item.slotId === selectedSlot);
+        if (!exists) {
+          setSelectedSlot(items[0].slotId);
+        }
+      } else {
+        setSelectedSlot(items[0].slotId);
+      }
+    } catch (error) {
+      console.error('Failed to reload assignments:', error);
+    }
+  };
+
+  const handleFitCriterionChange = useCallback(
+    (criterionId: string, next: string) => {
+      const sanitized = next.trim();
+      setFormState((prev) => ({
+        ...prev,
+        fitCriteria: { ...prev.fitCriteria, [criterionId]: sanitized }
+      }));
+    },
+    [setFormState]
+  );
+
+  const handleCaseCriterionChange = useCallback(
+    (criterionId: string, next: string) => {
+      const sanitized = next.trim();
+      setFormState((prev) => ({
+        ...prev,
+        caseCriteria: { ...prev.caseCriteria, [criterionId]: sanitized }
+      }));
+    },
+    [setFormState]
+  );
+
+  const buildCriteriaPayload = (values: Record<string, string>): EvaluationCriterionScore[] => {
+    return Object.entries(values)
+      .map(([criterionId, scoreValue]) => {
+        if (!criterionId) {
+          return null;
+        }
+        const trimmed = scoreValue.trim();
+        if (!trimmed) {
+          return { criterionId, score: undefined };
+        }
+        const parsed = Number(trimmed);
+        return Number.isFinite(parsed)
+          ? ({ criterionId, score: parsed } as EvaluationCriterionScore)
+          : { criterionId, score: undefined };
+      })
+      .filter((item): item is EvaluationCriterionScore => Boolean(item));
+  };
+
+  const persistForm = async ({ submitted }: { submitted: boolean }) => {
+    if (!session?.email || !selectedAssignment) {
+      return;
+    }
+    if (submitted && selectedAssignment.form?.submitted) {
+      setBanner({ type: 'error', text: 'This evaluation has already been submitted.' });
+      return;
+    }
+    setSaving(true);
+    setBanner(null);
+    try {
+      await interviewerApi.submitForm(selectedAssignment.evaluationId, selectedAssignment.slotId, {
+        email: session.email,
+        submitted,
+        fitScore: resolveScoreValue(fitAverage, formState.fitScore),
+        caseScore: resolveScoreValue(caseAverage, formState.caseScore),
+        fitNotes: formState.fitNotes.trim() || undefined,
+        caseNotes: formState.caseNotes.trim() || undefined,
+        notes: formState.notes.trim() || undefined,
+        interestNotes: formState.interestNotes.trim() || undefined,
+        issuesToTest: formState.issuesToTest.trim() || undefined,
+        offerRecommendation: formState.offerRecommendation || undefined,
+        fitCriteria: buildCriteriaPayload(formState.fitCriteria),
+        caseCriteria: buildCriteriaPayload(formState.caseCriteria)
+      });
+      await refreshAssignments();
+      setBanner({
+        type: 'info',
+        text: submitted ? 'Evaluation submitted. Thank you for your feedback!' : 'Draft saved.'
+      });
+    } catch (error) {
+      if (error instanceof ApiError) {
+        if (error.code === 'access-denied') {
+          setBanner({ type: 'error', text: 'You do not have access to this interview.' });
+          return;
+        }
+        if (error.code === 'form-locked') {
+          setBanner({ type: 'error', text: 'The evaluation is already locked and cannot be edited.' });
+          return;
+        }
+      }
+      console.error('Failed to submit interview form:', error);
+      setBanner({ type: 'error', text: 'Could not save the form. Please try again.' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveDraft = () => {
+    void persistForm({ submitted: false });
+  };
+
+  const handleSubmitFinal = () => {
+    void persistForm({ submitted: true });
+  };
+
+  const renderList = () => {
+    if (loading) {
+      return <p>Loading assignments…</p>;
+    }
+    if (assignments.length === 0) {
+      return (
+        <div className={styles.emptyState}>
+          <h2>No assignments yet</h2>
+          <p>When an administrator assigns an interview to you, it will appear in this list.</p>
+        </div>
+      );
+    }
+    return (
+      <ul className={styles.list}>
+        {assignments.map((assignment) => {
+          const candidateName = assignment.candidate
+            ? `${assignment.candidate.lastName} ${assignment.candidate.firstName}`.trim()
+            : 'Candidate not assigned';
+          const submitted = assignment.form?.submitted ?? false;
+          const statusLabel = submitted ? 'Completed' : 'Assigned';
+          return (
+            <li
+              key={assignment.slotId}
+              className={`${styles.listItem} ${selectedSlot === assignment.slotId ? styles.listItemActive : ''}`}
+              onClick={() => setSelectedSlot(assignment.slotId)}
+            >
+              <div className={styles.listItemTitle}>{candidateName}</div>
+              <div className={styles.listItemMetaRow}>
+                <span className={`${styles.statusPill} ${submitted ? styles.statusPillCompleted : styles.statusPillAssigned}`}>
+                  {statusLabel}
+                </span>
+                <span className={styles.listItemMetaText}>Assigned {formatDateTime(assignment.invitationSentAt)}</span>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    );
+  };
+
+  const renderFiles = (folder: CaseFolder | undefined) => {
+    if (!folder || folder.files.length === 0) {
+      return <p className={styles.placeholderText}>No case files are attached.</p>;
+    }
+    return (
+      <div className={styles.files}>
+        {folder.files.map((file) => (
+          <a key={file.id} href={file.dataUrl} download={file.fileName} className={styles.fileLink}>
+            {file.fileName}
+          </a>
+        ))}
+      </div>
+    );
+  };
+
+  const renderDetail = () => {
+    if (!selectedAssignment) {
+      return (
+        <div className={styles.emptyState}>
+          <h2>Select an interview</h2>
+          <p>Use the list on the left to open candidate materials and share your feedback.</p>
+        </div>
+      );
+    }
+    const candidate = selectedAssignment.candidate;
+    const candidateName = candidate
+      ? `${candidate.lastName} ${candidate.firstName}`.trim() || candidate.id
+      : 'Candidate not assigned';
+    const fitQuestion = selectedAssignment.fitQuestion;
+    const behaviouralCriteria: CriterionDefinition[] = fitQuestion?.criteria ?? [];
+    const caseCriteriaSource: CriterionDefinition[] = selectedAssignment.caseFolder?.evaluationCriteria ?? [];
+    const orderedCaseCriteria = orderCaseCriteria(caseCriteriaSource);
+    const resumeLink = candidate?.resume ? (
+      <a className={styles.fileLink} href={candidate.resume.dataUrl} download={candidate.resume.fileName}>
+        Download resume ({candidate.resume.fileName})
+      </a>
+    ) : (
+      <p className={styles.placeholderText}>Resume is not available.</p>
+    );
+    const submittedAtLabel = selectedAssignment.form?.submittedAt
+      ? formatDateTime(selectedAssignment.form?.submittedAt)
+      : null;
+    const targetOfficeLabel = candidate?.targetOffice?.trim() || '—';
+    const targetRoleLabel = candidate?.desiredPosition?.trim() || '—';
+    const behaviouralScoreLabel = formatScoreDisplay(displayedFitScore);
+    const caseScoreLabel = formatScoreDisplay(displayedCaseScore);
+
+    return (
+      <div className={styles.detailPanel}>
+        <div className={styles.detailHeader}>
+          <div>
+            <h2 className={styles.detailTitle}>{candidateName}</h2>
+            <div className={styles.detailMeta}>
+              <span>Target office: {targetOfficeLabel}</span>
+              <span>Target role: {targetRoleLabel}</span>
+            </div>
+          </div>
+          <span className={`${styles.badge} ${isSubmitted ? styles.badgeSuccess : ''}`}>
+            {isSubmitted ? 'Submitted' : 'In progress'}
+          </span>
+        </div>
+        <div className={styles.detailColumns}>
+          <aside className={styles.infoColumn}>
+            <div className={styles.infoCard}>
+              <h3>Candidate materials</h3>
+              {resumeLink}
+              {candidate?.targetPractice && <p>Practice: {candidate.targetPractice}</p>}
+            </div>
+            <div className={styles.infoCard}>
+              <h3>Fit question</h3>
+              {fitQuestion ? (
+                <>
+                  <p className={styles.fitQuestionTitle}>{fitQuestion.shortTitle}</p>
+                  <p className={styles.fitQuestionContent}>{fitQuestion.content}</p>
+                </>
+              ) : (
+                <p className={styles.placeholderText}>Fit question is not assigned.</p>
+              )}
+            </div>
+            <div className={styles.infoCard}>
+              <h3>Case resources</h3>
+              {renderFiles(selectedAssignment.caseFolder)}
+            </div>
+          </aside>
+          <div className={styles.formColumn}>
+            <form
+              className={styles.form}
+              onSubmit={(event) => {
+                event.preventDefault();
+                handleSaveDraft();
+              }}
+            >
+              {isSubmitted && (
+                <div className={styles.formNotice}>
+                  This evaluation was submitted
+                  {submittedAtLabel ? ` on ${submittedAtLabel}` : ''} and can no longer be edited.
+                </div>
+              )}
+
+              <section className={styles.formSection}>
+                <header className={styles.sectionHeader}>
+                  <h3>Behavioural interview</h3>
+                </header>
+                {behaviouralCriteria.length ? (
+                  <div className={styles.criteriaGrid}>
+                    {behaviouralCriteria.map((criterion) => (
+                      <CriterionSelector
+                        key={criterion.id}
+                        criterion={criterion}
+                        value={formState.fitCriteria[criterion.id] ?? ''}
+                        disabled={disableInputs}
+                        onChange={(next) => handleFitCriterionChange(criterion.id, next)}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <p className={styles.placeholderText}>No behavioural criteria are configured.</p>
+                )}
+                <div className={styles.scoreSummary}>
+                  <span className={styles.scoreLabel}>Overall behavioural score</span>
+                  <span className={styles.scoreValue}>{behaviouralScoreLabel}</span>
+                </div>
+                <div className={styles.formRow}>
+                  <label htmlFor="fitNotes">Behavioural Questions Notes</label>
+                  <textarea
+                    id="fitNotes"
+                    rows={4}
+                    value={formState.fitNotes}
+                    onChange={(event) => setFormState((prev) => ({ ...prev, fitNotes: event.target.value }))}
+                    disabled={disableInputs}
+                  />
+                </div>
+              </section>
+
+              <section className={styles.formSection}>
+                <header className={styles.sectionHeader}>
+                  <h3>Case interview</h3>
+                </header>
+                {orderedCaseCriteria.length ? (
+                  <div className={styles.criteriaGrid}>
+                    {orderedCaseCriteria.map((criterion) => (
+                      <CriterionSelector
+                        key={criterion.id}
+                        criterion={criterion}
+                        value={formState.caseCriteria[criterion.id] ?? ''}
+                        disabled={disableInputs}
+                        onChange={(next) => handleCaseCriterionChange(criterion.id, next)}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <p className={styles.placeholderText}>No case criteria are configured for this folder.</p>
+                )}
+                <div className={styles.scoreSummary}>
+                  <span className={styles.scoreLabel}>Overall case score</span>
+                  <span className={styles.scoreValue}>{caseScoreLabel}</span>
+                </div>
+                <div className={styles.formRow}>
+                  <label htmlFor="caseNotes">Case notes</label>
+                  <textarea
+                    id="caseNotes"
+                    rows={4}
+                    value={formState.caseNotes}
+                    onChange={(event) => setFormState((prev) => ({ ...prev, caseNotes: event.target.value }))}
+                    disabled={disableInputs}
+                  />
+                </div>
+              </section>
+
+              <section className={styles.formSection}>
+                <header className={styles.sectionHeader}>
+                  <h3>Interest level</h3>
+                </header>
+                <div className={styles.formRow}>
+                  <label htmlFor="interestNotes">Interest Level Notes</label>
+                  <textarea
+                    id="interestNotes"
+                    rows={3}
+                    value={formState.interestNotes}
+                    onChange={(event) =>
+                      setFormState((prev) => ({ ...prev, interestNotes: event.target.value }))
+                    }
+                    disabled={disableInputs}
+                  />
+                </div>
+              </section>
+
+              <section className={styles.formSection}>
+                <header className={styles.sectionHeader}>
+                  <h3>Issues to Test in Next Interview</h3>
+                </header>
+                <div className={styles.formRow}>
+                  <label htmlFor="issuesToTest">Issues to Test in Next Interview</label>
+                  <textarea
+                    id="issuesToTest"
+                    rows={3}
+                    value={formState.issuesToTest}
+                    onChange={(event) =>
+                      setFormState((prev) => ({ ...prev, issuesToTest: event.target.value }))
+                    }
+                    disabled={disableInputs}
+                  />
+                </div>
+              </section>
+
+              <section className={styles.formSection}>
+                <header className={styles.sectionHeader}>
+                  <h3>Summary & recommendation</h3>
+                </header>
+                <div className={styles.offerGroup}>
+                  {OFFER_OPTIONS.map((option) => (
+                    <label key={option.value} className={styles.offerOption}>
+                      <input
+                        type="radio"
+                        name="offerRecommendation"
+                        value={option.value}
+                        checked={formState.offerRecommendation === option.value}
+                        disabled={disableInputs}
+                        onChange={() =>
+                          setFormState((prev) => ({ ...prev, offerRecommendation: option.value }))
+                        }
+                      />
+                      <span>{option.label}</span>
+                    </label>
+                  ))}
+                </div>
+                <div className={styles.formRow}>
+                  <label htmlFor="generalNotes">Comments (optional)</label>
+                  <textarea
+                    id="generalNotes"
+                    rows={4}
+                    value={formState.notes}
+                    onChange={(event) => setFormState((prev) => ({ ...prev, notes: event.target.value }))}
+                    disabled={disableInputs}
+                  />
+                </div>
+              </section>
+
+              <div className={styles.formActions}>
+                <button
+                  type="button"
+                  className={styles.secondaryButton}
+                  disabled={disableInputs}
+                  onClick={handleSaveDraft}
+                >
+                  {saving ? 'Saving…' : 'Save draft'}
+                </button>
+                <button
+                  type="button"
+                  className={styles.primaryButton}
+                  disabled={isSubmitted || saving}
+                  onClick={handleSubmitFinal}
+                >
+                  Submit evaluation
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className={styles.wrapper}>
+      <header>
+        <h1>My interviews</h1>
+        <p>All interview assignments assigned to you are collected in this workspace.</p>
+      </header>
+
+      {banner && (
+        <div className={`${styles.banner} ${banner.type === 'info' ? styles.bannerInfo : styles.bannerError}`}>
+          {banner.text}
+        </div>
+      )}
+
+      <div className={styles.content}>
+        <aside className={styles.listPanel}>
+          <h2 className={styles.listTitle}>Assignments</h2>
+          {renderList()}
+        </aside>
+        {renderDetail()}
+      </div>
+    </div>
+  );
+};

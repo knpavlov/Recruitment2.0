@@ -7,6 +7,7 @@ type CaseFolderPayload = Partial<CaseFolder> & {
   createdAt?: unknown;
   updatedAt?: unknown;
   files?: unknown;
+  evaluationCriteria?: unknown;
 };
 
 type CaseFilePayload = Partial<CaseFileRecord> & {
@@ -85,6 +86,30 @@ const normalizeFolder = (payload: unknown): CaseFolder | null => {
     .map((file) => normalizeFile(file))
     .filter((item): item is CaseFileRecord => Boolean(item));
 
+  const criteriaSource = Array.isArray(record.evaluationCriteria) ? record.evaluationCriteria : [];
+  const evaluationCriteria = criteriaSource
+    .map((entry) => {
+      if (!entry || typeof entry !== 'object') {
+        return null;
+      }
+      const criterion = entry as Partial<CaseFolder['evaluationCriteria'][number]> & { id?: unknown };
+      const criterionId = typeof criterion.id === 'string' && criterion.id.trim() ? criterion.id : null;
+      const title = typeof criterion.title === 'string' && criterion.title.trim() ? criterion.title : null;
+      if (!criterionId || !title) {
+        return null;
+      }
+      const ratings: CaseFolder['evaluationCriteria'][number]['ratings'] = {};
+      const sourceRatings = (criterion.ratings ?? {}) as Record<string, unknown>;
+      for (const score of [1, 2, 3, 4, 5] as const) {
+        const value = sourceRatings[String(score)];
+        if (typeof value === 'string' && value.trim()) {
+          ratings[score] = value.trim();
+        }
+      }
+      return { id: criterionId, title, ratings };
+    })
+    .filter((item): item is CaseFolder['evaluationCriteria'][number] => Boolean(item));
+
   if (!id || !name || version === null || !createdAt || !updatedAt) {
     return null;
   }
@@ -95,7 +120,8 @@ const normalizeFolder = (payload: unknown): CaseFolder | null => {
     version,
     createdAt,
     updatedAt,
-    files
+    files,
+    evaluationCriteria
   };
 };
 
