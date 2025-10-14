@@ -6,7 +6,7 @@ Monorepo for the recruiting team portal. The structure is split into the fronten
 
 - `frontend/` — SPA with a modern interface, left navigation menu, and screens for cases, candidates, evaluations, and account management.
 - `backend/` — Express API layer with modular domains.
-- `docs/` — documentation about architecture and next steps. See [`docs/authentication-setup.md`](docs/authentication-setup.md) for the email + login checklist.
+- `docs/` — documentation about architecture and next steps. See [`docs/authentication-setup.md`](docs/authentication-setup.md) for the email + login checklist, [`docs/railway-ssl-troubleshooting.md`](docs/railway-ssl-troubleshooting.md) for SSL/TLS diagnostics on Railway deployments, и [`docs/railway-custom-domain.md`](docs/railway-custom-domain.md) для подключения собственного домена в Railway.
 
 ## Getting started
 
@@ -61,6 +61,10 @@ You can use either Resend (recommended for Railway) or a custom SMTP server. The
    ```
    *`RESEND_FROM` must be a verified sender/domain inside Resend.*
 3. Trigger any invitation or access-code flow — letters will be delivered through the Resend API.
+
+> 📬 Если вы меняете домен отправителя (например, после переноса фронтенда на `recruitment2.0.nboard.au`), обновите
+> переменную `RESEND_FROM` и подтвердите домен в Resend заново. Пока домен не верифицирован, API вернёт HTTP 424 с
+> сообщением о необходимости проверить DNS-записи.
 
 ##### Как недорого подтвердить домен для Resend
 

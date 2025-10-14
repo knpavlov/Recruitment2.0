@@ -51,7 +51,9 @@ Adjust the value to the real backend origin. Если фронтенд и бэк
 3. In your DNS zone add the Resend verification records: DKIM (`resend._domainkey`), SPF (`send` TXT), and MX (`feedback-smtp.ap-northeast-1.amazonses.com`).
 4. (Recommended) Add a DMARC TXT record such as `v=DMARC1; p=none; rua=mailto:postmaster@nboard.au`.
 
-Wait for DNS propagation and confirm the domain status in the Resend dashboard.
+Wait for DNS propagation and confirm the domain status in the Resend dashboard. Если вы переключили фронтенд на новый домен,
+обновите `RESEND_FROM` и убедитесь, что Resend показывает статус **Verified** для этого домена — иначе отправка писем будет
+заблокирована.
 
 ## 5. End-to-end verification
 
@@ -62,4 +64,4 @@ Wait for DNS propagation and confirm the domain status in the Resend dashboard.
 5. Enter the code, tick **Keep me signed in** if you want a long session, and ensure the dashboard opens with the correct role-based navigation.
 6. Use the **Sign out** button in the sidebar and confirm you return to the login screen.
 
-If any step fails, check the backend logs. When email delivery is misconfigured the API returns HTTP 503 with the error code `mailer-unavailable`, and the UI displays a dedicated message so you can fix the settings before retrying.
+If any step fails, check the backend logs. When email delivery is misconfigured the API returns HTTP 503 with the error code `mailer-unavailable`. If the sender domain is not verified in Resend you will receive HTTP 424 with the code `mailer-domain`. Other provider-side failures are reported as HTTP 502. The UI displays dedicated messages so you can fix the settings before retrying.

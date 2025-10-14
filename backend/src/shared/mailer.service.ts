@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import { connect as createNetConnection, type Socket } from 'net';
 import { connect as createTlsConnection, type TLSSocket } from 'tls';
-import { sendWithResend } from './resend.client.js';
+import { ResendError, sendWithResend } from './resend.client.js';
 
 type SmtpSocket = Socket | TLSSocket;
 
@@ -26,6 +26,19 @@ type ResendMailerConfig = BaseMailerConfig & {
 type MailerConfig = SmtpMailerConfig | ResendMailerConfig;
 
 export const MAILER_NOT_CONFIGURED = 'MAILER_NOT_CONFIGURED';
+
+type MailerDeliveryReason = 'domain-not-verified' | 'provider-error';
+
+// Ошибка верхнего уровня, чтобы модули могли различать причину сбоя доставки
+export class MailerDeliveryError extends Error {
+  constructor(
+    public readonly reason: MailerDeliveryReason,
+    message?: string
+  ) {
+    super(message ?? reason);
+    this.name = 'MailerDeliveryError';
+  }
+}
 
 const resolveConfig = (): MailerConfig | null => {
   const resendApiKey = process.env.RESEND_API_KEY?.trim();
@@ -244,14 +257,29 @@ export class MailerService {
     }
 
     if (config.kind === 'resend') {
-      await sendWithResend({
-        apiKey: config.apiKey,
-        from: config.from,
-        to,
-        subject,
-        text
-      });
-      return;
+      try {
+        await sendWithResend({
+          apiKey: config.apiKey,
+          from: config.from,
+          to,
+          subject,
+          text
+        });
+        return;
+      } catch (error) {
+        if (error instanceof ResendError) {
+          const normalizedCode = error.code?.toLowerCase();
+          const reason: MailerDeliveryReason =
+            normalizedCode === 'domain_not_verified' || normalizedCode === 'missing_domain_verification'
+              ? 'domain-not-verified'
+              : error.status === 403 && error.message.toLowerCase().includes('domain')
+                ? 'domain-not-verified'
+                : 'provider-error';
+
+          throw new MailerDeliveryError(reason, error.message);
+        }
+        throw error;
+      }
     }
 
     await sendViaSmtp(config, to, subject, text);
