@@ -1,5 +1,6 @@
 import { EvaluationsRepository } from './evaluations.repository.js';
-import { EvaluationRecord, EvaluationWriteModel } from './evaluations.types.js';
+import { EvaluationRecord, EvaluationRoundSnapshot, EvaluationWriteModel } from './evaluations.types.js';
+import { computeInvitationState } from './evaluationAssignments.utils.js';
 
 const readOptionalString = (value: unknown): string | undefined => {
   if (typeof value !== 'string') {
@@ -152,6 +153,40 @@ const sanitizeForms = (
   return forms;
 };
 
+const sanitizeRoundHistory = (value: unknown): EvaluationRoundSnapshot[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const history: EvaluationRoundSnapshot[] = [];
+  for (const entry of value) {
+    if (!entry || typeof entry !== 'object') {
+      continue;
+    }
+    const payload = entry as Record<string, unknown>;
+    const roundNumber = readOptionalPositiveInteger(payload.roundNumber);
+    if (!roundNumber) {
+      continue;
+    }
+    const interviews = sanitizeSlots(payload.interviews);
+    const slotIds = new Set(interviews.map((slot) => slot.id));
+    const forms = sanitizeForms(payload.forms, slotIds);
+    history.push({
+      roundNumber,
+      interviewCount: interviews.length,
+      interviews,
+      forms,
+      fitQuestionId: readOptionalString(payload.fitQuestionId),
+      processStatus: readProcessStatus(payload.processStatus),
+      processStartedAt: readOptionalIsoDate(payload.processStartedAt),
+      completedAt: readOptionalIsoDate(payload.completedAt),
+      createdAt: readOptionalIsoDate(payload.createdAt) ?? new Date().toISOString()
+    });
+  }
+
+  return history.sort((a, b) => a.roundNumber - b.roundNumber);
+};
+
 const readProcessStatus = (value: unknown): EvaluationRecord['processStatus'] => {
   if (value === 'in-progress' || value === 'completed' || value === 'draft') {
     return value;
@@ -184,6 +219,10 @@ const buildWriteModel = (payload: unknown): EvaluationWriteModel => {
 
   const slotIds = new Set(interviews.map((slot) => slot.id));
   const forms = sanitizeForms(source.forms, slotIds);
+  const roundHistory = sanitizeRoundHistory(source.roundHistory);
+  const rawProcessStarted = (source as Record<string, unknown>).processStartedAt;
+  const processStartedAt =
+    rawProcessStarted === null ? null : readOptionalIsoDate(rawProcessStarted);
 
   return {
     id,
@@ -193,20 +232,31 @@ const buildWriteModel = (payload: unknown): EvaluationWriteModel => {
     interviews,
     fitQuestionId: readOptionalString(source.fitQuestionId),
     forms,
-    processStatus: readProcessStatus(source.processStatus)
+    processStatus: readProcessStatus(source.processStatus),
+    processStartedAt,
+    roundHistory
   };
 };
+
 
 export class EvaluationsService {
   constructor(private readonly repository: EvaluationsRepository) {}
 
+  private async attachInvitationState(record: EvaluationRecord): Promise<EvaluationRecord> {
+    const assignments = await this.repository.listAssignmentsForEvaluation(record.id);
+    const invitationState = computeInvitationState(record, assignments);
+    return { ...record, invitationState };
+  }
+
   async listEvaluations(): Promise<EvaluationRecord[]> {
-    return this.repository.listEvaluations();
+    const evaluations = await this.repository.listEvaluations();
+    return Promise.all(evaluations.map((record) => this.attachInvitationState(record)));
   }
 
   async createEvaluation(payload: unknown): Promise<EvaluationRecord> {
     const model = buildWriteModel(payload);
-    return this.repository.createEvaluation(model);
+    const record = await this.repository.createEvaluation(model);
+    return this.attachInvitationState(record);
   }
 
   async updateEvaluation(
@@ -234,7 +284,7 @@ export class EvaluationsService {
     if (!result) {
       throw new Error('NOT_FOUND');
     }
-    return result;
+    return this.attachInvitationState(result);
   }
 
   async deleteEvaluation(id: string): Promise<string> {
