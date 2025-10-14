@@ -33,6 +33,7 @@ export interface EvaluationTableRow {
   decisionDisabled: boolean;
   decisionTooltip?: string;
   decisionLabel: string;
+  decisionSelection: DecisionOption | null;
   onDecisionSelect: (option: DecisionOption) => void;
 }
 
@@ -63,6 +64,19 @@ const DECISION_OPTIONS: Array<{ option: DecisionOption; label: string }> = [
 export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: EvaluationTableProps) => {
   const [openDecisionId, setOpenDecisionId] = useState<string | null>(null);
   const [openInvitesId, setOpenInvitesId] = useState<string | null>(null);
+
+  const resolveDecisionToneClass = (selection: DecisionOption | null) => {
+    if (selection === 'offer') {
+      return styles.decisionButtonOffer;
+    }
+    if (selection === 'reject') {
+      return styles.decisionButtonReject;
+    }
+    if (selection === 'progress') {
+      return styles.decisionButtonProgress;
+    }
+    return '';
+  };
 
   const closeMenus = () => {
     setOpenDecisionId(null);
@@ -235,12 +249,12 @@ export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: 
                         row.onOpenStatus();
                       }}
                     >
-                      Status
+                      Results
                     </button>
-                    <div className={styles.buttonWithMenu}>
+                    <div className={`${styles.buttonWithMenu} ${styles.buttonWithMenuFullWidth}`}>
                       <button
                         type="button"
-                        className={`${styles.actionButton} ${styles.decisionButton}`}
+                        className={`${styles.actionButton} ${styles.decisionButton} ${styles.decisionButtonExpanded} ${resolveDecisionToneClass(row.decisionSelection)}`}
                         onClick={handleDecisionToggle}
                         disabled={row.decisionDisabled}
                         data-tooltip={row.decisionDisabled ? row.decisionTooltip : undefined}
