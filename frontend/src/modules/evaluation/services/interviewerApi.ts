@@ -309,6 +309,7 @@ const normalizeAssignment = (value: unknown): InterviewerAssignmentView | null =
     return null;
   }
   const payload = value as Partial<InterviewerAssignmentView> & {
+    assignmentId?: unknown;
     evaluationId?: unknown;
     slotId?: unknown;
     interviewerEmail?: unknown;
@@ -320,6 +321,9 @@ const normalizeAssignment = (value: unknown): InterviewerAssignmentView | null =
     caseFolder?: unknown;
     fitQuestion?: unknown;
     form?: unknown;
+    roundNumber?: unknown;
+    isActive?: unknown;
+    archivedAt?: unknown;
   };
 
   const evaluationId = normalizeString(payload.evaluationId)?.trim();
@@ -330,6 +334,7 @@ const normalizeAssignment = (value: unknown): InterviewerAssignmentView | null =
   }
 
   return {
+    assignmentId: normalizeString(payload.assignmentId) ?? `${evaluationId}:${slotId}`,
     evaluationId,
     slotId,
     interviewerEmail,
@@ -341,7 +346,10 @@ const normalizeAssignment = (value: unknown): InterviewerAssignmentView | null =
     candidate: normalizeCandidate(payload.candidate),
     caseFolder: normalizeCaseFolder(payload.caseFolder),
     fitQuestion: normalizeFitQuestion(payload.fitQuestion),
-    form: normalizeForm(payload.form)
+    form: normalizeForm(payload.form),
+    roundNumber: normalizeNumber(payload.roundNumber) ?? 1,
+    isActive: payload.isActive !== false,
+    archivedAt: normalizeIso(payload.archivedAt) ?? undefined
   };
 };
 

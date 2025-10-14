@@ -179,24 +179,42 @@ const sortCaseCriteria = (criteria: CriterionDefinition[]): CriterionDefinition[
   });
 };
 
+const pickPreferredAssignmentId = (
+  items: InterviewerAssignmentView[],
+  currentId: string | null
+): string | null => {
+  if (!items.length) {
+    return null;
+  }
+  if (currentId) {
+    const existing = items.find((item) => item.assignmentId === currentId);
+    if (existing) {
+      return currentId;
+    }
+  }
+  const active = items.find((item) => item.isActive);
+  return (active ?? items[0]).assignmentId;
+};
+
 export const InterviewerScreen = () => {
   const { session } = useAuth();
   const [assignments, setAssignments] = useState<InterviewerAssignmentView[]>([]);
-  const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
+  const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
   const [banner, setBanner] = useState<Banner | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formState, setFormState] = useState<FormState>(createFormState(null));
 
   const selectedAssignment = useMemo(() => {
-    if (!selectedSlot) {
+    if (!selectedAssignmentId) {
       return null;
     }
-    return assignments.find((item) => item.slotId === selectedSlot) ?? null;
-  }, [assignments, selectedSlot]);
+    return assignments.find((item) => item.assignmentId === selectedAssignmentId) ?? null;
+  }, [assignments, selectedAssignmentId]);
 
   const isSubmitted = selectedAssignment?.form?.submitted ?? false;
-  const disableInputs = saving || isSubmitted;
+  const isActiveAssignment = selectedAssignment?.isActive ?? true;
+  const disableInputs = saving || isSubmitted || !isActiveAssignment;
 
   useEffect(() => {
     setFormState(createFormState(selectedAssignment));
@@ -205,7 +223,7 @@ export const InterviewerScreen = () => {
   useEffect(() => {
     if (!session?.email) {
       setAssignments([]);
-      setSelectedSlot(null);
+      setSelectedAssignmentId(null);
       return;
     }
     const load = async () => {
@@ -213,16 +231,7 @@ export const InterviewerScreen = () => {
       try {
         const items = await interviewerApi.listAssignments(session.email);
         setAssignments(items);
-        if (items.length && !selectedSlot) {
-          setSelectedSlot(items[0].slotId);
-        } else if (items.length === 0) {
-          setSelectedSlot(null);
-        } else if (selectedSlot) {
-          const stillExists = items.some((item) => item.slotId === selectedSlot);
-          if (!stillExists) {
-            setSelectedSlot(items[0]?.slotId ?? null);
-          }
-        }
+        setSelectedAssignmentId((current) => pickPreferredAssignmentId(items, current));
       } catch (error) {
         console.error('Failed to load interviewer assignments:', error);
         setBanner({ type: 'error', text: 'Assignments could not be loaded. Please refresh the page later.' });
@@ -241,16 +250,7 @@ export const InterviewerScreen = () => {
     try {
       const items = await interviewerApi.listAssignments(session.email);
       setAssignments(items);
-      if (items.length === 0) {
-        setSelectedSlot(null);
-      } else if (selectedSlot) {
-        const exists = items.some((item) => item.slotId === selectedSlot);
-        if (!exists) {
-          setSelectedSlot(items[0].slotId);
-        }
-      } else {
-        setSelectedSlot(items[0].slotId);
-      }
+      setSelectedAssignmentId((current) => pickPreferredAssignmentId(items, current));
     } catch (error) {
       console.error('Failed to reload assignments:', error);
     }
@@ -360,18 +360,32 @@ export const InterviewerScreen = () => {
             ? `${assignment.candidate.lastName} ${assignment.candidate.firstName}`.trim()
             : 'Candidate not assigned';
           const submitted = assignment.form?.submitted ?? false;
-          const statusLabel = submitted ? 'Completed' : 'Assigned';
+          const statusLabel = submitted
+            ? 'Completed'
+            : assignment.isActive
+              ? 'Assigned'
+              : 'Archived';
+          const statusClassName = `${styles.statusPill} ${
+            submitted
+              ? styles.statusPillCompleted
+              : assignment.isActive
+                ? styles.statusPillAssigned
+                : styles.statusPillArchived
+          }`;
           return (
             <li
-              key={assignment.slotId}
-              className={`${styles.listItem} ${selectedSlot === assignment.slotId ? styles.listItemActive : ''}`}
-              onClick={() => setSelectedSlot(assignment.slotId)}
+              key={assignment.assignmentId}
+              className={`${styles.listItem} ${
+                selectedAssignmentId === assignment.assignmentId ? styles.listItemActive : ''
+              }`}
+              onClick={() => setSelectedAssignmentId(assignment.assignmentId)}
             >
-              <div className={styles.listItemTitle}>{candidateName}</div>
+              <div className={styles.listItemHeader}>
+                <div className={styles.listItemTitle}>{candidateName}</div>
+                <span className={styles.roundPill}>Round {assignment.roundNumber}</span>
+              </div>
               <div className={styles.listItemMetaRow}>
-                <span className={`${styles.statusPill} ${submitted ? styles.statusPillCompleted : styles.statusPillAssigned}`}>
-                  {statusLabel}
-                </span>
+                <span className={statusClassName}>{statusLabel}</span>
                 <span className={styles.listItemMetaText}>Assigned {formatDateTime(assignment.invitationSentAt)}</span>
               </div>
             </li>
@@ -443,15 +457,18 @@ export const InterviewerScreen = () => {
         <div className={styles.detailHeader}>
           <div>
             <h2 className={styles.detailTitle}>{candidateName}</h2>
-            {(targetRole || targetOffice) && (
-              <div className={styles.detailMeta}>
-                {targetRole && <span className={styles.detailMetaItem}>Target role: {targetRole}</span>}
-                {targetOffice && <span className={styles.detailMetaItem}>Target office: {targetOffice}</span>}
-              </div>
-            )}
+            <div className={styles.detailMeta}>
+              <span className={styles.detailMetaItem}>Round {selectedAssignment.roundNumber}</span>
+              {targetRole && <span className={styles.detailMetaItem}>Target role: {targetRole}</span>}
+              {targetOffice && <span className={styles.detailMetaItem}>Target office: {targetOffice}</span>}
+            </div>
           </div>
-          <span className={`${styles.badge} ${isSubmitted ? styles.badgeSuccess : ''}`}>
-            {isSubmitted ? 'Submitted' : 'In progress'}
+          <span
+            className={`${styles.badge} ${
+              isSubmitted ? styles.badgeSuccess : isActiveAssignment ? '' : styles.badgeArchived
+            }`}
+          >
+            {isSubmitted ? 'Submitted' : isActiveAssignment ? 'In progress' : 'Archived'}
           </span>
         </div>
         <div className={styles.detailColumns}>
@@ -489,6 +506,11 @@ export const InterviewerScreen = () => {
                 <div className={styles.formNotice}>
                   This evaluation was submitted
                   {submittedAtLabel ? ` on ${submittedAtLabel}` : ''} and can no longer be edited.
+                </div>
+              )}
+              {!isSubmitted && !isActiveAssignment && (
+                <div className={styles.formNotice}>
+                  This assignment is archived. Editing is disabled for this round.
                 </div>
               )}
 

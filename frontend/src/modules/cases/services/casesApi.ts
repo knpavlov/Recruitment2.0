@@ -17,6 +17,12 @@ type CaseFilePayload = Partial<CaseFileRecord> & {
   uploadedAt?: unknown;
 };
 
+type CaseCriterionPayload = Partial<CaseEvaluationCriterion> & {
+  id?: unknown;
+  updatedAt?: unknown;
+  ratings?: unknown;
+};
+
 const normalizeIso = (value: unknown): string | null => {
   if (value instanceof Date) {
     return value.toISOString();
@@ -69,6 +75,32 @@ const normalizeFile = (payload: unknown): CaseFileRecord | null => {
   };
 };
 
+const normalizeCriterion = (payload: unknown): CaseEvaluationCriterion | null => {
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
+  const record = payload as CaseCriterionPayload;
+  const id = typeof record.id === 'string' && record.id.trim() ? record.id : null;
+  const title = typeof record.title === 'string' && record.title.trim() ? record.title : null;
+  if (!id || !title) {
+    return null;
+  }
+  const ratings: CaseEvaluationCriterion['ratings'] = {};
+  const sourceRatings = (record.ratings ?? {}) as Record<string, unknown>;
+  for (const score of [1, 2, 3, 4, 5] as const) {
+    const value = sourceRatings[String(score)];
+    if (typeof value === 'string' && value.trim()) {
+      ratings[score] = value.trim();
+    }
+  }
+  return {
+    id,
+    title,
+    ratings,
+    updatedAt: normalizeIso(record.updatedAt) ?? undefined
+  };
+};
+
 const normalizeFolder = (payload: unknown): CaseFolder | null => {
   if (!payload || typeof payload !== 'object') {
     return null;
@@ -88,26 +120,7 @@ const normalizeFolder = (payload: unknown): CaseFolder | null => {
 
   const criteriaSource = Array.isArray(record.evaluationCriteria) ? record.evaluationCriteria : [];
   const evaluationCriteria = criteriaSource
-    .map((entry) => {
-      if (!entry || typeof entry !== 'object') {
-        return null;
-      }
-      const criterion = entry as Partial<CaseFolder['evaluationCriteria'][number]> & { id?: unknown };
-      const criterionId = typeof criterion.id === 'string' && criterion.id.trim() ? criterion.id : null;
-      const title = typeof criterion.title === 'string' && criterion.title.trim() ? criterion.title : null;
-      if (!criterionId || !title) {
-        return null;
-      }
-      const ratings: CaseFolder['evaluationCriteria'][number]['ratings'] = {};
-      const sourceRatings = (criterion.ratings ?? {}) as Record<string, unknown>;
-      for (const score of [1, 2, 3, 4, 5] as const) {
-        const value = sourceRatings[String(score)];
-        if (typeof value === 'string' && value.trim()) {
-          ratings[score] = value.trim();
-        }
-      }
-      return { id: criterionId, title, ratings };
-    })
+    .map((entry) => normalizeCriterion(entry))
     .filter((item): item is CaseFolder['evaluationCriteria'][number] => Boolean(item));
 
   if (!id || !name || version === null || !createdAt || !updatedAt) {
@@ -142,8 +155,28 @@ const ensureFolder = (value: unknown): CaseFolder => {
   return folder;
 };
 
+const ensureCriterion = (value: unknown): CaseEvaluationCriterion => {
+  const criterion = normalizeCriterion(value);
+  if (!criterion) {
+    throw new Error('Failed to parse the criterion payload.');
+  }
+  return criterion;
+};
+
+const serializeRatings = (ratings: CaseEvaluationCriterion['ratings']) => {
+  const payload: Record<string, string> = {};
+  for (const score of [1, 2, 3, 4, 5] as const) {
+    const value = ratings[score];
+    if (typeof value === 'string' && value.trim()) {
+      payload[String(score)] = value;
+    }
+  }
+  return payload;
+};
+
 export const casesApi = {
   list: async () => ensureFolderList(await apiRequest<unknown>('/cases')),
+  get: async (id: string) => ensureFolder(await apiRequest<unknown>(`/cases/${id}`)),
   create: async (name: string) =>
     ensureFolder(
       await apiRequest<unknown>('/cases', {
@@ -178,5 +211,40 @@ export const casesApi = {
         method: 'DELETE',
         body: { expectedVersion }
       })
-    )
+    ),
+  createCriterion: async (
+    folderId: string,
+    criterion: { id?: string; title: string; ratings: CaseEvaluationCriterion['ratings'] }
+  ) =>
+    ensureCriterion(
+      await apiRequest<unknown>(`/cases/${folderId}/criteria`, {
+        method: 'POST',
+        body: {
+          id: criterion.id,
+          title: criterion.title,
+          ratings: serializeRatings(criterion.ratings)
+        }
+      })
+    ),
+  updateCriterion: async (
+    folderId: string,
+    criterionId: string,
+    criterion: { title: string; ratings: CaseEvaluationCriterion['ratings'] }
+  ) =>
+    ensureCriterion(
+      await apiRequest<unknown>(`/cases/${folderId}/criteria/${criterionId}`, {
+        method: 'PATCH',
+        body: {
+          title: criterion.title,
+          ratings: serializeRatings(criterion.ratings)
+        }
+      })
+    ),
+  removeCriterion: async (folderId: string, criterionId: string) =>
+    apiRequest<{ id?: unknown }>(`/cases/${folderId}/criteria/${criterionId}`, {
+      method: 'DELETE'
+    }).then((result) => {
+      const id = typeof result.id === 'string' ? result.id : criterionId;
+      return { id };
+    })
 };

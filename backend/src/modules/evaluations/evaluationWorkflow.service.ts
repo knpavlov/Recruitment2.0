@@ -284,7 +284,8 @@ export class EvaluationWorkflowService {
     await this.evaluations.storeAssignments(trimmed, assignments, {
       status: 'in-progress',
       refreshSlotIds,
-      updateStartedAt: evaluation.processStatus === 'draft'
+      updateStartedAt: evaluation.processStatus === 'draft',
+      roundNumber: evaluation.roundNumber ?? 1
     });
 
     return this.loadEvaluationWithState(trimmed);
@@ -404,20 +405,35 @@ export class EvaluationWorkflowService {
 
     return assignments.map((assignment) => {
       const evaluation = evaluationMap.get(assignment.evaluationId);
-      const form = evaluation?.forms.find((item) => item.slotId === assignment.slotId) ?? null;
       const candidate = evaluation?.candidateId ? candidateMap.get(evaluation.candidateId) ?? undefined : undefined;
+
+      let form = evaluation?.forms.find((item) => item.slotId === assignment.slotId) ?? null;
+      let processStatus = evaluation?.processStatus ?? 'draft';
+
+      if ((!form || !assignment.isActive) && evaluation) {
+        const snapshot = evaluation.roundHistory.find((round) => round.roundNumber === assignment.roundNumber);
+        if (snapshot) {
+          processStatus = snapshot.processStatus;
+          form = snapshot.forms.find((item) => item.slotId === assignment.slotId) ?? form;
+        }
+      }
+
       return {
+        assignmentId: assignment.id,
         evaluationId: assignment.evaluationId,
         slotId: assignment.slotId,
         interviewerEmail: assignment.interviewerEmail,
         interviewerName: assignment.interviewerName,
         invitationSentAt: assignment.invitationSentAt,
         evaluationUpdatedAt: evaluation?.updatedAt ?? assignment.createdAt,
-        evaluationProcessStatus: evaluation?.processStatus ?? 'draft',
+        evaluationProcessStatus: processStatus,
         candidate: candidate ?? undefined,
         caseFolder: caseMap.get(assignment.caseFolderId) ?? undefined,
         fitQuestion: questionMap.get(assignment.fitQuestionId) ?? undefined,
-        form
+        form,
+        roundNumber: assignment.roundNumber,
+        isActive: assignment.isActive,
+        archivedAt: assignment.archivedAt
       } satisfies InterviewerAssignmentView;
     });
   }

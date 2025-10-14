@@ -191,7 +191,17 @@ export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: 
                 <td>{row.offerSummary}</td>
                 <td>{row.processLabel}</td>
                 <td className={styles.actionsCell}>
-                  <div className={styles.actionsRow}>
+                  <div className={styles.actionsGrid}>
+                    <button
+                      type="button"
+                      className={`${styles.actionButton} ${styles.neutralButton}`}
+                      onClick={() => {
+                        closeMenus();
+                        row.onEdit();
+                      }}
+                    >
+                      Edit
+                    </button>
                     <div className={styles.buttonWithMenu}>
                       <button
                         type="button"
@@ -227,16 +237,6 @@ export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: 
                         </div>
                       )}
                     </div>
-                    <button
-                      type="button"
-                      className={`${styles.actionButton} ${styles.neutralButton}`}
-                      onClick={() => {
-                        closeMenus();
-                        row.onEdit();
-                      }}
-                    >
-                      Edit
-                    </button>
                     <button
                       type="button"
                       className={`${styles.actionButton} ${styles.neutralButton}`}

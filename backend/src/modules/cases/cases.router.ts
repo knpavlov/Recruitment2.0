@@ -33,6 +33,15 @@ router.get('/', async (_req, res) => {
   res.json(folders);
 });
 
+router.get('/:id', async (req, res) => {
+  try {
+    const folder = await casesService.getFolder(req.params.id);
+    res.json(folder);
+  } catch (error) {
+    handleError(error, res);
+  }
+});
+
 router.post('/', async (req, res) => {
   const { name } = req.body as { name?: string };
   try {
@@ -89,6 +98,73 @@ router.delete('/:id/files/:fileId', async (req, res) => {
   try {
     const folder = await casesService.removeFile(req.params.id, req.params.fileId, expectedVersion);
     res.json(folder);
+  } catch (error) {
+    handleError(error, res);
+  }
+});
+
+router.post('/:id/criteria', async (req, res) => {
+  const { id, title, ratings } = req.body as {
+    id?: string;
+    title?: string;
+    ratings?: Partial<Record<'1' | '2' | '3' | '4' | '5', string>>;
+  };
+  const normalizedRatings: Partial<Record<1 | 2 | 3 | 4 | 5, string>> = {};
+  if (ratings) {
+    for (const key of Object.keys(ratings)) {
+      const score = Number(key);
+      if ([1, 2, 3, 4, 5].includes(score)) {
+        const value = ratings[key as keyof typeof ratings];
+        if (typeof value === 'string') {
+          normalizedRatings[score as 1 | 2 | 3 | 4 | 5] = value;
+        }
+      }
+    }
+  }
+  try {
+    const criterion = await casesService.createCriterion(req.params.id, {
+      id,
+      title: title ?? '',
+      ratings: normalizedRatings
+    });
+    res.status(201).json(criterion);
+  } catch (error) {
+    handleError(error, res);
+  }
+});
+
+router.patch('/:id/criteria/:criterionId', async (req, res) => {
+  const { title, ratings } = req.body as {
+    title?: string;
+    ratings?: Partial<Record<'1' | '2' | '3' | '4' | '5', string>>;
+  };
+  const normalizedRatings: Partial<Record<1 | 2 | 3 | 4 | 5, string>> = {};
+  if (ratings) {
+    for (const key of Object.keys(ratings)) {
+      const score = Number(key);
+      if ([1, 2, 3, 4, 5].includes(score)) {
+        const value = ratings[key as keyof typeof ratings];
+        if (typeof value === 'string') {
+          normalizedRatings[score as 1 | 2 | 3 | 4 | 5] = value;
+        }
+      }
+    }
+  }
+  try {
+    const criterion = await casesService.updateCriterion(req.params.id, req.params.criterionId, {
+      title: title ?? '',
+      ratings: normalizedRatings
+    });
+    res.json(criterion);
+  } catch (error) {
+    handleError(error, res);
+  }
+});
+
+router.delete('/:id/criteria/:criterionId', async (req, res) => {
+  try {
+    const id = await casesService.deleteCriterion(req.params.id, req.params.criterionId);
+    res.json({ id });
   } catch (error) {
     handleError(error, res);
   }

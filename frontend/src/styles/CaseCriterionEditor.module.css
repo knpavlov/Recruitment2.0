@@ -1,0 +1,73 @@
+.criterionCard {
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: #f8fafc;
+}
+
+.criterionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.removeButton {
+  border: none;
+  background: transparent;
+  color: #ef4444;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.removeButton:disabled {
+  color: #fca5a5;
+  cursor: not-allowed;
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fieldGroup span {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.fieldGroup input {
+  border: 1px solid #cbd5f5;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+.ratingsGrid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.ratingField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ratingLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.ratingField textarea {
+  border: 1px solid #cbd5f5;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  min-height: 80px;
+}

@@ -187,8 +187,52 @@ const createTables = async () => {
       fit_question_id UUID NOT NULL,
       invitation_sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      UNIQUE (evaluation_id, slot_id)
+      round_number INTEGER NOT NULL DEFAULT 1,
+      is_active BOOLEAN NOT NULL DEFAULT TRUE,
+      archived_at TIMESTAMPTZ,
+      UNIQUE (evaluation_id, slot_id, round_number)
     );
+  `);
+
+  await postgresPool.query(`
+    ALTER TABLE case_evaluation_criteria
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+  `);
+
+  await postgresPool.query(`
+    ALTER TABLE evaluation_assignments
+      ADD COLUMN IF NOT EXISTS round_number INTEGER NOT NULL DEFAULT 1,
+      ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE,
+      ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ;
+  `);
+
+  await postgresPool.query(`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1
+          FROM information_schema.table_constraints
+         WHERE table_name = 'evaluation_assignments'
+           AND constraint_name = 'evaluation_assignments_evaluation_id_slot_id_key'
+      ) THEN
+        ALTER TABLE evaluation_assignments
+          DROP CONSTRAINT evaluation_assignments_evaluation_id_slot_id_key;
+      END IF;
+    END
+    $$;
+  `);
+
+  await postgresPool.query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'evaluation_assignments_evaluation_slot_round_unique'
+      ) THEN
+        CREATE UNIQUE INDEX evaluation_assignments_evaluation_slot_round_unique
+          ON evaluation_assignments(evaluation_id, slot_id, round_number);
+      END IF;
+    END
+    $$;
   `);
 
   await postgresPool.query(`

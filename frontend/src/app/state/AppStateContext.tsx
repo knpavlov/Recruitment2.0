@@ -1,5 +1,5 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { CaseFolder, CaseFileUploadDto } from '../../shared/types/caseLibrary';
+import { CaseFolder, CaseFileUploadDto, CaseEvaluationCriterion } from '../../shared/types/caseLibrary';
 import { CandidateProfile } from '../../shared/types/candidate';
 import { EvaluationConfig } from '../../shared/types/evaluation';
 import { AccountRecord, AccountRole } from '../../shared/types/account';
@@ -28,6 +28,10 @@ interface AppStateContextValue {
       folderId: string,
       fileId: string,
       expectedVersion: number
+    ) => Promise<DomainResult<CaseFolder>>;
+    saveCriteria: (
+      folderId: string,
+      criteria: CaseEvaluationCriterion[]
     ) => Promise<DomainResult<CaseFolder>>;
   };
   fitQuestions: {
@@ -165,6 +169,25 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const sortQuestionsByUpdated = (items: FitQuestion[]) =>
     [...items].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 
+  const normalizeCaseCriterion = (criterion: CaseEvaluationCriterion) => {
+    const trimmedId = criterion.id.trim();
+    const trimmedTitle = criterion.title.trim();
+    const ratings: CaseEvaluationCriterion['ratings'] = {};
+    (Object.keys(criterion.ratings) as Array<keyof CaseEvaluationCriterion['ratings']>).forEach((key) => {
+      const score = Number(key);
+      if (score >= 1 && score <= 5) {
+        const value = criterion.ratings[key];
+        if (typeof value === 'string') {
+          const trimmed = value.trim();
+          if (trimmed) {
+            ratings[score as 1 | 2 | 3 | 4 | 5] = trimmed;
+          }
+        }
+      }
+    });
+    return { ...criterion, id: trimmedId, title: trimmedTitle, ratings };
+  };
+
   const value = useMemo<AppStateContextValue>(() => ({
     cases: {
       folders,
@@ -286,6 +309,80 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
             }
           }
           console.error('Failed to delete file from folder:', error);
+          return { ok: false, error: 'unknown' };
+        }
+      },
+      saveCriteria: async (folderId, criteria) => {
+        const current = folders.find((item) => item.id === folderId);
+        if (!current) {
+          return { ok: false, error: 'not-found' };
+        }
+
+        const normalizedList = criteria.map((item) => normalizeCaseCriterion(item));
+
+        if (normalizedList.some((item) => !item.id || !item.title)) {
+          return { ok: false, error: 'invalid-input' };
+        }
+
+        const existingMap = new Map(
+          current.evaluationCriteria.map((item) => [item.id, normalizeCaseCriterion(item)])
+        );
+        const desiredMap = new Map(normalizedList.map((item) => [item.id, item]));
+
+        const toCreate = normalizedList.filter((item) => !existingMap.has(item.id));
+        const toUpdate = normalizedList.filter((item) => {
+          const previous = existingMap.get(item.id);
+          if (!previous) {
+            return false;
+          }
+          if (previous.title !== item.title) {
+            return true;
+          }
+          for (const score of [1, 2, 3, 4, 5] as const) {
+            const before = previous.ratings[score] ?? '';
+            const after = item.ratings[score] ?? '';
+            if (before !== after) {
+              return true;
+            }
+          }
+          return false;
+        });
+        const toDelete = current.evaluationCriteria.filter((item) => !desiredMap.has(item.id));
+
+        if (!toCreate.length && !toUpdate.length && !toDelete.length) {
+          return { ok: true, data: current };
+        }
+
+        try {
+          for (const item of toCreate) {
+            await casesApi.createCriterion(folderId, item);
+          }
+          for (const item of toUpdate) {
+            await casesApi.updateCriterion(folderId, item.id, item);
+          }
+          for (const item of toDelete) {
+            await casesApi.removeCriterion(folderId, item.id);
+          }
+
+          const fresh = await casesApi.get(folderId);
+          setFolders((prev) => prev.map((entry) => (entry.id === fresh.id ? fresh : entry)));
+          return { ok: true, data: fresh };
+        } catch (error) {
+          if (error instanceof ApiError) {
+            if (error.code === 'invalid-input') {
+              return { ok: false, error: 'invalid-input' };
+            }
+            if (error.code === 'not-found' || error.status === 404) {
+              return { ok: false, error: 'not-found' };
+            }
+          }
+          console.error('Failed to update case criteria:', error);
+          try {
+            const fresh = await casesApi.get(folderId);
+            setFolders((prev) => prev.map((entry) => (entry.id === fresh.id ? fresh : entry)));
+          } catch (syncError) {
+            console.error('Failed to refresh folders after criteria error:', syncError);
+          }
           return { ok: false, error: 'unknown' };
         }
       }

@@ -25,36 +25,50 @@ interface CaseCriterionRow extends Record<string, unknown> {
   rating_3: string | null;
   rating_4: string | null;
   rating_5: string | null;
+  updated_at: Date | null;
 }
+
+const mapRowToCriterion = (row: CaseCriterionRow): CaseEvaluationCriterion | null => {
+  if (!row.folder_id || !row.id) {
+    return null;
+  }
+  const title = typeof row.title === 'string' ? row.title.trim() : '';
+  if (!title) {
+    return null;
+  }
+  const ratings: CaseEvaluationCriterion['ratings'] = {};
+  const ratingPairs: Array<[1 | 2 | 3 | 4 | 5, string | null]> = [
+    [1, row.rating_1],
+    [2, row.rating_2],
+    [3, row.rating_3],
+    [4, row.rating_4],
+    [5, row.rating_5]
+  ];
+  for (const [score, value] of ratingPairs) {
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (trimmed) {
+        ratings[score] = trimmed;
+      }
+    }
+  }
+  return {
+    id: row.id,
+    title,
+    ratings,
+    updatedAt: row.updated_at ? row.updated_at.toISOString() : undefined
+  };
+};
 
 const mapCriterionRows = (rows: CaseCriterionRow[]): Map<string, CaseEvaluationCriterion[]> => {
   const byFolder = new Map<string, CaseEvaluationCriterion[]>();
   for (const row of rows) {
-    if (!row.folder_id || !row.id) {
+    const criterion = mapRowToCriterion(row);
+    if (!criterion) {
       continue;
-    }
-    const title = typeof row.title === 'string' ? row.title.trim() : '';
-    if (!title) {
-      continue;
-    }
-    const ratings: CaseEvaluationCriterion['ratings'] = {};
-    const ratingPairs: Array<[1 | 2 | 3 | 4 | 5, string | null]> = [
-      [1, row.rating_1],
-      [2, row.rating_2],
-      [3, row.rating_3],
-      [4, row.rating_4],
-      [5, row.rating_5]
-    ];
-    for (const [score, value] of ratingPairs) {
-      if (typeof value === 'string') {
-        const trimmed = value.trim();
-        if (trimmed) {
-          ratings[score] = trimmed;
-        }
-      }
     }
     const current = byFolder.get(row.folder_id) ?? [];
-    current.push({ id: row.id, title, ratings });
+    current.push(criterion);
     byFolder.set(row.folder_id, current);
   }
   return byFolder;
@@ -128,7 +142,8 @@ const fetchCriteriaRows = async (client: any, folderIds: string[]): Promise<Case
             rating_2,
             rating_3,
             rating_4,
-            rating_5
+            rating_5,
+            updated_at
        FROM case_evaluation_criteria
       WHERE folder_id = ANY($1::uuid[])
       ORDER BY created_at ASC, title ASC;`,
@@ -362,6 +377,180 @@ export class CasesRepository {
       const criteriaRows = await fetchCriteriaRows(client, [id]);
       const criteriaMap = mapCriterionRows(criteriaRows);
       return mapRowsToFolder(rows, criteriaMap.get(id) ?? []);
+    } finally {
+      client.release();
+    }
+  }
+
+  async createCriterion(
+    folderId: string,
+    criterion: { id: string; title: string; ratings: CaseEvaluationCriterion['ratings'] }
+  ): Promise<CaseEvaluationCriterion | null> {
+    const client = await connectClient();
+    try {
+      await client.query('BEGIN');
+      const folderResult = await client.query('SELECT id FROM case_folders WHERE id = $1 FOR UPDATE;', [folderId]);
+      if (folderResult.rowCount === 0) {
+        await client.query('ROLLBACK');
+        return null;
+      }
+
+      await client.query(
+        `INSERT INTO case_evaluation_criteria (
+           id,
+           folder_id,
+           title,
+           rating_1,
+           rating_2,
+           rating_3,
+           rating_4,
+           rating_5,
+           updated_at
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW());`,
+        [
+          criterion.id,
+          folderId,
+          criterion.title,
+          criterion.ratings[1] ?? null,
+          criterion.ratings[2] ?? null,
+          criterion.ratings[3] ?? null,
+          criterion.ratings[4] ?? null,
+          criterion.ratings[5] ?? null
+        ]
+      );
+
+      await client.query(
+        `UPDATE case_folders
+            SET updated_at = NOW(),
+                version = version + 1
+          WHERE id = $1;`,
+        [folderId]
+      );
+
+      const rowResult = await client.query(
+        `SELECT id,
+                folder_id,
+                title,
+                rating_1,
+                rating_2,
+                rating_3,
+                rating_4,
+                rating_5,
+                updated_at
+           FROM case_evaluation_criteria
+          WHERE id = $1
+          LIMIT 1;`,
+        [criterion.id]
+      );
+
+      await client.query('COMMIT');
+      const row = rowResult.rows[0] as CaseCriterionRow | undefined;
+      return row ? mapRowToCriterion(row) : null;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async updateCriterion(
+    folderId: string,
+    criterion: { id: string; title: string; ratings: CaseEvaluationCriterion['ratings'] }
+  ): Promise<CaseEvaluationCriterion | null> {
+    const client = await connectClient();
+    try {
+      await client.query('BEGIN');
+      const updateResult = await client.query(
+        `UPDATE case_evaluation_criteria
+            SET title = $3,
+                rating_1 = $4,
+                rating_2 = $5,
+                rating_3 = $6,
+                rating_4 = $7,
+                rating_5 = $8,
+                updated_at = NOW()
+          WHERE id = $1 AND folder_id = $2
+          RETURNING id;`,
+        [
+          criterion.id,
+          folderId,
+          criterion.title,
+          criterion.ratings[1] ?? null,
+          criterion.ratings[2] ?? null,
+          criterion.ratings[3] ?? null,
+          criterion.ratings[4] ?? null,
+          criterion.ratings[5] ?? null
+        ]
+      );
+
+      if (updateResult.rowCount === 0) {
+        await client.query('ROLLBACK');
+        return null;
+      }
+
+      await client.query(
+        `UPDATE case_folders
+            SET updated_at = NOW(),
+                version = version + 1
+          WHERE id = $1;`,
+        [folderId]
+      );
+
+      const rowResult = await client.query(
+        `SELECT id,
+                folder_id,
+                title,
+                rating_1,
+                rating_2,
+                rating_3,
+                rating_4,
+                rating_5,
+                updated_at
+           FROM case_evaluation_criteria
+          WHERE id = $1
+          LIMIT 1;`,
+        [criterion.id]
+      );
+
+      await client.query('COMMIT');
+      const row = rowResult.rows[0] as CaseCriterionRow | undefined;
+      return row ? mapRowToCriterion(row) : null;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async deleteCriterion(folderId: string, criterionId: string): Promise<boolean> {
+    const client = await connectClient();
+    try {
+      await client.query('BEGIN');
+      const deleteResult = await client.query(
+        `DELETE FROM case_evaluation_criteria WHERE id = $1 AND folder_id = $2;`,
+        [criterionId, folderId]
+      );
+
+      if (deleteResult.rowCount === 0) {
+        await client.query('ROLLBACK');
+        return false;
+      }
+
+      await client.query(
+        `UPDATE case_folders
+            SET updated_at = NOW(),
+                version = version + 1
+          WHERE id = $1;`,
+        [folderId]
+      );
+
+      await client.query('COMMIT');
+      return true;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
     } finally {
       client.release();
     }

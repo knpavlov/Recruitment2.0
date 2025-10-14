@@ -71,6 +71,9 @@ export interface InterviewAssignmentRecord extends InterviewAssignmentModel {
   evaluationId: string;
   invitationSentAt: string;
   createdAt: string;
+  roundNumber: number;
+  isActive: boolean;
+  archivedAt?: string;
 }
 
 export interface EvaluationRecord {
@@ -104,6 +107,7 @@ export interface EvaluationWriteModel {
 }
 
 export interface InterviewerAssignmentView {
+  assignmentId: string;
   evaluationId: string;
   slotId: string;
   interviewerEmail: string;
@@ -115,4 +119,7 @@ export interface InterviewerAssignmentView {
   caseFolder?: CaseFolder;
   fitQuestion?: FitQuestionRecord;
   form: InterviewStatusModel | null;
+  roundNumber: number;
+  isActive: boolean;
+  archivedAt?: string;
 }
