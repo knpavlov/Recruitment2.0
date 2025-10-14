@@ -361,6 +361,7 @@ export const InterviewerScreen = () => {
             : 'Candidate not assigned';
           const submitted = assignment.form?.submitted ?? false;
           const statusLabel = submitted ? 'Completed' : 'Assigned';
+          const roundLabel = `Round ${assignment.roundNumber}`;
           return (
             <li
               key={assignment.slotId}
@@ -369,6 +370,7 @@ export const InterviewerScreen = () => {
             >
               <div className={styles.listItemTitle}>{candidateName}</div>
               <div className={styles.listItemMetaRow}>
+                <span className={styles.roundPill}>{roundLabel}</span>
                 <span className={`${styles.statusPill} ${submitted ? styles.statusPillCompleted : styles.statusPillAssigned}`}>
                   {statusLabel}
                 </span>
@@ -443,12 +445,16 @@ export const InterviewerScreen = () => {
         <div className={styles.detailHeader}>
           <div>
             <h2 className={styles.detailTitle}>{candidateName}</h2>
-            {(targetRole || targetOffice) && (
-              <div className={styles.detailMeta}>
-                {targetRole && <span className={styles.detailMetaItem}>Target role: {targetRole}</span>}
-                {targetOffice && <span className={styles.detailMetaItem}>Target office: {targetOffice}</span>}
-              </div>
-            )}
+            <div className={styles.detailMeta}>
+              <span className={styles.detailMetaItem}>{`Round ${selectedAssignment.roundNumber}`}</span>
+              {targetRole && <span className={styles.detailMetaItem}>Target role: {targetRole}</span>}
+              {targetOffice && <span className={styles.detailMetaItem}>Target office: {targetOffice}</span>}
+              {!targetRole && !targetOffice && (
+                <span className={styles.detailMetaItem}>
+                  Assigned {formatDateTime(selectedAssignment.invitationSentAt)}
+                </span>
+              )}
+            </div>
           </div>
           <span className={`${styles.badge} ${isSubmitted ? styles.badgeSuccess : ''}`}>
             {isSubmitted ? 'Submitted' : 'In progress'}

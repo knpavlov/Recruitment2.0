@@ -41,6 +41,11 @@ const handleError = (error: unknown, res: Response) => {
         .status(409)
         .json({ code: 'version-conflict', message: 'Evaluation data is outdated. Refresh the page.' });
       return;
+    case 'FORMS_PENDING':
+      res
+        .status(409)
+        .json({ code: 'forms-pending', message: 'Collect all interview feedback before progressing.' });
+      return;
     default:
       res.status(500).json({ code: 'unknown', message: 'Failed to process the request.' });
   }
@@ -61,6 +66,32 @@ router.post('/:id/start', async (req, res) => {
       portalBaseUrl: resolvedBase
     });
     res.json(result);
+  } catch (error) {
+    handleError(error, res);
+  }
+});
+
+router.post('/:id/invitations', async (req, res) => {
+  try {
+    const body = (req.body ?? {}) as { scope?: unknown; portalBaseUrl?: unknown };
+    const scope = body.scope === 'updated' ? 'updated' : 'all';
+    const portalBaseUrl = typeof body.portalBaseUrl === 'string' ? body.portalBaseUrl.trim() : undefined;
+    const requestOrigin = req.get('origin');
+    const resolvedBase = portalBaseUrl && portalBaseUrl.length > 0 ? portalBaseUrl : requestOrigin;
+    const evaluation = await evaluationWorkflowService.sendInvitations(req.params.id, {
+      scope,
+      portalBaseUrl: resolvedBase
+    });
+    res.json(evaluation);
+  } catch (error) {
+    handleError(error, res);
+  }
+});
+
+router.post('/:id/advance', async (req, res) => {
+  try {
+    const evaluation = await evaluationWorkflowService.advanceRound(req.params.id);
+    res.json(evaluation);
   } catch (error) {
     handleError(error, res);
   }

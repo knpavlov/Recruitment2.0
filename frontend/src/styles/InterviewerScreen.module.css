@@ -77,6 +77,19 @@
   display: inline-block;
 }
 
+.roundPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #ede9fe;
+  color: #5b21b6;
+  border: 1px solid #ddd6fe;
+}
+
 .statusPill {
   display: inline-flex;
   align-items: center;
