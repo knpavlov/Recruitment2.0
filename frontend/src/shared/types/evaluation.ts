@@ -49,6 +49,7 @@ export interface EvaluationConfig {
   forms: InterviewStatusRecord[];
   processStatus: EvaluationProcessStatus;
   processStartedAt?: string;
+  latestInvitationAt?: string;
 }
 
 export interface InterviewerAssignmentView {

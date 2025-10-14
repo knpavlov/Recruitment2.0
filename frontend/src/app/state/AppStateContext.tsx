@@ -54,6 +54,7 @@ interface AppStateContextValue {
     ) => Promise<DomainResult<EvaluationConfig>>;
     removeEvaluation: (id: string) => Promise<DomainResult<string>>;
     startProcess: (id: string) => Promise<DomainResult<string>>;
+    resendInvitations: (id: string, mode: 'all' | 'updated') => Promise<DomainResult<string>>;
   };
   accounts: {
     list: AccountRecord[];
@@ -479,7 +480,9 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
                 ? {
                     ...item,
                     processStatus: 'in-progress',
-                    processStartedAt: item.processStartedAt ?? startedAt
+                    processStartedAt: item.processStartedAt ?? startedAt,
+                    latestInvitationAt: startedAt,
+                    updatedAt: startedAt
                   }
                 : item
             )
@@ -504,6 +507,43 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
             }
           }
           console.error('Failed to start evaluation process:', error);
+          return { ok: false, error: 'unknown' };
+        }
+      },
+      resendInvitations: async (id, mode) => {
+        try {
+          await evaluationsApi.resend(id, mode);
+          const inviteTime = nowIso();
+          setEvaluations((prev) =>
+            prev.map((item) =>
+              item.id === id
+                ? { ...item, updatedAt: inviteTime, latestInvitationAt: inviteTime }
+                : item
+            )
+          );
+          return { ok: true, data: id };
+        } catch (error) {
+          if (error instanceof ApiError) {
+            if (error.code === 'process-not-started') {
+              return { ok: false, error: 'process-not-started' };
+            }
+            if (error.code === 'missing-assignment-data') {
+              return { ok: false, error: 'missing-assignment-data' };
+            }
+            if (error.code === 'mailer-unavailable') {
+              return { ok: false, error: 'mailer-unavailable' };
+            }
+            if (error.code === 'invalid-portal-url') {
+              return { ok: false, error: 'invalid-portal-url' };
+            }
+            if (error.code === 'no-updates') {
+              return { ok: false, error: 'no-updates' };
+            }
+            if (error.code === 'not-found') {
+              return { ok: false, error: 'not-found' };
+            }
+          }
+          console.error('Failed to resend evaluation invitations:', error);
           return { ok: false, error: 'unknown' };
         }
       }

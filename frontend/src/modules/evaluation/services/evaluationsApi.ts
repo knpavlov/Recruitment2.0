@@ -189,6 +189,7 @@ const normalizeEvaluation = (value: unknown): EvaluationConfig | null => {
     forms?: unknown;
     processStatus?: unknown;
     processStartedAt?: unknown;
+    latestInvitationAt?: unknown;
   };
 
   const id = normalizeString(payload.id)?.trim();
@@ -224,7 +225,8 @@ const normalizeEvaluation = (value: unknown): EvaluationConfig | null => {
     updatedAt,
     forms,
     processStatus: (normalizeString(payload.processStatus) as EvaluationProcessStatus | undefined) ?? 'draft',
-    processStartedAt: normalizeIsoString(payload.processStartedAt)
+    processStartedAt: normalizeIsoString(payload.processStartedAt),
+    latestInvitationAt: normalizeIsoString(payload.latestInvitationAt)
   };
 };
 
@@ -297,6 +299,11 @@ export const evaluationsApi = {
     apiRequest<{ id: string }>(`/evaluations/${id}/start`, {
       method: 'POST',
       body: { portalBaseUrl: computePortalBaseUrl() }
+    }),
+  resend: async (id: string, mode: 'all' | 'updated') =>
+    apiRequest<{ id: string }>(`/evaluations/${id}/invitations`, {
+      method: 'POST',
+      body: { mode, portalBaseUrl: computePortalBaseUrl() }
     }),
   remove: async (id: string) =>
     apiRequest<{ id?: unknown }>(`/evaluations/${id}`, {
