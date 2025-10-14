@@ -158,7 +158,8 @@ const createTables = async () => {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       forms JSONB NOT NULL DEFAULT '[]'::JSONB,
       process_status TEXT NOT NULL DEFAULT 'draft',
-      process_started_at TIMESTAMPTZ
+      process_started_at TIMESTAMPTZ,
+      round_history JSONB NOT NULL DEFAULT '[]'::JSONB
     );
   `);
 
@@ -171,7 +172,8 @@ const createTables = async () => {
       ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       ADD COLUMN IF NOT EXISTS forms JSONB NOT NULL DEFAULT '[]'::JSONB,
       ADD COLUMN IF NOT EXISTS process_status TEXT NOT NULL DEFAULT 'draft',
-      ADD COLUMN IF NOT EXISTS process_started_at TIMESTAMPTZ;
+      ADD COLUMN IF NOT EXISTS process_started_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS round_history JSONB NOT NULL DEFAULT '[]'::JSONB;
   `);
 
   await postgresPool.query(`
