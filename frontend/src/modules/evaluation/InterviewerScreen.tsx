@@ -361,6 +361,7 @@ export const InterviewerScreen = () => {
             : 'Candidate not assigned';
           const submitted = assignment.form?.submitted ?? false;
           const statusLabel = submitted ? 'Completed' : 'Assigned';
+          const roundLabel = `Round ${assignment.roundNumber}`;
           return (
             <li
               key={assignment.slotId}
@@ -369,6 +370,7 @@ export const InterviewerScreen = () => {
             >
               <div className={styles.listItemTitle}>{candidateName}</div>
               <div className={styles.listItemMetaRow}>
+                <span className={styles.roundPill}>{roundLabel}</span>
                 <span className={`${styles.statusPill} ${submitted ? styles.statusPillCompleted : styles.statusPillAssigned}`}>
                   {statusLabel}
                 </span>

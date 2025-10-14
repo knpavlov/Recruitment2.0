@@ -283,9 +283,10 @@ export const EvaluationStatusModal = ({
           <div>
             <h3 className={styles.sectionTitle}>Interviewer feedback</h3>
             <p className={styles.sectionSubtitle}>
-              Review detailed scores, notes and offer recommendations for every interviewer.
+              Review completion status, scores and offer recommendations for every interviewer. Detailed comments are
+              available directly in the Evaluation management table.
             </p>
-            {summarySections.length > 0 && (
+            {summarySections.length > 0 ? (
               <div className={styles.summaryTableSection}>
                 <div className={styles.summaryTableWrapper}>
                   <table className={styles.summaryTable}>
@@ -338,124 +339,8 @@ export const EvaluationStatusModal = ({
                   </table>
                 </div>
               </div>
-            )}
-            {evaluation.forms.length === 0 ? (
-              <p className={styles.emptyState}>No interviewer feedback has been recorded yet.</p>
             ) : (
-              <ul className={styles.formList}>
-                {evaluation.forms.map((form) => {
-                  const submittedLabel = form.submittedAt
-                    ? `Submitted ${formatDateTime(form.submittedAt)}`
-                    : 'Awaiting submission';
-                  const offerLabel = form.offerRecommendation
-                    ? OFFER_LABELS[form.offerRecommendation]
-                    : null;
-
-                  const fitCriteria = (form.fitCriteria ?? []).map((criterion) => ({
-                    id: criterion.criterionId,
-                    title: fitMap.get(criterion.criterionId) ?? 'Fit criterion',
-                    score: formatScore(criterion.score)
-                  }));
-
-                  const caseCriteria = (form.caseCriteria ?? []).map((criterion) => ({
-                    id: criterion.criterionId,
-                    title: caseMap.get(criterion.criterionId) ?? 'Case criterion',
-                    score: formatScore(criterion.score)
-                  }));
-
-                  return (
-                    <li key={form.slotId} className={styles.formCard}>
-                      <div className={styles.formHeader}>
-                        <div>
-                          <h3>{form.interviewerName}</h3>
-                          <p className={styles.formMeta}>{submittedLabel}</p>
-                        </div>
-                        <span
-                          className={form.submitted ? styles.statusBadgeSuccess : styles.statusBadgePending}
-                        >
-                          {form.submitted ? 'Complete' : 'Pending'}
-                        </span>
-                      </div>
-
-                      <div className={styles.scoreRow}>
-                        <div className={styles.scoreCard}>
-                          <span className={styles.scoreLabel}>Fit score</span>
-                          <span className={styles.scoreValue}>{formatScore(form.fitScore)}</span>
-                        </div>
-                        <div className={styles.scoreCard}>
-                          <span className={styles.scoreLabel}>Case score</span>
-                          <span className={styles.scoreValue}>{formatScore(form.caseScore)}</span>
-                        </div>
-                        {offerLabel && (
-                          <div className={styles.scoreCard}>
-                            <span className={styles.scoreLabel}>Offer decision</span>
-                            <span className={styles.scoreValue}>{offerLabel}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {(fitCriteria.length > 0 || caseCriteria.length > 0) && (
-                        <div className={styles.criteriaBlock}>
-                          {fitCriteria.length > 0 && (
-                            <div>
-                              <p className={styles.criteriaTitle}>Fit criteria</p>
-                              <div className={styles.criteriaList}>
-                                {fitCriteria.map((criterion) => (
-                                  <div key={criterion.id} className={styles.criterionRow}>
-                                    <span className={styles.criterionTitle}>{criterion.title}</span>
-                                    <span className={styles.criterionScore}>{criterion.score}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                          {caseCriteria.length > 0 && (
-                            <div>
-                              <p className={styles.criteriaTitle}>Case criteria</p>
-                              <div className={styles.criteriaList}>
-                                {caseCriteria.map((criterion) => (
-                                  <div key={criterion.id} className={styles.criterionRow}>
-                                    <span className={styles.criterionTitle}>{criterion.title}</span>
-                                    <span className={styles.criterionScore}>{criterion.score}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      <div className={styles.notesBlock}>
-                        {form.fitNotes && (
-                          <p className={styles.noteRow}>
-                            <strong>Fit notes:</strong> {form.fitNotes}
-                          </p>
-                        )}
-                        {form.caseNotes && (
-                          <p className={styles.noteRow}>
-                            <strong>Case notes:</strong> {form.caseNotes}
-                          </p>
-                        )}
-                        {form.interestNotes && (
-                          <p className={styles.noteRow}>
-                            <strong>Interest level notes:</strong> {form.interestNotes}
-                          </p>
-                        )}
-                        {form.issuesToTest && (
-                          <p className={styles.noteRow}>
-                            <strong>Issues to test in next interview:</strong> {form.issuesToTest}
-                          </p>
-                        )}
-                        {form.notes && (
-                          <p className={styles.noteRow}>
-                            <strong>General notes:</strong> {form.notes}
-                          </p>
-                        )}
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
+              <p className={styles.emptyState}>No interviewer feedback has been recorded yet.</p>
             )}
           </div>
         </div>

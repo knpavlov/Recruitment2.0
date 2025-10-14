@@ -53,7 +53,8 @@ interface AppStateContextValue {
       expectedVersion: number | null
     ) => Promise<DomainResult<EvaluationConfig>>;
     removeEvaluation: (id: string) => Promise<DomainResult<string>>;
-    startProcess: (id: string) => Promise<DomainResult<string>>;
+    sendInvitations: (id: string, scope: 'all' | 'updated') => Promise<DomainResult<EvaluationConfig>>;
+    advanceRound: (id: string) => Promise<DomainResult<EvaluationConfig>>;
   };
   accounts: {
     list: AccountRecord[];
@@ -64,8 +65,6 @@ interface AppStateContextValue {
 }
 
 const AppStateContext = createContext<AppStateContextValue | null>(null);
-
-const nowIso = () => new Date().toISOString();
 
 export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [folders, setFolders] = useState<CaseFolder[]>([]);
@@ -469,27 +468,13 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
           return { ok: false, error: 'unknown' };
         }
       },
-      startProcess: async (id) => {
+      sendInvitations: async (id, scope) => {
         try {
-          await evaluationsApi.start(id);
-          const startedAt = nowIso();
-          setEvaluations((prev) =>
-            prev.map((item) =>
-              item.id === id
-                ? {
-                    ...item,
-                    processStatus: 'in-progress',
-                    processStartedAt: item.processStartedAt ?? startedAt
-                  }
-                : item
-            )
-          );
-          return { ok: true, data: id };
+          const updated = await evaluationsApi.sendInvitations(id, scope);
+          setEvaluations((prev) => prev.map((item) => (item.id === id ? updated : item)));
+          return { ok: true, data: updated };
         } catch (error) {
           if (error instanceof ApiError) {
-            if (error.code === 'process-already-started') {
-              return { ok: false, error: 'process-already-started' };
-            }
             if (error.code === 'missing-assignment-data') {
               return { ok: false, error: 'missing-assignment-data' };
             }
@@ -503,7 +488,28 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
               return { ok: false, error: 'not-found' };
             }
           }
-          console.error('Failed to start evaluation process:', error);
+          console.error('Failed to send invitations:', error);
+          return { ok: false, error: 'unknown' };
+        }
+      },
+      advanceRound: async (id) => {
+        try {
+          const updated = await evaluationsApi.advance(id);
+          setEvaluations((prev) => prev.map((item) => (item.id === id ? updated : item)));
+          return { ok: true, data: updated };
+        } catch (error) {
+          if (error instanceof ApiError) {
+            if (error.code === 'forms-pending') {
+              return { ok: false, error: 'forms-pending' };
+            }
+            if (error.code === 'version-conflict') {
+              return { ok: false, error: 'version-conflict' };
+            }
+            if (error.code === 'not-found') {
+              return { ok: false, error: 'not-found' };
+            }
+          }
+          console.error('Failed to advance evaluation round:', error);
           return { ok: false, error: 'unknown' };
         }
       }
