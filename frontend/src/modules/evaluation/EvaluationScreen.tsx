@@ -231,14 +231,14 @@ export const EvaluationScreen = () => {
       } else if (!slotsReady) {
         invitesDisabled = true;
         invitesTooltip = 'Complete all interviewer, case and fit question assignments before sending invites.';
-      } else if (evaluation.invitationState.hasInvitations && !evaluation.invitationState.hasPendingChanges) {
-        invitesDisabled = true;
-        invitesTooltip = 'Invitations are already up to date.';
       }
 
       const invitesMenuAvailable =
         evaluation.invitationState.hasInvitations && evaluation.invitationState.hasPendingChanges && !isHistoricalView;
-      const invitesButtonLabel = evaluation.invitationState.hasInvitations ? 'Send invites again' : 'Send invites';
+      const invitesButtonLabel = evaluation.invitationState.hasInvitations ? 'Send Invites Again' : 'Send Invites';
+      if (!invitesDisabled && evaluation.invitationState.hasInvitations && !evaluation.invitationState.hasPendingChanges) {
+        invitesTooltip = 'Invitations were already sent. Use this action to resend the same details.';
+      }
 
       const decisionDisabled = isHistoricalView || !allFormsSubmitted;
       let decisionTooltip: string | undefined;
@@ -337,6 +337,7 @@ export const EvaluationScreen = () => {
         decisionDisabled,
         decisionTooltip,
         decisionLabel,
+        decisionState: decisionSelection,
         onDecisionSelect: decide
       } satisfies EvaluationTableRow;
     });
