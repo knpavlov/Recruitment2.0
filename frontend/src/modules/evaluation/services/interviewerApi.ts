@@ -313,6 +313,7 @@ const normalizeAssignment = (value: unknown): InterviewerAssignmentView | null =
     slotId?: unknown;
     interviewerEmail?: unknown;
     interviewerName?: unknown;
+    roundNumber?: unknown;
     invitationSentAt?: unknown;
     evaluationUpdatedAt?: unknown;
     evaluationProcessStatus?: unknown;
@@ -334,6 +335,7 @@ const normalizeAssignment = (value: unknown): InterviewerAssignmentView | null =
     slotId,
     interviewerEmail,
     interviewerName: normalizeString(payload.interviewerName) ?? 'Interviewer',
+    roundNumber: normalizeNumber(payload.roundNumber) ?? 1,
     invitationSentAt: normalizeIso(payload.invitationSentAt) ?? new Date().toISOString(),
     evaluationUpdatedAt: normalizeIso(payload.evaluationUpdatedAt) ?? new Date().toISOString(),
     evaluationProcessStatus:

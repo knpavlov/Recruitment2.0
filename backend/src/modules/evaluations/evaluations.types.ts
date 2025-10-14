@@ -46,6 +46,25 @@ export interface InterviewAssignmentModel {
   interviewerName: string;
   caseFolderId: string;
   fitQuestionId: string;
+  roundNumber: number;
+}
+
+export interface EvaluationRoundSnapshot {
+  roundNumber: number;
+  interviewCount: number;
+  interviews: InterviewSlotModel[];
+  forms: InterviewStatusModel[];
+  fitQuestionId?: string;
+  processStatus: EvaluationProcessStatus;
+  processStartedAt?: string;
+  completedAt?: string;
+  createdAt: string;
+}
+
+export interface EvaluationInvitationState {
+  hasInvitations: boolean;
+  hasPendingChanges: boolean;
+  lastSentAt?: string;
 }
 
 export interface InterviewAssignmentRecord extends InterviewAssignmentModel {
@@ -68,6 +87,8 @@ export interface EvaluationRecord {
   forms: InterviewStatusModel[];
   processStatus: EvaluationProcessStatus;
   processStartedAt?: string;
+  roundHistory: EvaluationRoundSnapshot[];
+  invitationState: EvaluationInvitationState;
 }
 
 export interface EvaluationWriteModel {
@@ -79,6 +100,8 @@ export interface EvaluationWriteModel {
   fitQuestionId?: string;
   forms: InterviewStatusModel[];
   processStatus?: EvaluationProcessStatus;
+  processStartedAt?: string | null;
+  roundHistory: EvaluationRoundSnapshot[];
 }
 
 export interface InterviewerAssignmentView {
@@ -86,6 +109,7 @@ export interface InterviewerAssignmentView {
   slotId: string;
   interviewerEmail: string;
   interviewerName: string;
+  roundNumber: number;
   invitationSentAt: string;
   evaluationUpdatedAt: string;
   evaluationProcessStatus: EvaluationProcessStatus;
