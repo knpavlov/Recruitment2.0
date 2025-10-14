@@ -66,6 +66,21 @@ const createTables = async () => {
   `);
 
   await postgresPool.query(`
+    CREATE TABLE IF NOT EXISTS case_criteria (
+      id UUID PRIMARY KEY,
+      title TEXT NOT NULL,
+      rating_1 TEXT,
+      rating_2 TEXT,
+      rating_3 TEXT,
+      rating_4 TEXT,
+      rating_5 TEXT,
+      version INTEGER NOT NULL DEFAULT 1,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  await postgresPool.query(`
     ALTER TABLE case_folders
       ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1;
@@ -189,6 +204,11 @@ const createTables = async () => {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       UNIQUE (evaluation_id, slot_id)
     );
+  `);
+
+  await postgresPool.query(`
+    ALTER TABLE evaluation_assignments
+      ADD COLUMN IF NOT EXISTS round_number INTEGER NOT NULL DEFAULT 1;
   `);
 
   await postgresPool.query(`

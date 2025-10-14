@@ -14,6 +14,7 @@ import type { AccountsService } from '../accounts/accounts.service.js';
 import type { CandidatesService } from '../candidates/candidates.service.js';
 import type { CasesService } from '../cases/cases.service.js';
 import type { QuestionsService } from '../questions/questions.service.js';
+import type { CaseCriteriaService } from '../caseCriteria/caseCriteria.service.js';
 
 const normalizeEmail = (value: string): string => value.trim().toLowerCase();
 
@@ -117,6 +118,7 @@ export class EvaluationWorkflowService {
     private readonly candidates: CandidatesService,
     private readonly cases: CasesService,
     private readonly questions: QuestionsService,
+    private readonly caseCriteria: CaseCriteriaService,
     private readonly mailer = new MailerService()
   ) {}
 
@@ -135,6 +137,7 @@ export class EvaluationWorkflowService {
       throw new Error('INVALID_INPUT');
     }
     const assignments: InterviewAssignmentModel[] = [];
+    const roundNumber = evaluation.roundNumber ?? 1;
     for (const slot of evaluation.interviews) {
       const email = slot.interviewerEmail?.trim().toLowerCase() ?? '';
       const caseId = slot.caseFolderId?.trim() ?? '';
@@ -147,7 +150,8 @@ export class EvaluationWorkflowService {
         interviewerEmail: email,
         interviewerName: slot.interviewerName || 'Interviewer',
         caseFolderId: caseId,
-        fitQuestionId: questionId
+        fitQuestionId: questionId,
+        roundNumber
       });
     }
     return assignments;
@@ -284,7 +288,8 @@ export class EvaluationWorkflowService {
     await this.evaluations.storeAssignments(trimmed, assignments, {
       status: 'in-progress',
       refreshSlotIds,
-      updateStartedAt: evaluation.processStatus === 'draft'
+      updateStartedAt: evaluation.processStatus === 'draft',
+      roundNumber: evaluation.roundNumber ?? 1
     });
 
     return this.loadEvaluationWithState(trimmed);
@@ -358,6 +363,7 @@ export class EvaluationWorkflowService {
     }
 
     const evaluationMap = new Map<string, EvaluationRecord>();
+    const globalCaseCriteria = await this.caseCriteria.listCriteria();
     for (const assignment of assignments) {
       if (!evaluationMap.has(assignment.evaluationId)) {
         const record = await this.evaluations.findEvaluation(assignment.evaluationId);
@@ -414,9 +420,11 @@ export class EvaluationWorkflowService {
         invitationSentAt: assignment.invitationSentAt,
         evaluationUpdatedAt: evaluation?.updatedAt ?? assignment.createdAt,
         evaluationProcessStatus: evaluation?.processStatus ?? 'draft',
+        roundNumber: assignment.roundNumber,
         candidate: candidate ?? undefined,
         caseFolder: caseMap.get(assignment.caseFolderId) ?? undefined,
         fitQuestion: questionMap.get(assignment.fitQuestionId) ?? undefined,
+        caseCriteria: globalCaseCriteria,
         form
       } satisfies InterviewerAssignmentView;
     });

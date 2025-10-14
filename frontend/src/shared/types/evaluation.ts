@@ -79,8 +79,10 @@ export interface InterviewerAssignmentView {
   invitationSentAt: string;
   evaluationUpdatedAt: string;
   evaluationProcessStatus: EvaluationProcessStatus;
+  roundNumber: number;
   candidate?: import('./candidate').CandidateProfile;
   caseFolder?: import('./caseLibrary').CaseFolder;
   fitQuestion?: import('./fitQuestion').FitQuestion;
+  caseCriteria?: import('./caseCriteria').CaseCriterion[];
   form: InterviewStatusRecord | null;
 }
