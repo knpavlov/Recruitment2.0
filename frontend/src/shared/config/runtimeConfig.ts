@@ -43,6 +43,24 @@ const readGlobalConfig = (): string | undefined => {
 
 // Attempt to derive the backend domain based on the frontend domain.
 // This covers deployments where services follow the "frontend"/"backend" naming pattern on Railway.
+// Удаляет суффиксы вида "-v2", "_3", "4" и т.п. из сегмента домена,
+// чтобы восстановить исходное имя сервиса без числового маркера.
+const stripVersionSuffix = (segment: string): string => {
+  let current = segment;
+
+  while (true) {
+    const next = current.replace(/(?:[-_]?v)?\d+$/i, '');
+
+    if (next === current) {
+      break;
+    }
+
+    current = next;
+  }
+
+  return current;
+};
+
 const deriveBackendHost = (hostname: string): string | undefined => {
   const attempts: string[] = [];
 
@@ -84,7 +102,31 @@ const deriveBackendHost = (hostname: string): string | undefined => {
     attempts.push(hostname.replace('frontend', 'backend'));
   }
 
+  const segments = hostname.split('.');
+
+  // Удаляем сегменты, состоящие только из цифр (часто используются как маркеры версий).
+  const withoutNumericSegments = segments.filter((segment) => !/^\d+$/.test(segment));
+  if (withoutNumericSegments.length > 0 && withoutNumericSegments.length !== segments.length) {
+    attempts.push(withoutNumericSegments.join('.'));
+  }
+
+  // Формируем кандидата, удаляя числовые суффиксы и маркеры версий из каждого сегмента.
+  const strippedSegments = segments
+    .map((segment) => stripVersionSuffix(segment).trim())
+    .filter((segment) => segment.length > 0);
+
+  if (strippedSegments.length > 0 && strippedSegments.join('.') !== hostname) {
+    attempts.push(strippedSegments.join('.'));
+  }
+
+  const seen = new Set<string>();
+
   for (const candidate of attempts) {
+    if (!candidate || candidate === hostname || seen.has(candidate)) {
+      continue;
+    }
+
+    seen.add(candidate);
     if (candidate && candidate !== hostname) {
       return candidate;
     }
