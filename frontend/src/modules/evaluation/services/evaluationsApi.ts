@@ -4,7 +4,9 @@ import {
   EvaluationProcessStatus,
   InterviewSlot,
   InterviewStatusRecord,
-  EvaluationCriterionScore
+  EvaluationCriterionScore,
+  EvaluationRoundSnapshot,
+  EvaluationInvitationState
 } from '../../../shared/types/evaluation';
 
 const normalizeString = (value: unknown): string | undefined => {
@@ -57,6 +59,57 @@ const normalizeScore = (value: unknown): number | undefined => {
     }
   }
   return undefined;
+};
+
+const normalizeRoundHistory = (value: unknown): EvaluationRoundSnapshot[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const rounds: EvaluationRoundSnapshot[] = [];
+  for (const entry of value) {
+    if (!entry || typeof entry !== 'object') {
+      continue;
+    }
+    const payload = entry as Record<string, unknown>;
+    const roundNumber = normalizeNumber(payload.roundNumber);
+    if (typeof roundNumber !== 'number' || !Number.isFinite(roundNumber) || roundNumber <= 0) {
+      continue;
+    }
+    const interviews = Array.isArray(payload.interviews)
+      ? payload.interviews
+          .map((item) => normalizeSlot(item))
+          .filter((slot): slot is InterviewSlot => Boolean(slot))
+      : [];
+    const forms = Array.isArray(payload.forms)
+      ? payload.forms
+          .map((item) => normalizeForm(item))
+          .filter((form): form is InterviewStatusRecord => Boolean(form))
+      : [];
+    rounds.push({
+      roundNumber,
+      interviewCount: normalizeNumber(payload.interviewCount) ?? interviews.length,
+      interviews,
+      forms,
+      fitQuestionId: normalizeString(payload.fitQuestionId)?.trim() || undefined,
+      processStatus: (normalizeString(payload.processStatus) as EvaluationProcessStatus | undefined) ?? 'draft',
+      processStartedAt: normalizeIsoString(payload.processStartedAt),
+      completedAt: normalizeIsoString(payload.completedAt),
+      createdAt: normalizeIsoString(payload.createdAt) ?? new Date().toISOString()
+    });
+  }
+  return rounds.sort((a, b) => a.roundNumber - b.roundNumber);
+};
+
+const normalizeInvitationState = (value: unknown): EvaluationInvitationState => {
+  if (!value || typeof value !== 'object') {
+    return { hasInvitations: false, hasPendingChanges: true };
+  }
+  const payload = value as Record<string, unknown>;
+  const hasInvitations = typeof payload.hasInvitations === 'boolean' ? payload.hasInvitations : false;
+  const hasPendingChanges =
+    typeof payload.hasPendingChanges === 'boolean' ? payload.hasPendingChanges : !hasInvitations;
+  const lastSentAt = normalizeIsoString(payload.lastSentAt) ?? undefined;
+  return { hasInvitations, hasPendingChanges, lastSentAt };
 };
 
 const normalizeSlot = (value: unknown): InterviewSlot | null => {
@@ -189,6 +242,8 @@ const normalizeEvaluation = (value: unknown): EvaluationConfig | null => {
     forms?: unknown;
     processStatus?: unknown;
     processStartedAt?: unknown;
+    roundHistory?: unknown;
+    invitationState?: unknown;
   };
 
   const id = normalizeString(payload.id)?.trim();
@@ -224,7 +279,9 @@ const normalizeEvaluation = (value: unknown): EvaluationConfig | null => {
     updatedAt,
     forms,
     processStatus: (normalizeString(payload.processStatus) as EvaluationProcessStatus | undefined) ?? 'draft',
-    processStartedAt: normalizeIsoString(payload.processStartedAt)
+    processStartedAt: normalizeIsoString(payload.processStartedAt),
+    roundHistory: normalizeRoundHistory(payload.roundHistory),
+    invitationState: normalizeInvitationState(payload.invitationState)
   };
 };
 
@@ -245,16 +302,50 @@ const ensureEvaluationList = (value: unknown): EvaluationConfig[] => {
     .filter((evaluation): evaluation is EvaluationConfig => Boolean(evaluation));
 };
 
+const serializeRoundHistory = (history: EvaluationRoundSnapshot[]) =>
+  history.map((round) => ({
+    ...round,
+    fitQuestionId: round.fitQuestionId ?? null,
+    processStartedAt: round.processStartedAt ?? null,
+    completedAt: round.completedAt ?? null,
+    interviews: round.interviews.map((slot) => ({
+      ...slot,
+      caseFolderId: slot.caseFolderId ?? null,
+      fitQuestionId: slot.fitQuestionId ?? null
+    })),
+    forms: round.forms.map((form) => ({
+      ...form,
+      submittedAt: form.submittedAt ?? null,
+      notes: form.notes ?? null,
+      fitCriteria: Array.isArray(form.fitCriteria)
+        ? form.fitCriteria.map((criterion) => ({
+            criterionId: criterion.criterionId,
+            score: typeof criterion.score === 'number' ? criterion.score : null
+          }))
+        : [],
+      caseCriteria: Array.isArray(form.caseCriteria)
+        ? form.caseCriteria.map((criterion) => ({
+            criterionId: criterion.criterionId,
+            score: typeof criterion.score === 'number' ? criterion.score : null
+          }))
+        : [],
+      interestNotes: form.interestNotes ?? null,
+      issuesToTest: form.issuesToTest ?? null,
+      offerRecommendation: form.offerRecommendation ?? null
+    }))
+  }));
+
 const serializeEvaluation = (config: EvaluationConfig) => ({
-  ...config,
+  id: config.id,
   candidateId: config.candidateId ?? null,
   roundNumber: config.roundNumber ?? null,
-  fitQuestionId: config.fitQuestionId ?? null,
+  interviewCount: config.interviewCount,
   interviews: config.interviews.map((slot) => ({
     ...slot,
     caseFolderId: slot.caseFolderId ?? null,
     fitQuestionId: slot.fitQuestionId ?? null
   })),
+  fitQuestionId: config.fitQuestionId ?? null,
   forms: config.forms.map((form) => ({
     ...form,
     submittedAt: form.submittedAt ?? null,
@@ -274,7 +365,10 @@ const serializeEvaluation = (config: EvaluationConfig) => ({
     interestNotes: form.interestNotes ?? null,
     issuesToTest: form.issuesToTest ?? null,
     offerRecommendation: form.offerRecommendation ?? null
-  }))
+  })),
+  processStatus: config.processStatus,
+  processStartedAt: config.processStartedAt ?? null,
+  roundHistory: serializeRoundHistory(config.roundHistory)
 });
 
 export const evaluationsApi = {
@@ -298,6 +392,19 @@ export const evaluationsApi = {
       method: 'POST',
       body: { portalBaseUrl: computePortalBaseUrl() }
     }),
+  sendInvitations: async (id: string, scope: 'all' | 'updated') =>
+    ensureEvaluation(
+      await apiRequest<unknown>(`/evaluations/${id}/invitations`, {
+        method: 'POST',
+        body: { scope, portalBaseUrl: computePortalBaseUrl() }
+      })
+    ),
+  advance: async (id: string) =>
+    ensureEvaluation(
+      await apiRequest<unknown>(`/evaluations/${id}/advance`, {
+        method: 'POST'
+      })
+    ),
   remove: async (id: string) =>
     apiRequest<{ id?: unknown }>(`/evaluations/${id}`, {
       method: 'DELETE'

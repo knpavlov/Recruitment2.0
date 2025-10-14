@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { MailerService, MAILER_NOT_CONFIGURED } from '../../shared/mailer.service.js';
 import { EvaluationsRepository } from './evaluations.repository.js';
 import {
@@ -8,6 +9,7 @@ import {
   EvaluationCriterionScore,
   OfferRecommendationValue
 } from './evaluations.types.js';
+import { computeInvitationState } from './evaluationAssignments.utils.js';
 import type { AccountsService } from '../accounts/accounts.service.js';
 import type { CandidatesService } from '../candidates/candidates.service.js';
 import type { CasesService } from '../cases/cases.service.js';
@@ -46,7 +48,15 @@ const buildWriteModelFromRecord = (record: EvaluationRecord): EvaluationWriteMod
   interviews: record.interviews,
   fitQuestionId: record.fitQuestionId,
   forms: record.forms,
-  processStatus: record.processStatus
+  processStatus: record.processStatus,
+  processStartedAt: record.processStartedAt ?? null,
+  roundHistory: record.roundHistory
+});
+
+const createEmptySlot = (): EvaluationRecord['interviews'][number] => ({
+  id: randomUUID(),
+  interviewerName: 'Interviewer',
+  interviewerEmail: ''
 });
 
 const readScore = (value: unknown): number | undefined => {
@@ -110,10 +120,21 @@ export class EvaluationWorkflowService {
     private readonly mailer = new MailerService()
   ) {}
 
+  private async loadEvaluationWithState(id: string): Promise<EvaluationRecord> {
+    const record = await this.evaluations.findEvaluation(id);
+    if (!record) {
+      throw new Error('NOT_FOUND');
+    }
+    const assignments = await this.evaluations.listAssignmentsForEvaluation(id);
+    const invitationState = computeInvitationState(record, assignments);
+    return { ...record, invitationState };
+  }
+
   private buildAssignments(evaluation: EvaluationRecord): InterviewAssignmentModel[] {
     if (!evaluation.interviews.length) {
       throw new Error('INVALID_INPUT');
     }
+    const roundNumber = evaluation.roundNumber ?? 1;
     const assignments: InterviewAssignmentModel[] = [];
     for (const slot of evaluation.interviews) {
       const email = slot.interviewerEmail?.trim().toLowerCase() ?? '';
@@ -127,7 +148,8 @@ export class EvaluationWorkflowService {
         interviewerEmail: email,
         interviewerName: slot.interviewerName || 'Interviewer',
         caseFolderId: caseId,
-        fitQuestionId: questionId
+        fitQuestionId: questionId,
+        roundNumber
       });
     }
     return assignments;
@@ -158,7 +180,7 @@ export class EvaluationWorkflowService {
     return { candidate, caseMap, questionMap };
   }
 
-  private async sendInvitations(
+  private async deliverInvitations(
     assignments: InterviewAssignmentModel[],
     evaluation: EvaluationRecord,
     portalBaseUrl: string,
@@ -191,30 +213,145 @@ export class EvaluationWorkflowService {
     if (!trimmed) {
       throw new Error('INVALID_INPUT');
     }
-    const evaluation = await this.evaluations.findEvaluation(trimmed);
-    if (!evaluation) {
+    await this.sendInvitations(trimmed, { scope: 'all', portalBaseUrl: options?.portalBaseUrl });
+    return { id: trimmed };
+  }
+
+  async sendInvitations(
+    id: string,
+    options: { scope: 'all' | 'updated'; portalBaseUrl?: string }
+  ): Promise<EvaluationRecord> {
+    const trimmed = id.trim();
+    if (!trimmed) {
+      throw new Error('INVALID_INPUT');
+    }
+
+    const evaluation = await this.loadEvaluationWithState(trimmed);
+    const assignments = this.buildAssignments(evaluation);
+    const existingAssignments = await this.evaluations.listAssignmentsForEvaluation(trimmed);
+    const currentRound = evaluation.roundNumber ?? 1;
+    const currentAssignments = existingAssignments.filter(
+      (assignment) => assignment.roundNumber === currentRound
+    );
+
+    const existingBySlot = new Map(currentAssignments.map((item) => [item.slotId, item]));
+    const newSlotIds = new Set(assignments.map((assignment) => assignment.slotId));
+    const changedSlotIds = new Set<string>();
+
+    for (const assignment of assignments) {
+      const existing = existingBySlot.get(assignment.slotId);
+      if (!existing) {
+        changedSlotIds.add(assignment.slotId);
+        continue;
+      }
+      const sameEmail = normalizeEmail(existing.interviewerEmail) === assignment.interviewerEmail;
+      const sameName = (existing.interviewerName ?? '').trim() === assignment.interviewerName.trim();
+      const sameCase = (existing.caseFolderId ?? '') === assignment.caseFolderId;
+      const sameQuestion = (existing.fitQuestionId ?? '') === assignment.fitQuestionId;
+      if (!sameEmail || !sameName || !sameCase || !sameQuestion) {
+        changedSlotIds.add(assignment.slotId);
+      }
+    }
+
+    const removedSlots = currentAssignments.filter((item) => !newSlotIds.has(item.slotId));
+    const structuralChange = removedSlots.length > 0;
+
+    const scope: 'all' | 'updated' = evaluation.processStatus === 'draft' ? 'all' : options.scope;
+
+    if (scope === 'updated' && changedSlotIds.size === 0 && !structuralChange) {
+      return evaluation;
+    }
+
+    const refreshSlotIds =
+      scope === 'all'
+        ? assignments.map((assignment) => assignment.slotId)
+        : Array.from(changedSlotIds);
+
+    const assignmentsToSend =
+      scope === 'all'
+        ? assignments
+        : assignments.filter((assignment) => changedSlotIds.has(assignment.slotId));
+
+    if (assignmentsToSend.length > 0) {
+      await this.ensureAccounts(assignmentsToSend);
+      const context = await this.loadContext(assignmentsToSend, evaluation);
+      const portalBaseUrl = resolvePortalBaseUrl(options.portalBaseUrl);
+
+      try {
+        await this.deliverInvitations(assignmentsToSend, evaluation, portalBaseUrl, context);
+      } catch (error) {
+        if (error instanceof Error && error.message === MAILER_NOT_CONFIGURED) {
+          throw new Error('MAILER_UNAVAILABLE');
+        }
+        throw error;
+      }
+    }
+
+    await this.evaluations.storeAssignments(trimmed, assignments, {
+      status: 'in-progress',
+      refreshSlotIds,
+      updateStartedAt: evaluation.processStatus === 'draft',
+      roundNumber: currentRound
+    });
+
+    return this.loadEvaluationWithState(trimmed);
+  }
+
+  async advanceRound(id: string): Promise<EvaluationRecord> {
+    const trimmed = id.trim();
+    if (!trimmed) {
+      throw new Error('INVALID_INPUT');
+    }
+
+    const evaluation = await this.loadEvaluationWithState(trimmed);
+    const allSubmitted = evaluation.forms.length > 0 && evaluation.forms.every((form) => form.submitted);
+    if (!allSubmitted) {
+      throw new Error('FORMS_PENDING');
+    }
+
+    const currentRound = evaluation.roundNumber ?? 1;
+    const snapshotCreatedAt = evaluation.processStartedAt ?? evaluation.createdAt;
+    const snapshot = {
+      roundNumber: currentRound,
+      interviewCount: evaluation.interviewCount,
+      interviews: evaluation.interviews,
+      forms: evaluation.forms,
+      fitQuestionId: evaluation.fitQuestionId,
+      processStatus: 'completed' as const,
+      processStartedAt: evaluation.processStartedAt,
+      completedAt: new Date().toISOString(),
+      createdAt: snapshotCreatedAt
+    };
+
+    const filteredHistory = evaluation.roundHistory.filter((entry) => entry.roundNumber !== currentRound);
+
+    const nextRoundNumber = currentRound + 1;
+    const newSlots = [createEmptySlot()];
+    const newForms = newSlots.map((slot) => ({
+      slotId: slot.id,
+      interviewerName: slot.interviewerName,
+      submitted: false
+    }));
+
+    const writeModel = buildWriteModelFromRecord(evaluation);
+    writeModel.roundNumber = nextRoundNumber;
+    writeModel.interviewCount = newSlots.length;
+    writeModel.interviews = newSlots;
+    writeModel.forms = newForms;
+    writeModel.fitQuestionId = undefined;
+    writeModel.processStatus = 'draft';
+    writeModel.processStartedAt = null;
+    writeModel.roundHistory = [...filteredHistory, snapshot].sort((a, b) => a.roundNumber - b.roundNumber);
+
+    const updated = await this.evaluations.updateEvaluation(writeModel, evaluation.version);
+    if (updated === 'version-conflict') {
+      throw new Error('VERSION_CONFLICT');
+    }
+    if (!updated) {
       throw new Error('NOT_FOUND');
     }
-    if (evaluation.processStatus !== 'draft') {
-      throw new Error('PROCESS_ALREADY_STARTED');
-    }
 
-    const assignments = this.buildAssignments(evaluation);
-    await this.ensureAccounts(assignments);
-    const context = await this.loadContext(assignments, evaluation);
-    const portalBaseUrl = resolvePortalBaseUrl(options?.portalBaseUrl);
-
-    try {
-      await this.sendInvitations(assignments, evaluation, portalBaseUrl, context);
-    } catch (error) {
-      if (error instanceof Error && error.message === MAILER_NOT_CONFIGURED) {
-        throw new Error('MAILER_UNAVAILABLE');
-      }
-      throw error;
-    }
-
-    await this.evaluations.replaceAssignments(trimmed, assignments, 'in-progress');
-    return { id: trimmed };
+    return this.loadEvaluationWithState(trimmed);
   }
 
   async listAssignmentsForInterviewer(email: string): Promise<InterviewerAssignmentView[]> {
@@ -274,16 +411,29 @@ export class EvaluationWorkflowService {
 
     return assignments.map((assignment) => {
       const evaluation = evaluationMap.get(assignment.evaluationId);
-      const form = evaluation?.forms.find((item) => item.slotId === assignment.slotId) ?? null;
+      const roundNumber = assignment.roundNumber;
+      const currentForm = evaluation?.forms.find((item) => item.slotId === assignment.slotId) ?? null;
+      const historicalRound = evaluation?.roundHistory.find((round) => round.roundNumber === roundNumber);
+      const historicalForm = historicalRound?.forms.find((item) => item.slotId === assignment.slotId) ?? null;
+      const form = currentForm ?? historicalForm ?? null;
       const candidate = evaluation?.candidateId ? candidateMap.get(evaluation.candidateId) ?? undefined : undefined;
+      const processStatus =
+        evaluation?.roundNumber === roundNumber
+          ? evaluation?.processStatus ?? 'draft'
+          : historicalRound?.processStatus ?? 'completed';
+      const evaluationUpdatedAt =
+        evaluation?.roundNumber === roundNumber
+          ? evaluation?.updatedAt ?? assignment.createdAt
+          : historicalRound?.completedAt ?? historicalRound?.createdAt ?? evaluation?.updatedAt ?? assignment.createdAt;
       return {
         evaluationId: assignment.evaluationId,
         slotId: assignment.slotId,
         interviewerEmail: assignment.interviewerEmail,
         interviewerName: assignment.interviewerName,
+        roundNumber,
         invitationSentAt: assignment.invitationSentAt,
-        evaluationUpdatedAt: evaluation?.updatedAt ?? assignment.createdAt,
-        evaluationProcessStatus: evaluation?.processStatus ?? 'draft',
+        evaluationUpdatedAt,
+        evaluationProcessStatus: processStatus,
         candidate: candidate ?? undefined,
         caseFolder: caseMap.get(assignment.caseFolderId) ?? undefined,
         fitQuestion: questionMap.get(assignment.fitQuestionId) ?? undefined,

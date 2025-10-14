@@ -5,9 +5,11 @@ export type DomainErrorCode =
   | 'invalid-input'
   | 'mailer-unavailable'
   | 'process-already-started'
+  | 'forms-pending'
   | 'missing-assignment-data'
   | 'access-denied'
   | 'invalid-portal-url'
+  | 'form-locked'
   | 'unknown';
 
 export interface DomainFailure {
