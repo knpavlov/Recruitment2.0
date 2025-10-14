@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import styles from '../../../styles/EvaluationModal.module.css';
-import { EvaluationConfig, InterviewSlot, InterviewStatusRecord } from '../../../shared/types/evaluation';
+import { EvaluationConfig, InterviewSlot } from '../../../shared/types/evaluation';
 import { CandidateProfile } from '../../../shared/types/candidate';
 import { CaseFolder } from '../../../shared/types/caseLibrary';
 import { FitQuestion } from '../../../shared/types/fitQuestion';
-import { generateId } from '../../../shared/ui/generateId';
+import {
+  createEmptyEvaluationConfig,
+  createInterviewSlot,
+  createStatusRecord
+} from '../utils/configFactory';
 
 interface EvaluationModalProps {
   initialConfig: EvaluationConfig | null;
@@ -18,35 +22,6 @@ interface EvaluationModalProps {
   folders: CaseFolder[];
   fitQuestions: FitQuestion[];
 }
-
-const createInterviewSlot = (): InterviewSlot => ({
-  id: generateId(),
-  interviewerName: '',
-  interviewerEmail: ''
-});
-
-const createStatusRecord = (slot: InterviewSlot): InterviewStatusRecord => ({
-  slotId: slot.id,
-  interviewerName: slot.interviewerName || 'Interviewer',
-  submitted: false
-});
-
-const createDefaultConfig = (): EvaluationConfig => {
-  const interviews = [createInterviewSlot()];
-  return {
-    id: generateId(),
-    candidateId: undefined,
-    roundNumber: 1,
-    interviewCount: 1,
-    interviews,
-    fitQuestionId: undefined,
-    version: 1,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    forms: interviews.map((slot) => createStatusRecord(slot)),
-    processStatus: 'draft'
-  };
-};
 
 const shuffleArray = <T,>(source: T[]): T[] => {
   const items = [...source];
@@ -87,13 +62,13 @@ export const EvaluationModal = ({
   folders,
   fitQuestions
 }: EvaluationModalProps) => {
-  const [config, setConfig] = useState<EvaluationConfig>(createDefaultConfig());
+  const [config, setConfig] = useState<EvaluationConfig>(createEmptyEvaluationConfig());
 
   useEffect(() => {
     if (initialConfig) {
       setConfig(initialConfig);
     } else {
-      setConfig(createDefaultConfig());
+      setConfig(createEmptyEvaluationConfig());
     }
   }, [initialConfig]);
 

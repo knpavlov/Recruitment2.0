@@ -19,6 +19,9 @@ const handleError = (error: unknown, res: Response) => {
     case 'PROCESS_ALREADY_STARTED':
       res.status(409).json({ code: 'process-already-started', message: 'The process has already been started.' });
       return;
+    case 'PROCESS_NOT_STARTED':
+      res.status(409).json({ code: 'process-not-started', message: 'Send the first batch of invitations before re-sending.' });
+      return;
     case 'MISSING_ASSIGNMENT_DATA':
       res.status(400).json({ code: 'missing-assignment-data', message: 'Fill in interviewers, cases and fit questions.' });
       return;
@@ -35,6 +38,11 @@ const handleError = (error: unknown, res: Response) => {
           message:
             'Provide a valid interviewer portal URL (environment override or request origin) that interviewers can access.'
         });
+      return;
+    case 'NO_UPDATES':
+      res
+        .status(400)
+        .json({ code: 'no-updates', message: 'There are no interviewer changes to notify about.' });
       return;
     case 'VERSION_CONFLICT':
       res
@@ -58,6 +66,24 @@ router.post('/:id/start', async (req, res) => {
     const requestOrigin = req.get('origin');
     const resolvedBase = portalBaseUrl && portalBaseUrl.length > 0 ? portalBaseUrl : requestOrigin;
     const result = await evaluationWorkflowService.startProcess(req.params.id, {
+      portalBaseUrl: resolvedBase
+    });
+    res.json(result);
+  } catch (error) {
+    handleError(error, res);
+  }
+});
+
+router.post('/:id/invitations', async (req, res) => {
+  try {
+    const body = (req.body ?? {}) as { mode?: unknown; portalBaseUrl?: unknown };
+    const modeValue = typeof body.mode === 'string' ? body.mode.trim() : '';
+    const mode = modeValue === 'all' || modeValue === 'updated' ? modeValue : 'updated';
+    const portalBaseUrl = typeof body.portalBaseUrl === 'string' ? body.portalBaseUrl.trim() : undefined;
+    const requestOrigin = req.get('origin');
+    const resolvedBase = portalBaseUrl && portalBaseUrl.length > 0 ? portalBaseUrl : requestOrigin;
+    const result = await evaluationWorkflowService.resendInvitations(req.params.id, {
+      mode,
       portalBaseUrl: resolvedBase
     });
     res.json(result);

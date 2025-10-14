@@ -68,6 +68,7 @@ export interface EvaluationRecord {
   forms: InterviewStatusModel[];
   processStatus: EvaluationProcessStatus;
   processStartedAt?: string;
+  latestInvitationAt?: string;
 }
 
 export interface EvaluationWriteModel {

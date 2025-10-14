@@ -217,6 +217,65 @@ export class EvaluationWorkflowService {
     return { id: trimmed };
   }
 
+  async resendInvitations(
+    id: string,
+    options: { mode: 'all' | 'updated'; portalBaseUrl?: string }
+  ) {
+    const trimmed = id.trim();
+    if (!trimmed) {
+      throw new Error('INVALID_INPUT');
+    }
+
+    const evaluation = await this.evaluations.findEvaluation(trimmed);
+    if (!evaluation) {
+      throw new Error('NOT_FOUND');
+    }
+    if (evaluation.processStatus === 'draft') {
+      throw new Error('PROCESS_NOT_STARTED');
+    }
+
+    const assignments = this.buildAssignments(evaluation);
+    const existingAssignments = await this.evaluations.listAssignmentsByEvaluation(trimmed);
+    const previousBySlot = new Map(existingAssignments.map((item) => [item.slotId, item]));
+
+    let targetAssignments = assignments;
+    if (options.mode === 'updated') {
+      targetAssignments = assignments.filter((assignment) => {
+        const previous = previousBySlot.get(assignment.slotId);
+        if (!previous) {
+          return true;
+        }
+        return (
+          previous.interviewerEmail !== assignment.interviewerEmail ||
+          previous.interviewerName !== assignment.interviewerName ||
+          previous.caseFolderId !== assignment.caseFolderId ||
+          previous.fitQuestionId !== assignment.fitQuestionId
+        );
+      });
+    }
+
+    if (targetAssignments.length === 0) {
+      throw new Error('NO_UPDATES');
+    }
+
+    await this.ensureAccounts(targetAssignments);
+    const context = await this.loadContext(targetAssignments, evaluation);
+    const portalBaseUrl = resolvePortalBaseUrl(options.portalBaseUrl);
+
+    try {
+      await this.sendInvitations(targetAssignments, evaluation, portalBaseUrl, context);
+    } catch (error) {
+      if (error instanceof Error && error.message === MAILER_NOT_CONFIGURED) {
+        throw new Error('MAILER_UNAVAILABLE');
+      }
+      throw error;
+    }
+
+    const status = evaluation.processStatus === 'completed' ? 'completed' : 'in-progress';
+    await this.evaluations.replaceAssignments(trimmed, assignments, status);
+    return { id: trimmed };
+  }
+
   async listAssignmentsForInterviewer(email: string): Promise<InterviewerAssignmentView[]> {
     const normalized = normalizeEmail(email);
     if (!normalized) {

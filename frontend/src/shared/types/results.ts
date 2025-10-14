@@ -5,7 +5,9 @@ export type DomainErrorCode =
   | 'invalid-input'
   | 'mailer-unavailable'
   | 'process-already-started'
+  | 'process-not-started'
   | 'missing-assignment-data'
+  | 'no-updates'
   | 'access-denied'
   | 'invalid-portal-url'
   | 'unknown';

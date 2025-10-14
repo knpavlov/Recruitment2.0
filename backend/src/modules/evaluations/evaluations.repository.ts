@@ -23,6 +23,7 @@ interface EvaluationRow extends Record<string, unknown> {
   forms: unknown;
   process_status: string | null;
   process_started_at: Date | null;
+  latest_invitation_at: Date | null;
 }
 
 const mapSlots = (value: unknown): InterviewSlotModel[] => {
@@ -151,7 +152,8 @@ const mapRowToRecord = (row: EvaluationRow): EvaluationRecord => {
     updatedAt: row.updated_at.toISOString(),
     forms,
     processStatus: (row.process_status as EvaluationRecord['processStatus']) ?? 'draft',
-    processStartedAt: row.process_started_at ? row.process_started_at.toISOString() : undefined
+    processStartedAt: row.process_started_at ? row.process_started_at.toISOString() : undefined,
+    latestInvitationAt: row.latest_invitation_at ? row.latest_invitation_at.toISOString() : undefined
   } satisfies EvaluationRecord;
 };
 
@@ -182,40 +184,42 @@ const mapRowToAssignment = (row: AssignmentRow): InterviewAssignmentRecord => ({
 export class EvaluationsRepository {
   async listEvaluations(): Promise<EvaluationRecord[]> {
     const result = await postgresPool.query<EvaluationRow>(
-      `SELECT id,
-              candidate_id,
-              round_number,
-              interview_count,
-              interviews,
-              fit_question_id,
-              version,
-              created_at,
-              updated_at,
-              forms,
-              process_status,
-              process_started_at
-         FROM evaluations
-        ORDER BY updated_at DESC, created_at DESC;`
+      `SELECT e.id,
+              e.candidate_id,
+              e.round_number,
+              e.interview_count,
+              e.interviews,
+              e.fit_question_id,
+              e.version,
+              e.created_at,
+              e.updated_at,
+              e.forms,
+              e.process_status,
+              e.process_started_at,
+              (SELECT MAX(invitation_sent_at) FROM evaluation_assignments WHERE evaluation_id = e.id) AS latest_invitation_at
+         FROM evaluations e
+        ORDER BY e.updated_at DESC, e.created_at DESC;`
     );
     return result.rows.map((row) => mapRowToRecord(row));
   }
 
   async findEvaluation(id: string): Promise<EvaluationRecord | null> {
     const result = await postgresPool.query<EvaluationRow>(
-      `SELECT id,
-              candidate_id,
-              round_number,
-              interview_count,
-              interviews,
-              fit_question_id,
-              version,
-              created_at,
-              updated_at,
-              forms,
-              process_status,
-              process_started_at
-         FROM evaluations
-        WHERE id = $1
+      `SELECT e.id,
+              e.candidate_id,
+              e.round_number,
+              e.interview_count,
+              e.interviews,
+              e.fit_question_id,
+              e.version,
+              e.created_at,
+              e.updated_at,
+              e.forms,
+              e.process_status,
+              e.process_started_at,
+              (SELECT MAX(invitation_sent_at) FROM evaluation_assignments WHERE evaluation_id = e.id) AS latest_invitation_at
+         FROM evaluations e
+        WHERE e.id = $1
         LIMIT 1;`,
       [id]
     );
@@ -243,7 +247,8 @@ export class EvaluationsRepository {
                 updated_at,
                 forms,
                 process_status,
-                process_started_at;`,
+                process_started_at,
+                (SELECT MAX(invitation_sent_at) FROM evaluation_assignments WHERE evaluation_id = evaluations.id) AS latest_invitation_at;`,
       [
         model.id,
         model.candidateId ?? null,
@@ -289,7 +294,8 @@ export class EvaluationsRepository {
                 updated_at,
                 forms,
                 process_status,
-                process_started_at;`,
+                process_started_at,
+                (SELECT MAX(invitation_sent_at) FROM evaluation_assignments WHERE evaluation_id = evaluations.id) AS latest_invitation_at;`,
       [
         model.candidateId ?? null,
         model.roundNumber ?? null,
@@ -406,6 +412,24 @@ export class EvaluationsRepository {
         WHERE lower(interviewer_email) = lower($1)
         ORDER BY invitation_sent_at DESC, created_at DESC;`,
       [email]
+    );
+    return result.rows.map((row) => mapRowToAssignment(row));
+  }
+
+  async listAssignmentsByEvaluation(id: string): Promise<InterviewAssignmentRecord[]> {
+    const result = await postgresPool.query<AssignmentRow>(
+      `SELECT id,
+              evaluation_id,
+              slot_id,
+              interviewer_email,
+              interviewer_name,
+              case_folder_id,
+              fit_question_id,
+              invitation_sent_at,
+              created_at
+         FROM evaluation_assignments
+        WHERE evaluation_id = $1;`,
+      [id]
     );
     return result.rows.map((row) => mapRowToAssignment(row));
   }
