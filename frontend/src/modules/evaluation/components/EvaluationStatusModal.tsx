@@ -61,6 +61,8 @@ interface InterviewerColumn {
   form?: EvaluationConfig['forms'][number];
 }
 
+type CommentKey = 'fitNotes' | 'caseNotes' | 'interestNotes' | 'issuesToTest' | 'notes';
+
 const buildCriteriaTitleMap = (fitQuestions: FitQuestion[], caseFolders: CaseFolder[]) => {
   const fitMap = new Map<string, string>();
   for (const question of fitQuestions) {
@@ -163,6 +165,28 @@ const buildGeneralRows = (columns: InterviewerColumn[]): SummaryTableRowData[] =
   return [statusRow, fitScoreRow, caseScoreRow, offerRow];
 };
 
+const buildCommentRows = (columns: InterviewerColumn[]): SummaryTableRowData[] => {
+  const commentFields: Array<{ key: CommentKey; label: string }> = [
+    { key: 'fitNotes', label: 'Fit notes' },
+    { key: 'caseNotes', label: 'Case notes' },
+    { key: 'interestNotes', label: 'Interest level notes' },
+    { key: 'issuesToTest', label: 'Issues to test in next interview' },
+    { key: 'notes', label: 'General notes' }
+  ];
+
+  return commentFields
+    .map(({ key, label }) => {
+      const cells = columns.map((column) => {
+        const rawValue = column.form?.[key];
+        const text = typeof rawValue === 'string' ? rawValue.trim() : '';
+        return { primary: text.length > 0 ? text : '—' };
+      });
+      const hasContent = cells.some((cell) => cell.primary !== '—');
+      return hasContent ? ({ label, cells } satisfies SummaryTableRowData) : null;
+    })
+    .filter((row): row is SummaryTableRowData => Boolean(row));
+};
+
 const buildCriteriaRows = (
   columns: InterviewerColumn[],
   getCriteria: (form: EvaluationConfig['forms'][number] | undefined) =>
@@ -239,6 +263,11 @@ export const EvaluationStatusModal = ({
     );
     if (caseCriteriaRows.length > 0) {
       summarySections.push({ title: 'Case criteria', rows: caseCriteriaRows });
+    }
+
+    const commentRows = buildCommentRows(interviewerColumns);
+    if (commentRows.length > 0) {
+      summarySections.push({ title: 'Interviewer comments', rows: commentRows });
     }
   }
 
@@ -339,123 +368,8 @@ export const EvaluationStatusModal = ({
                 </div>
               </div>
             )}
-            {evaluation.forms.length === 0 ? (
+            {evaluation.forms.length === 0 && (
               <p className={styles.emptyState}>No interviewer feedback has been recorded yet.</p>
-            ) : (
-              <ul className={styles.formList}>
-                {evaluation.forms.map((form) => {
-                  const submittedLabel = form.submittedAt
-                    ? `Submitted ${formatDateTime(form.submittedAt)}`
-                    : 'Awaiting submission';
-                  const offerLabel = form.offerRecommendation
-                    ? OFFER_LABELS[form.offerRecommendation]
-                    : null;
-
-                  const fitCriteria = (form.fitCriteria ?? []).map((criterion) => ({
-                    id: criterion.criterionId,
-                    title: fitMap.get(criterion.criterionId) ?? 'Fit criterion',
-                    score: formatScore(criterion.score)
-                  }));
-
-                  const caseCriteria = (form.caseCriteria ?? []).map((criterion) => ({
-                    id: criterion.criterionId,
-                    title: caseMap.get(criterion.criterionId) ?? 'Case criterion',
-                    score: formatScore(criterion.score)
-                  }));
-
-                  return (
-                    <li key={form.slotId} className={styles.formCard}>
-                      <div className={styles.formHeader}>
-                        <div>
-                          <h3>{form.interviewerName}</h3>
-                          <p className={styles.formMeta}>{submittedLabel}</p>
-                        </div>
-                        <span
-                          className={form.submitted ? styles.statusBadgeSuccess : styles.statusBadgePending}
-                        >
-                          {form.submitted ? 'Complete' : 'Pending'}
-                        </span>
-                      </div>
-
-                      <div className={styles.scoreRow}>
-                        <div className={styles.scoreCard}>
-                          <span className={styles.scoreLabel}>Fit score</span>
-                          <span className={styles.scoreValue}>{formatScore(form.fitScore)}</span>
-                        </div>
-                        <div className={styles.scoreCard}>
-                          <span className={styles.scoreLabel}>Case score</span>
-                          <span className={styles.scoreValue}>{formatScore(form.caseScore)}</span>
-                        </div>
-                        {offerLabel && (
-                          <div className={styles.scoreCard}>
-                            <span className={styles.scoreLabel}>Offer decision</span>
-                            <span className={styles.scoreValue}>{offerLabel}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {(fitCriteria.length > 0 || caseCriteria.length > 0) && (
-                        <div className={styles.criteriaBlock}>
-                          {fitCriteria.length > 0 && (
-                            <div>
-                              <p className={styles.criteriaTitle}>Fit criteria</p>
-                              <div className={styles.criteriaList}>
-                                {fitCriteria.map((criterion) => (
-                                  <div key={criterion.id} className={styles.criterionRow}>
-                                    <span className={styles.criterionTitle}>{criterion.title}</span>
-                                    <span className={styles.criterionScore}>{criterion.score}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                          {caseCriteria.length > 0 && (
-                            <div>
-                              <p className={styles.criteriaTitle}>Case criteria</p>
-                              <div className={styles.criteriaList}>
-                                {caseCriteria.map((criterion) => (
-                                  <div key={criterion.id} className={styles.criterionRow}>
-                                    <span className={styles.criterionTitle}>{criterion.title}</span>
-                                    <span className={styles.criterionScore}>{criterion.score}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      <div className={styles.notesBlock}>
-                        {form.fitNotes && (
-                          <p className={styles.noteRow}>
-                            <strong>Fit notes:</strong> {form.fitNotes}
-                          </p>
-                        )}
-                        {form.caseNotes && (
-                          <p className={styles.noteRow}>
-                            <strong>Case notes:</strong> {form.caseNotes}
-                          </p>
-                        )}
-                        {form.interestNotes && (
-                          <p className={styles.noteRow}>
-                            <strong>Interest level notes:</strong> {form.interestNotes}
-                          </p>
-                        )}
-                        {form.issuesToTest && (
-                          <p className={styles.noteRow}>
-                            <strong>Issues to test in next interview:</strong> {form.issuesToTest}
-                          </p>
-                        )}
-                        {form.notes && (
-                          <p className={styles.noteRow}>
-                            <strong>General notes:</strong> {form.notes}
-                          </p>
-                        )}
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
             )}
           </div>
         </div>

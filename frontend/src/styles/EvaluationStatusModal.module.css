@@ -10,7 +10,7 @@
 }
 
 .modal {
-  width: min(980px, 100%);
+  width: min(1180px, 96%);
   max-height: 100%;
   overflow: auto;
   background: #f8fafc;
@@ -135,7 +135,7 @@
 .summaryTable {
   width: 100%;
   border-collapse: collapse;
-  min-width: 520px;
+  min-width: 720px;
 }
 
 .summaryTable thead th {
@@ -163,53 +163,18 @@
   flex-direction: column;
   gap: 6px;
   align-items: flex-start;
+  width: 100%;
 }
 
 .summaryTablePrimary {
   font-weight: 600;
   color: #0f172a;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .summaryTableSecondary {
   font-size: 12px;
-  color: #64748b;
-}
-
-.formList {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
-.formCard {
-  border-radius: 20px;
-  border: 1px solid rgba(148, 163, 184, 0.25);
-  background: rgba(255, 255, 255, 0.88);
-  padding: 20px 22px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.formHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-}
-
-.formHeader h3 {
-  margin: 0;
-  font-size: 18px;
-  color: #0f172a;
-}
-
-.formMeta {
-  margin: 0;
-  font-size: 14px;
   color: #64748b;
 }
 
@@ -229,84 +194,6 @@
 .statusBadgePending {
   background: rgba(253, 230, 138, 0.25);
   color: #92400e;
-}
-
-.scoreRow {
-  display: flex;
-  gap: 24px;
-  flex-wrap: wrap;
-}
-
-.scoreCard {
-  min-width: 140px;
-  padding: 12px 16px;
-  border-radius: 14px;
-  background: rgba(240, 249, 255, 0.6);
-  border: 1px solid rgba(125, 211, 252, 0.35);
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.scoreLabel {
-  font-size: 12px;
-  text-transform: uppercase;
-  color: #0f172a;
-  letter-spacing: 0.08em;
-}
-
-.scoreValue {
-  font-size: 22px;
-  font-weight: 600;
-  color: #0f172a;
-}
-
-.criteriaBlock {
-  display: grid;
-  gap: 12px;
-}
-
-.criteriaTitle {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 600;
-  color: #0f172a;
-}
-
-.criteriaList {
-  display: grid;
-  gap: 10px;
-}
-
-.criterionRow {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: rgba(148, 163, 184, 0.12);
-}
-
-.criterionTitle {
-  margin: 0;
-  color: #475569;
-  font-size: 14px;
-}
-
-.criterionScore {
-  font-weight: 600;
-  color: #0f172a;
-}
-
-.notesBlock {
-  display: grid;
-  gap: 10px;
-}
-
-.noteRow {
-  margin: 0;
-  font-size: 14px;
-  color: #0f172a;
 }
 
 .emptyState {

@@ -158,7 +158,8 @@ const createTables = async () => {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       forms JSONB NOT NULL DEFAULT '[]'::JSONB,
       process_status TEXT NOT NULL DEFAULT 'draft',
-      process_started_at TIMESTAMPTZ
+      process_started_at TIMESTAMPTZ,
+      round_history JSONB NOT NULL DEFAULT '[]'::JSONB
     );
   `);
 
@@ -171,7 +172,8 @@ const createTables = async () => {
       ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       ADD COLUMN IF NOT EXISTS forms JSONB NOT NULL DEFAULT '[]'::JSONB,
       ADD COLUMN IF NOT EXISTS process_status TEXT NOT NULL DEFAULT 'draft',
-      ADD COLUMN IF NOT EXISTS process_started_at TIMESTAMPTZ;
+      ADD COLUMN IF NOT EXISTS process_started_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS round_history JSONB NOT NULL DEFAULT '[]'::JSONB;
   `);
 
   await postgresPool.query(`
@@ -183,10 +185,16 @@ const createTables = async () => {
       interviewer_name TEXT NOT NULL,
       case_folder_id UUID NOT NULL,
       fit_question_id UUID NOT NULL,
+      round_number INTEGER NOT NULL DEFAULT 1,
       invitation_sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       UNIQUE (evaluation_id, slot_id)
     );
+  `);
+
+  await postgresPool.query(`
+    ALTER TABLE evaluation_assignments
+      ADD COLUMN IF NOT EXISTS round_number INTEGER NOT NULL DEFAULT 1;
   `);
 
   await postgresPool.query(`
