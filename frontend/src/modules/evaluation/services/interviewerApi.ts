@@ -12,6 +12,7 @@ import {
 } from '../../../shared/types/candidate';
 import { CaseFileRecord, CaseFolder } from '../../../shared/types/caseLibrary';
 import { FitQuestion } from '../../../shared/types/fitQuestion';
+import { CaseCriterion } from '../../../shared/types/caseCriteria';
 
 const normalizeString = (value: unknown): string | undefined => {
   if (typeof value === 'string') {
@@ -233,6 +234,36 @@ const normalizeCaseFolder = (value: unknown): CaseFolder | undefined => {
   };
 };
 
+const normalizeCaseCriterion = (value: unknown): CaseCriterion | null => {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const payload = value as Partial<CaseCriterion> & { id?: unknown; title?: unknown; ratings?: unknown };
+  const id = normalizeString(payload.id)?.trim();
+  const title = normalizeString(payload.title)?.trim();
+  if (!id || !title) {
+    return null;
+  }
+  const ratings: CaseCriterion['ratings'] = {};
+  const sourceRatings = (payload.ratings ?? {}) as Record<string, unknown>;
+  for (const score of [1, 2, 3, 4, 5] as const) {
+    const valueRaw = normalizeString(sourceRatings[String(score)]);
+    if (valueRaw) {
+      ratings[score] = valueRaw;
+    }
+  }
+  return { id, title, ratings };
+};
+
+const normalizeCaseCriteriaList = (value: unknown): CaseCriterion[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((entry) => normalizeCaseCriterion(entry))
+    .filter((item): item is CaseCriterion => Boolean(item));
+};
+
 const normalizeFitQuestion = (value: unknown): FitQuestion | undefined => {
   if (!value || typeof value !== 'object') {
     return undefined;
@@ -320,6 +351,8 @@ const normalizeAssignment = (value: unknown): InterviewerAssignmentView | null =
     caseFolder?: unknown;
     fitQuestion?: unknown;
     form?: unknown;
+    roundNumber?: unknown;
+    caseCriteria?: unknown;
   };
 
   const evaluationId = normalizeString(payload.evaluationId)?.trim();
@@ -338,9 +371,11 @@ const normalizeAssignment = (value: unknown): InterviewerAssignmentView | null =
     evaluationUpdatedAt: normalizeIso(payload.evaluationUpdatedAt) ?? new Date().toISOString(),
     evaluationProcessStatus:
       (normalizeString(payload.evaluationProcessStatus) as InterviewerAssignmentView['evaluationProcessStatus']) ?? 'draft',
+    roundNumber: normalizeNumber(payload.roundNumber) ?? 1,
     candidate: normalizeCandidate(payload.candidate),
     caseFolder: normalizeCaseFolder(payload.caseFolder),
     fitQuestion: normalizeFitQuestion(payload.fitQuestion),
+    caseCriteria: normalizeCaseCriteriaList(payload.caseCriteria),
     form: normalizeForm(payload.form)
   };
 };

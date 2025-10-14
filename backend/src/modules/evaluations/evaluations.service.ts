@@ -243,7 +243,10 @@ export class EvaluationsService {
   constructor(private readonly repository: EvaluationsRepository) {}
 
   private async attachInvitationState(record: EvaluationRecord): Promise<EvaluationRecord> {
-    const assignments = await this.repository.listAssignmentsForEvaluation(record.id);
+    const assignments = await this.repository.listAssignmentsForEvaluation(
+      record.id,
+      record.roundNumber ?? undefined
+    );
     const invitationState = computeInvitationState(record, assignments);
     return { ...record, invitationState };
   }

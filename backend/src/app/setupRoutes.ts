@@ -7,6 +7,7 @@ import { interviewerRouter } from '../modules/evaluations/interviewer.router.js'
 import { questionsRouter } from '../modules/questions/questions.router.js';
 import { healthRouter } from '../shared/health.router.js';
 import { authRouter } from '../modules/auth/auth.router.js';
+import { caseCriteriaRouter } from '../modules/case-criteria/caseCriteria.router.js';
 
 export const registerAppRoutes = (app: Application) => {
   // TODO: add middleware for authentication and request logging
@@ -14,6 +15,7 @@ export const registerAppRoutes = (app: Application) => {
   app.use('/accounts', accountsRouter);
   app.use('/auth', authRouter);
   app.use('/cases', casesRouter);
+  app.use('/case-criteria', caseCriteriaRouter);
   app.use('/candidates', candidatesRouter);
   app.use('/evaluations', evaluationsRouter);
   app.use('/interviewer', interviewerRouter);

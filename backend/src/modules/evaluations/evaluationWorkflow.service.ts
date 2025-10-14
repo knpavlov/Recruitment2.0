@@ -14,6 +14,7 @@ import type { AccountsService } from '../accounts/accounts.service.js';
 import type { CandidatesService } from '../candidates/candidates.service.js';
 import type { CasesService } from '../cases/cases.service.js';
 import type { QuestionsService } from '../questions/questions.service.js';
+import type { CaseCriteriaService } from '../case-criteria/caseCriteria.service.js';
 
 const normalizeEmail = (value: string): string => value.trim().toLowerCase();
 
@@ -117,6 +118,7 @@ export class EvaluationWorkflowService {
     private readonly candidates: CandidatesService,
     private readonly cases: CasesService,
     private readonly questions: QuestionsService,
+    private readonly caseCriteria: CaseCriteriaService,
     private readonly mailer = new MailerService()
   ) {}
 
@@ -125,7 +127,10 @@ export class EvaluationWorkflowService {
     if (!record) {
       throw new Error('NOT_FOUND');
     }
-    const assignments = await this.evaluations.listAssignmentsForEvaluation(id);
+    const assignments = await this.evaluations.listAssignmentsForEvaluation(
+      id,
+      record.roundNumber ?? undefined
+    );
     const invitationState = computeInvitationState(record, assignments);
     return { ...record, invitationState };
   }
@@ -226,7 +231,10 @@ export class EvaluationWorkflowService {
 
     const evaluation = await this.loadEvaluationWithState(trimmed);
     const assignments = this.buildAssignments(evaluation);
-    const existingAssignments = await this.evaluations.listAssignmentsForEvaluation(trimmed);
+    const existingAssignments = await this.evaluations.listAssignmentsForEvaluation(
+      trimmed,
+      evaluation.roundNumber ?? undefined
+    );
 
     const existingBySlot = new Map(existingAssignments.map((item) => [item.slotId, item]));
     const newSlotIds = new Set(assignments.map((assignment) => assignment.slotId));
@@ -281,7 +289,7 @@ export class EvaluationWorkflowService {
       }
     }
 
-    await this.evaluations.storeAssignments(trimmed, assignments, {
+    await this.evaluations.storeAssignments(trimmed, evaluation.roundNumber ?? 1, assignments, {
       status: 'in-progress',
       refreshSlotIds,
       updateStartedAt: evaluation.processStatus === 'draft'
@@ -357,6 +365,15 @@ export class EvaluationWorkflowService {
       return [];
     }
 
+    let globalCaseCriteria: import('../case-criteria/caseCriteria.types.js').CaseCriterionRecord[] = [];
+    try {
+      const criteriaResult = await this.caseCriteria.listAll();
+      globalCaseCriteria = criteriaResult.items;
+    } catch (error) {
+      console.warn('Failed to load case criteria registry', error);
+      globalCaseCriteria = [];
+    }
+
     const evaluationMap = new Map<string, EvaluationRecord>();
     for (const assignment of assignments) {
       if (!evaluationMap.has(assignment.evaluationId)) {
@@ -414,9 +431,11 @@ export class EvaluationWorkflowService {
         invitationSentAt: assignment.invitationSentAt,
         evaluationUpdatedAt: evaluation?.updatedAt ?? assignment.createdAt,
         evaluationProcessStatus: evaluation?.processStatus ?? 'draft',
+        roundNumber: assignment.roundNumber,
         candidate: candidate ?? undefined,
         caseFolder: caseMap.get(assignment.caseFolderId) ?? undefined,
         fitQuestion: questionMap.get(assignment.fitQuestionId) ?? undefined,
+        caseCriteria: globalCaseCriteria,
         form
       } satisfies InterviewerAssignmentView;
     });
