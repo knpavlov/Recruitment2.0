@@ -361,13 +361,17 @@ export const InterviewerScreen = () => {
             : 'Candidate not assigned';
           const submitted = assignment.form?.submitted ?? false;
           const statusLabel = submitted ? 'Completed' : 'Assigned';
+          const roundNumber = assignment.roundNumber && assignment.roundNumber > 0 ? assignment.roundNumber : 1;
           return (
             <li
               key={assignment.slotId}
               className={`${styles.listItem} ${selectedSlot === assignment.slotId ? styles.listItemActive : ''}`}
               onClick={() => setSelectedSlot(assignment.slotId)}
             >
-              <div className={styles.listItemTitle}>{candidateName}</div>
+              <div className={styles.listItemTitleRow}>
+                <span className={styles.listItemTitle}>{candidateName}</span>
+                <span className={styles.roundBadge}>Round {roundNumber}</span>
+              </div>
               <div className={styles.listItemMetaRow}>
                 <span className={`${styles.statusPill} ${submitted ? styles.statusPillCompleted : styles.statusPillAssigned}`}>
                   {statusLabel}

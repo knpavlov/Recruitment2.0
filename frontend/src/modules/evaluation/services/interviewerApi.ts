@@ -329,6 +329,8 @@ const normalizeAssignment = (value: unknown): InterviewerAssignmentView | null =
     return null;
   }
 
+  const parsedRound = normalizeNumber(payload.roundNumber);
+
   return {
     evaluationId,
     slotId,
@@ -338,6 +340,7 @@ const normalizeAssignment = (value: unknown): InterviewerAssignmentView | null =
     evaluationUpdatedAt: normalizeIso(payload.evaluationUpdatedAt) ?? new Date().toISOString(),
     evaluationProcessStatus:
       (normalizeString(payload.evaluationProcessStatus) as InterviewerAssignmentView['evaluationProcessStatus']) ?? 'draft',
+    roundNumber: parsedRound && parsedRound > 0 ? parsedRound : 1,
     candidate: normalizeCandidate(payload.candidate),
     caseFolder: normalizeCaseFolder(payload.caseFolder),
     fitQuestion: normalizeFitQuestion(payload.fitQuestion),

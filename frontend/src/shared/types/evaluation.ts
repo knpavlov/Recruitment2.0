@@ -49,6 +49,26 @@ export interface EvaluationConfig {
   forms: InterviewStatusRecord[];
   processStatus: EvaluationProcessStatus;
   processStartedAt?: string;
+  roundHistory: EvaluationRoundSnapshot[];
+  invitationState: EvaluationInvitationState;
+}
+
+export interface EvaluationRoundSnapshot {
+  roundNumber: number;
+  interviewCount: number;
+  interviews: InterviewSlot[];
+  forms: InterviewStatusRecord[];
+  fitQuestionId?: string;
+  processStatus: EvaluationProcessStatus;
+  processStartedAt?: string;
+  completedAt?: string;
+  createdAt: string;
+}
+
+export interface EvaluationInvitationState {
+  hasInvitations: boolean;
+  hasPendingChanges: boolean;
+  lastSentAt?: string;
 }
 
 export interface InterviewerAssignmentView {
@@ -59,6 +79,7 @@ export interface InterviewerAssignmentView {
   invitationSentAt: string;
   evaluationUpdatedAt: string;
   evaluationProcessStatus: EvaluationProcessStatus;
+  roundNumber: number;
   candidate?: import('./candidate').CandidateProfile;
   caseFolder?: import('./caseLibrary').CaseFolder;
   fitQuestion?: import('./fitQuestion').FitQuestion;

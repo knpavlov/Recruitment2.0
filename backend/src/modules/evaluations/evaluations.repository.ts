@@ -7,7 +7,8 @@ import {
   InterviewStatusModel,
   InterviewAssignmentModel,
   InterviewAssignmentRecord,
-  EvaluationCriterionScore
+  EvaluationCriterionScore,
+  EvaluationRoundSnapshot
 } from './evaluations.types.js';
 
 interface EvaluationRow extends Record<string, unknown> {
@@ -23,6 +24,7 @@ interface EvaluationRow extends Record<string, unknown> {
   forms: unknown;
   process_status: string | null;
   process_started_at: Date | null;
+  round_history: unknown;
 }
 
 const mapSlots = (value: unknown): InterviewSlotModel[] => {
@@ -131,6 +133,66 @@ const mapForms = (value: unknown): InterviewStatusModel[] => {
   return forms;
 };
 
+const mapRoundHistory = (value: unknown): EvaluationRoundSnapshot[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const history: EvaluationRoundSnapshot[] = [];
+  for (const entry of value) {
+    if (!entry || typeof entry !== 'object') {
+      continue;
+    }
+    const item = entry as Record<string, unknown>;
+    const rawRoundNumber = item.roundNumber;
+    const roundNumber =
+      typeof rawRoundNumber === 'number' && Number.isInteger(rawRoundNumber) && rawRoundNumber > 0
+        ? rawRoundNumber
+        : undefined;
+    if (!roundNumber) {
+      continue;
+    }
+    const interviews = mapSlots(item.interviews);
+    const forms = mapForms(item.forms);
+    const interviewCount =
+      typeof item.interviewCount === 'number' && Number.isFinite(item.interviewCount)
+        ? item.interviewCount
+        : interviews.length;
+    const fitQuestionId =
+      typeof item.fitQuestionId === 'string' ? item.fitQuestionId.trim() || undefined : undefined;
+    const processStatus =
+      item.processStatus === 'completed' || item.processStatus === 'in-progress'
+        ? item.processStatus
+        : 'draft';
+    const processStartedAt =
+      typeof item.processStartedAt === 'string' && item.processStartedAt.trim()
+        ? new Date(item.processStartedAt).toISOString()
+        : undefined;
+    const completedAt =
+      typeof item.completedAt === 'string' && item.completedAt.trim()
+        ? new Date(item.completedAt).toISOString()
+        : undefined;
+    const createdAt =
+      typeof item.createdAt === 'string' && item.createdAt.trim()
+        ? new Date(item.createdAt).toISOString()
+        : new Date().toISOString();
+
+    history.push({
+      roundNumber,
+      interviewCount,
+      interviews,
+      forms,
+      fitQuestionId,
+      processStatus,
+      processStartedAt,
+      completedAt,
+      createdAt
+    });
+  }
+
+  return history;
+};
+
 const mapRowToRecord = (row: EvaluationRow): EvaluationRecord => {
   const interviews = mapSlots(row.interviews);
   const forms = mapForms(row.forms);
@@ -151,7 +213,9 @@ const mapRowToRecord = (row: EvaluationRow): EvaluationRecord => {
     updatedAt: row.updated_at.toISOString(),
     forms,
     processStatus: (row.process_status as EvaluationRecord['processStatus']) ?? 'draft',
-    processStartedAt: row.process_started_at ? row.process_started_at.toISOString() : undefined
+    processStartedAt: row.process_started_at ? row.process_started_at.toISOString() : undefined,
+    roundHistory: mapRoundHistory(row.round_history),
+    invitationState: { hasInvitations: false, hasPendingChanges: false }
   } satisfies EvaluationRecord;
 };
 
@@ -163,6 +227,7 @@ interface AssignmentRow extends Record<string, unknown> {
   interviewer_name: string;
   case_folder_id: string;
   fit_question_id: string;
+  round_number: number | null;
   invitation_sent_at: Date;
   created_at: Date;
 }
@@ -175,6 +240,9 @@ const mapRowToAssignment = (row: AssignmentRow): InterviewAssignmentRecord => ({
   interviewerName: row.interviewer_name,
   caseFolderId: row.case_folder_id,
   fitQuestionId: row.fit_question_id,
+  roundNumber: typeof row.round_number === 'number' && Number.isFinite(row.round_number)
+    ? row.round_number
+    : 1,
   invitationSentAt: row.invitation_sent_at.toISOString(),
   createdAt: row.created_at.toISOString()
 });
@@ -193,7 +261,8 @@ export class EvaluationsRepository {
               updated_at,
               forms,
               process_status,
-              process_started_at
+              process_started_at,
+              round_history
          FROM evaluations
         ORDER BY updated_at DESC, created_at DESC;`
     );
@@ -213,7 +282,8 @@ export class EvaluationsRepository {
               updated_at,
               forms,
               process_status,
-              process_started_at
+              process_started_at,
+              round_history
          FROM evaluations
         WHERE id = $1
         LIMIT 1;`,
@@ -228,10 +298,11 @@ export class EvaluationsRepository {
   async createEvaluation(model: EvaluationWriteModel): Promise<EvaluationRecord> {
     const interviewsJson = JSON.stringify(model.interviews);
     const formsJson = JSON.stringify(model.forms);
+    const historyJson = JSON.stringify(model.roundHistory ?? []);
 
     const result = await postgresPool.query<EvaluationRow>(
-      `INSERT INTO evaluations (id, candidate_id, round_number, interview_count, interviews, fit_question_id, version, created_at, updated_at, forms, process_status)
-         VALUES ($1, $2, $3, $4, $5::jsonb, $6, 1, NOW(), NOW(), $7::jsonb, $8)
+      `INSERT INTO evaluations (id, candidate_id, round_number, interview_count, interviews, fit_question_id, version, created_at, updated_at, forms, round_history, process_status, process_started_at)
+         VALUES ($1, $2, $3, $4, $5::jsonb, $6, 1, NOW(), NOW(), $7::jsonb, $8::jsonb, $9, $10)
       RETURNING id,
                 candidate_id,
                 round_number,
@@ -243,7 +314,8 @@ export class EvaluationsRepository {
                 updated_at,
                 forms,
                 process_status,
-                process_started_at;`,
+                process_started_at,
+                round_history;`,
       [
         model.id,
         model.candidateId ?? null,
@@ -252,7 +324,9 @@ export class EvaluationsRepository {
         interviewsJson,
         model.fitQuestionId ?? null,
         formsJson,
-        model.processStatus ?? 'draft'
+        historyJson,
+        model.processStatus ?? 'draft',
+        model.processStartedAt ?? null
       ]
     );
 
@@ -265,6 +339,7 @@ export class EvaluationsRepository {
   ): Promise<'version-conflict' | EvaluationRecord | null> {
     const interviewsJson = JSON.stringify(model.interviews);
     const formsJson = JSON.stringify(model.forms);
+    const historyJson = JSON.stringify(model.roundHistory ?? []);
 
     const result = await postgresPool.query<EvaluationRow>(
       `UPDATE evaluations
@@ -274,10 +349,12 @@ export class EvaluationsRepository {
               interviews = $4::jsonb,
               fit_question_id = $5,
               forms = $6::jsonb,
-              process_status = $7,
+              round_history = $7::jsonb,
+              process_status = $8,
+              process_started_at = $9,
               version = version + 1,
               updated_at = NOW()
-        WHERE id = $8 AND version = $9
+        WHERE id = $10 AND version = $11
       RETURNING id,
                 candidate_id,
                 round_number,
@@ -289,7 +366,8 @@ export class EvaluationsRepository {
                 updated_at,
                 forms,
                 process_status,
-                process_started_at;`,
+                process_started_at,
+                round_history;`,
       [
         model.candidateId ?? null,
         model.roundNumber ?? null,
@@ -297,7 +375,9 @@ export class EvaluationsRepository {
         interviewsJson,
         model.fitQuestionId ?? null,
         formsJson,
+        historyJson,
         model.processStatus ?? 'draft',
+        model.processStartedAt ?? null,
         model.id,
         expectedVersion
       ]
@@ -319,10 +399,15 @@ export class EvaluationsRepository {
     return result.rows.length > 0;
   }
 
-  async replaceAssignments(
+  async storeAssignments(
     evaluationId: string,
     assignments: InterviewAssignmentModel[],
-    status: EvaluationRecord['processStatus']
+    options: {
+      status: EvaluationRecord['processStatus'];
+      refreshSlotIds: string[];
+      updateStartedAt: boolean;
+      roundNumber: number;
+    }
   ): Promise<void> {
     const client = await (postgresPool as unknown as { connect: () => Promise<any> }).connect();
     try {
@@ -338,7 +423,18 @@ export class EvaluationsRepository {
         throw new Error('NOT_FOUND');
       }
 
-      await client.query('DELETE FROM evaluation_assignments WHERE evaluation_id = $1;', [evaluationId]);
+      const slotIds = assignments.map((assignment) => assignment.slotId);
+
+      await client.query(
+        `DELETE FROM evaluation_assignments
+          WHERE evaluation_id = $1
+            AND round_number = $2
+            AND NOT (slot_id = ANY($3::text[]));`,
+        [evaluationId, options.roundNumber, slotIds]
+      );
+
+      const refreshIds = Array.from(new Set(options.refreshSlotIds));
+      const roundNumber = options.roundNumber > 0 ? options.roundNumber : 1;
 
       for (const assignment of assignments) {
         const assignmentId = randomUUID();
@@ -351,16 +447,22 @@ export class EvaluationsRepository {
              interviewer_name,
              case_folder_id,
              fit_question_id,
+             round_number,
              invitation_sent_at,
              created_at
-           ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
            ON CONFLICT (evaluation_id, slot_id)
            DO UPDATE SET
              interviewer_email = EXCLUDED.interviewer_email,
              interviewer_name = EXCLUDED.interviewer_name,
              case_folder_id = EXCLUDED.case_folder_id,
              fit_question_id = EXCLUDED.fit_question_id,
-             invitation_sent_at = NOW();`,
+             round_number = EXCLUDED.round_number,
+             invitation_sent_at = CASE
+               WHEN EXCLUDED.slot_id = ANY($9::text[])
+                 THEN NOW()
+               ELSE evaluation_assignments.invitation_sent_at
+             END;`,
           [
             assignmentId,
             evaluationId,
@@ -368,7 +470,9 @@ export class EvaluationsRepository {
             assignment.interviewerEmail,
             assignment.interviewerName,
             assignment.caseFolderId,
-            assignment.fitQuestionId
+            assignment.fitQuestionId,
+            roundNumber,
+            refreshIds
           ]
         );
       }
@@ -376,10 +480,13 @@ export class EvaluationsRepository {
       await client.query(
         `UPDATE evaluations
             SET process_status = $2,
-                process_started_at = COALESCE(process_started_at, NOW()),
+                process_started_at = CASE
+                  WHEN $3::boolean IS TRUE THEN COALESCE(process_started_at, NOW())
+                  ELSE process_started_at
+                END,
                 updated_at = NOW()
           WHERE id = $1;`,
-        [evaluationId, status]
+        [evaluationId, options.status, options.updateStartedAt]
       );
 
       await client.query('COMMIT');
@@ -400,12 +507,33 @@ export class EvaluationsRepository {
               interviewer_name,
               case_folder_id,
               fit_question_id,
+              round_number,
               invitation_sent_at,
               created_at
          FROM evaluation_assignments
         WHERE lower(interviewer_email) = lower($1)
-        ORDER BY invitation_sent_at DESC, created_at DESC;`,
+        ORDER BY round_number DESC NULLS LAST, invitation_sent_at DESC, created_at DESC;`,
       [email]
+    );
+    return result.rows.map((row) => mapRowToAssignment(row));
+  }
+
+  async listAssignmentsForEvaluation(evaluationId: string): Promise<InterviewAssignmentRecord[]> {
+    const result = await postgresPool.query<AssignmentRow>(
+      `SELECT id,
+              evaluation_id,
+              slot_id,
+              interviewer_email,
+              interviewer_name,
+              case_folder_id,
+              fit_question_id,
+              round_number,
+              invitation_sent_at,
+              created_at
+         FROM evaluation_assignments
+        WHERE evaluation_id = $1
+        ORDER BY round_number DESC NULLS LAST, invitation_sent_at DESC, created_at DESC;`,
+      [evaluationId]
     );
     return result.rows.map((row) => mapRowToAssignment(row));
   }
@@ -422,6 +550,7 @@ export class EvaluationsRepository {
               interviewer_name,
               case_folder_id,
               fit_question_id,
+              round_number,
               invitation_sent_at,
               created_at
          FROM evaluation_assignments

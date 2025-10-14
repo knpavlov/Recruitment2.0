@@ -1,38 +1,53 @@
+import { ChangeEvent, useState } from 'react';
 import styles from '../../../styles/EvaluationScreen.module.css';
+
+type DecisionOption = 'offer' | 'progress' | 'reject';
+
+type SortableColumnKey = 'name' | 'position' | 'created' | 'round' | 'avgFit' | 'avgCase';
 
 export interface EvaluationTableRow {
   id: string;
   candidateName: string;
   candidatePosition: string;
-  roundNumber: number | null;
+  createdAt: string | null;
+  createdOn: string;
+  roundOptions: Array<{ value: number; label: string }>;
+  selectedRound: number;
+  roundNumber: number;
+  onRoundChange: (round: number) => void;
+  isHistoricalView: boolean;
   formsCompleted: number;
   formsPlanned: number;
   avgFitScore: number | null;
   avgCaseScore: number | null;
   offerSummary: string;
-  processStatus: 'draft' | 'in-progress' | 'completed';
-  onStartProcess: () => void;
-  startDisabled: boolean;
-  startTooltip?: string;
-  decisionDisabled: boolean;
-  decisionTooltip?: string;
+  processLabel: string;
+  invitesButtonLabel: string;
+  invitesDisabled: boolean;
+  invitesTooltip?: string;
+  invitesMenuAvailable: boolean;
+  onSendInvitesAll: () => void;
+  onSendInvitesUpdated: () => void;
   onEdit: () => void;
   onOpenStatus: () => void;
+  decisionDisabled: boolean;
+  decisionTooltip?: string;
+  decisionLabel: string;
+  decisionOption: DecisionOption | null;
+  onDecisionSelect: (option: DecisionOption) => void;
 }
 
 export interface EvaluationTableProps {
   rows: EvaluationTableRow[];
-  sortKey: 'name' | 'position' | 'round' | 'avgFit' | 'avgCase';
+  sortKey: SortableColumnKey;
   sortDirection: 'asc' | 'desc';
-  onSortChange: (key: 'name' | 'position' | 'round' | 'avgFit' | 'avgCase') => void;
+  onSortChange: (key: SortableColumnKey) => void;
 }
 
-const SORTABLE_COLUMNS: Array<{
-  key: 'name' | 'position' | 'round' | 'avgFit' | 'avgCase';
-  title: string;
-}> = [
+const SORTABLE_COLUMNS: Array<{ key: SortableColumnKey; title: string }> = [
   { key: 'name', title: 'Candidate' },
   { key: 'position', title: 'Position' },
+  { key: 'created', title: 'Created on' },
   { key: 'round', title: 'Round' },
   { key: 'avgFit', title: 'Avg fit score' },
   { key: 'avgCase', title: 'Avg case score' }
@@ -40,7 +55,34 @@ const SORTABLE_COLUMNS: Array<{
 
 const getSortLabel = (direction: 'asc' | 'desc') => (direction === 'asc' ? '▲' : '▼');
 
+const DECISION_OPTIONS: Array<{ option: DecisionOption; label: string }> = [
+  { option: 'offer', label: 'Offer' },
+  { option: 'progress', label: 'Progress to next round' },
+  { option: 'reject', label: 'Reject' }
+];
+
+const getDecisionClassName = (option: DecisionOption | null) => {
+  if (option === 'offer') {
+    return styles.decisionOffer;
+  }
+  if (option === 'reject') {
+    return styles.decisionReject;
+  }
+  if (option === 'progress') {
+    return styles.decisionProgress;
+  }
+  return styles.decisionNeutral;
+};
+
 export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: EvaluationTableProps) => {
+  const [openDecisionId, setOpenDecisionId] = useState<string | null>(null);
+  const [openInvitesId, setOpenInvitesId] = useState<string | null>(null);
+
+  const closeMenus = () => {
+    setOpenDecisionId(null);
+    setOpenInvitesId(null);
+  };
+
   if (rows.length === 0) {
     return (
       <div className={styles.tableWrapper}>
@@ -90,80 +132,151 @@ export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: 
         </thead>
         <tbody>
           {rows.map((row) => {
-            const roundLabel = row.roundNumber != null ? `Round ${row.roundNumber}` : '—';
             const formsLabel = `${row.formsCompleted}/${row.formsPlanned}`;
             const avgFitLabel = row.avgFitScore != null ? row.avgFitScore.toFixed(1) : '—';
             const avgCaseLabel = row.avgCaseScore != null ? row.avgCaseScore.toFixed(1) : '—';
-            const processLabel =
-              row.processStatus === 'in-progress'
-                ? 'In progress'
-                : row.processStatus === 'completed'
-                  ? 'Completed'
-                  : 'Draft';
+            const selectedRoundOption = row.roundOptions.find((option) => option.value === row.selectedRound);
+            const roundLabel = selectedRoundOption?.label ?? `Round ${row.selectedRound}`;
+            const isInvitesMenuOpen = openInvitesId === row.id;
+            const isDecisionMenuOpen = openDecisionId === row.id;
+            const decisionClassName = getDecisionClassName(row.decisionOption);
+
+            const handleRoundChange = (event: ChangeEvent<HTMLSelectElement>) => {
+              closeMenus();
+              row.onRoundChange(Number(event.target.value));
+            };
+
+            const handleInvitesClick = () => {
+              if (row.invitesDisabled) {
+                return;
+              }
+              if (!row.invitesMenuAvailable) {
+                closeMenus();
+                row.onSendInvitesAll();
+                return;
+              }
+              setOpenDecisionId(null);
+              setOpenInvitesId((current) => (current === row.id ? null : row.id));
+            };
+
+            const handleDecisionToggle = () => {
+              if (row.decisionDisabled) {
+                return;
+              }
+              setOpenInvitesId(null);
+              setOpenDecisionId((current) => (current === row.id ? null : row.id));
+            };
+
+            const handleDecisionSelect = (option: DecisionOption) => {
+              closeMenus();
+              row.onDecisionSelect(option);
+            };
+
             return (
               <tr key={row.id}>
                 <td>{row.candidateName}</td>
                 <td>{row.candidatePosition}</td>
-                <td>{roundLabel}</td>
+                <td>{row.createdOn}</td>
+                <td>
+                  {row.roundOptions.length > 1 ? (
+                    <select value={row.selectedRound} onChange={handleRoundChange} className={styles.roundSelect}>
+                      {row.roundOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    roundLabel
+                  )}
+                </td>
                 <td>{avgFitLabel}</td>
                 <td>{avgCaseLabel}</td>
                 <td>{formsLabel}</td>
                 <td>{row.offerSummary}</td>
-                <td>{processLabel}</td>
+                <td>{row.processLabel}</td>
                 <td className={styles.actionsCell}>
-                  <div className={styles.actionGroup}>
+                  <div className={styles.actionsRow}>
+                    <div className={styles.buttonWithMenu}>
+                      <button
+                        type="button"
+                        className={`${styles.actionButton} ${styles.neutralButton}`}
+                        onClick={handleInvitesClick}
+                        disabled={row.invitesDisabled}
+                        data-tooltip={row.invitesDisabled ? row.invitesTooltip : undefined}
+                      >
+                        {row.invitesButtonLabel}
+                      </button>
+                      {row.invitesMenuAvailable && isInvitesMenuOpen && (
+                        <div className={styles.dropdownMenu}>
+                          <button
+                            type="button"
+                            className={styles.dropdownItem}
+                            onClick={() => {
+                              closeMenus();
+                              row.onSendInvitesAll();
+                            }}
+                          >
+                            Send invites to all interviewers
+                          </button>
+                          <button
+                            type="button"
+                            className={styles.dropdownItem}
+                            onClick={() => {
+                              closeMenus();
+                              row.onSendInvitesUpdated();
+                            }}
+                          >
+                            Send invites only to updated interviewers
+                          </button>
+                        </div>
+                      )}
+                    </div>
                     <button
                       type="button"
                       className={`${styles.actionButton} ${styles.neutralButton}`}
-                      onClick={row.onStartProcess}
-                      disabled={row.startDisabled}
-                      data-tooltip={row.startDisabled ? row.startTooltip : undefined}
-                    >
-                      Start process
-                    </button>
-                    <button
-                      type="button"
-                      className={`${styles.actionButton} ${styles.neutralButton}`}
-                      onClick={row.onEdit}
+                      onClick={() => {
+                        closeMenus();
+                        row.onEdit();
+                      }}
                     >
                       Edit
                     </button>
                     <button
                       type="button"
                       className={`${styles.actionButton} ${styles.neutralButton}`}
-                      onClick={row.onOpenStatus}
+                      onClick={() => {
+                        closeMenus();
+                        row.onOpenStatus();
+                      }}
                     >
-                      Status
+                      Results
                     </button>
-                  </div>
-                  <div className={`${styles.actionGroup} ${styles.decisionGroup}`}>
-                    <button
-                      type="button"
-                      className={`${styles.actionButton} ${styles.offerButton}`}
-                      disabled={row.decisionDisabled}
-                      data-tooltip={row.decisionDisabled ? row.decisionTooltip : undefined}
-                      onClick={() => {}}
-                    >
-                      Offer
-                    </button>
-                    <button
-                      type="button"
-                      className={`${styles.actionButton} ${styles.progressButton}`}
-                      disabled={row.decisionDisabled}
-                      data-tooltip={row.decisionDisabled ? row.decisionTooltip : undefined}
-                      onClick={() => {}}
-                    >
-                      Progress to next round
-                    </button>
-                    <button
-                      type="button"
-                      className={`${styles.actionButton} ${styles.rejectButton}`}
-                      disabled={row.decisionDisabled}
-                      data-tooltip={row.decisionDisabled ? row.decisionTooltip : undefined}
-                      onClick={() => {}}
-                    >
-                      Reject
-                    </button>
+                    <div className={styles.buttonWithMenu}>
+                      <button
+                        type="button"
+                        className={`${styles.actionButton} ${styles.decisionButton} ${decisionClassName}`}
+                        onClick={handleDecisionToggle}
+                        disabled={row.decisionDisabled}
+                        data-tooltip={row.decisionDisabled ? row.decisionTooltip : undefined}
+                      >
+                        {row.decisionLabel}
+                      </button>
+                      {isDecisionMenuOpen && (
+                        <div className={styles.dropdownMenu}>
+                          {DECISION_OPTIONS.map((item) => (
+                            <button
+                              key={item.option}
+                              type="button"
+                              className={styles.dropdownItem}
+                              onClick={() => handleDecisionSelect(item.option)}
+                            >
+                              {item.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </td>
               </tr>

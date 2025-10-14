@@ -44,7 +44,12 @@ const createDefaultConfig = (): EvaluationConfig => {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     forms: interviews.map((slot) => createStatusRecord(slot)),
-    processStatus: 'draft'
+    processStatus: 'draft',
+    roundHistory: [],
+    invitationState: {
+      hasInvitations: false,
+      hasPendingChanges: true
+    }
   };
 };
 
@@ -108,7 +113,16 @@ export const EvaluationModal = ({
           ? { ...existing, interviewerName: slot.interviewerName || existing.interviewerName }
           : createStatusRecord(slot);
       });
-      return { ...prev, interviews, interviewCount: interviews.length, forms };
+      return {
+        ...prev,
+        interviews,
+        interviewCount: interviews.length,
+        forms,
+        invitationState: {
+          ...(prev.invitationState ?? { hasInvitations: false, hasPendingChanges: true }),
+          hasPendingChanges: true
+        }
+      };
     });
   };
 
