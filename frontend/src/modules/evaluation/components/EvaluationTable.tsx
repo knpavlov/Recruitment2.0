@@ -33,6 +33,7 @@ export interface EvaluationTableRow {
   decisionDisabled: boolean;
   decisionTooltip?: string;
   decisionLabel: string;
+  decisionSelection: DecisionOption | null;
   onDecisionSelect: (option: DecisionOption) => void;
 }
 
@@ -59,6 +60,12 @@ const DECISION_OPTIONS: Array<{ option: DecisionOption; label: string }> = [
   { option: 'progress', label: 'Progress to next round' },
   { option: 'reject', label: 'Reject' }
 ];
+
+const DECISION_TONE_CLASS: Record<DecisionOption, string> = {
+  offer: styles.decisionButtonOffer,
+  progress: styles.decisionButtonProgress,
+  reject: styles.decisionButtonReject
+};
 
 export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: EvaluationTableProps) => {
   const [openDecisionId, setOpenDecisionId] = useState<string | null>(null);
@@ -157,6 +164,11 @@ export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: 
               row.onDecisionSelect(option);
             };
 
+            const decisionButtonClasses = [styles.actionButton, styles.decisionButton];
+            if (row.decisionSelection) {
+              decisionButtonClasses.push(DECISION_TONE_CLASS[row.decisionSelection]);
+            }
+
             return (
               <tr key={row.id}>
                 <td>{row.candidateName}</td>
@@ -235,12 +247,12 @@ export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: 
                         row.onOpenStatus();
                       }}
                     >
-                      Status
+                      Results
                     </button>
-                    <div className={styles.buttonWithMenu}>
+                    <div className={`${styles.buttonWithMenu} ${styles.decisionButtonWrapper}`}>
                       <button
                         type="button"
-                        className={`${styles.actionButton} ${styles.decisionButton}`}
+                        className={decisionButtonClasses.join(' ')}
                         onClick={handleDecisionToggle}
                         disabled={row.decisionDisabled}
                         data-tooltip={row.decisionDisabled ? row.decisionTooltip : undefined}
