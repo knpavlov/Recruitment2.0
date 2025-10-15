@@ -27,6 +27,14 @@ const handleError = (error: unknown, res: Response) => {
         .status(503)
         .json({ code: 'mailer-unavailable', message: 'Email service is not configured. Cannot notify interviewers.' });
       return;
+    case 'ASSIGNMENT_RESOURCES_MISSING':
+      res
+        .status(400)
+        .json({
+          code: 'assignment-resources-missing',
+          message: 'Some interviews reference deleted cases or fit questions. Update the evaluation configuration and try again.'
+        });
+      return;
     case 'INVALID_PORTAL_URL':
       res
         .status(503)

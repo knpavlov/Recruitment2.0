@@ -16,6 +16,8 @@ import type { CasesService } from '../cases/cases.service.js';
 import type { QuestionsService } from '../questions/questions.service.js';
 
 const normalizeEmail = (value: string): string => value.trim().toLowerCase();
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const isUuid = (value: string): boolean => UUID_PATTERN.test(value);
 
 const resolvePortalBaseUrl = (override?: string): string => {
   const candidates = [override, process.env.INTERVIEW_PORTAL_URL].map((value) => value?.trim()).filter(Boolean) as string[];
@@ -142,6 +144,18 @@ export class EvaluationWorkflowService {
       if (!email || !caseId || !questionId) {
         throw new Error('MISSING_ASSIGNMENT_DATA');
       }
+      if (!isUuid(caseId) || !isUuid(questionId)) {
+        console.warn(
+          'Невозможно отправить инвайт: слот содержит некорректные ссылки на кейс или fit-вопрос',
+          {
+            evaluationId: evaluation.id,
+            slotId: slot.id,
+            caseId,
+            questionId
+          }
+        );
+        throw new Error('MISSING_ASSIGNMENT_DATA');
+      }
       assignments.push({
         slotId: slot.id,
         interviewerEmail: email,
@@ -160,22 +174,89 @@ export class EvaluationWorkflowService {
   }
 
   private async loadContext(assignments: InterviewAssignmentModel[], evaluation: EvaluationRecord) {
-    const candidate = evaluation.candidateId ? await this.candidates.getCandidate(evaluation.candidateId) : null;
+    const candidate = await this.loadCandidate(evaluation.candidateId);
 
     const uniqueCaseIds = Array.from(new Set(assignments.map((item) => item.caseFolderId)));
     const uniqueQuestionIds = Array.from(new Set(assignments.map((item) => item.fitQuestionId)));
 
     const caseMap = new Map<string, Awaited<ReturnType<CasesService['getFolder']>> | null>();
     for (const id of uniqueCaseIds) {
-      caseMap.set(id, await this.cases.getFolder(id));
+      const folder = await this.loadCaseFolder(id);
+      caseMap.set(id, folder);
     }
 
     const questionMap = new Map<string, Awaited<ReturnType<QuestionsService['getQuestion']>> | null>();
     for (const id of uniqueQuestionIds) {
-      questionMap.set(id, await this.questions.getQuestion(id));
+      const question = await this.loadFitQuestion(id);
+      questionMap.set(id, question);
+    }
+
+    const missingCases = Array.from(caseMap.entries())
+      .filter(([, value]) => value === null)
+      .map(([id]) => id);
+    const missingQuestions = Array.from(questionMap.entries())
+      .filter(([, value]) => value === null)
+      .map(([id]) => id);
+
+    if (missingCases.length > 0 || missingQuestions.length > 0) {
+      console.warn('Невозможно отправить инвайт: отсутствуют материалы интервью', {
+        evaluationId: evaluation.id,
+        missingCases,
+        missingQuestions
+      });
+      throw new Error('ASSIGNMENT_RESOURCES_MISSING');
     }
 
     return { candidate, caseMap, questionMap };
+  }
+
+  private async loadCandidate(
+    id: string | undefined
+  ): Promise<Awaited<ReturnType<CandidatesService['getCandidate']>> | null> {
+    if (!id) {
+      return null;
+    }
+    try {
+      return await this.candidates.getCandidate(id);
+    } catch (error) {
+      if (this.isMissingResourceError(error)) {
+        console.warn('Не удалось загрузить кандидата для интервью', id, error);
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  private async loadCaseFolder(
+    id: string
+  ): Promise<Awaited<ReturnType<CasesService['getFolder']>> | null> {
+    try {
+      return await this.cases.getFolder(id);
+    } catch (error) {
+      if (this.isMissingResourceError(error)) {
+        console.warn('Не удалось загрузить кейс для интервью', id, error);
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  private async loadFitQuestion(
+    id: string
+  ): Promise<Awaited<ReturnType<QuestionsService['getQuestion']>> | null> {
+    try {
+      return await this.questions.getQuestion(id);
+    } catch (error) {
+      if (this.isMissingResourceError(error)) {
+        console.warn('Не удалось загрузить fit-вопрос для интервью', id, error);
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  private isMissingResourceError(error: unknown): boolean {
+    return error instanceof Error && (error.message === 'NOT_FOUND' || error.message === 'INVALID_INPUT');
   }
 
   private async deliverInvitations(
@@ -281,14 +362,35 @@ export class EvaluationWorkflowService {
       }
     }
 
-    await this.evaluations.storeAssignments(trimmed, assignments, {
-      status: 'in-progress',
-      refreshSlotIds,
-      updateStartedAt: evaluation.processStatus === 'draft',
-      roundNumber: evaluation.roundNumber ?? 1
-    });
+    try {
+      await this.evaluations.storeAssignments(trimmed, assignments, {
+        status: 'in-progress',
+        refreshSlotIds,
+        updateStartedAt: evaluation.processStatus === 'draft',
+        roundNumber: evaluation.roundNumber ?? 1
+      });
+    } catch (error) {
+      if (this.isInvalidAssignmentReference(error)) {
+        throw new Error('MISSING_ASSIGNMENT_DATA');
+      }
+      throw error;
+    }
 
     return this.loadEvaluationWithState(trimmed);
+  }
+
+  private isInvalidAssignmentReference(error: unknown): boolean {
+    if (!error || typeof error !== 'object') {
+      return false;
+    }
+    const code = (error as { code?: unknown }).code;
+    if (code === '22P02') {
+      return true;
+    }
+    if (error instanceof Error && /invalid input syntax for type uuid/i.test(error.message)) {
+      return true;
+    }
+    return false;
   }
 
   async advanceRound(id: string): Promise<EvaluationRecord> {
