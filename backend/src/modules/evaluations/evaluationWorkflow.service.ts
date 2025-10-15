@@ -284,7 +284,8 @@ export class EvaluationWorkflowService {
     await this.evaluations.storeAssignments(trimmed, assignments, {
       status: 'in-progress',
       refreshSlotIds,
-      updateStartedAt: evaluation.processStatus === 'draft'
+      updateStartedAt: evaluation.processStatus === 'draft',
+      roundNumber: evaluation.roundNumber ?? 1
     });
 
     return this.loadEvaluationWithState(trimmed);
@@ -404,16 +405,27 @@ export class EvaluationWorkflowService {
 
     return assignments.map((assignment) => {
       const evaluation = evaluationMap.get(assignment.evaluationId);
-      const form = evaluation?.forms.find((item) => item.slotId === assignment.slotId) ?? null;
+      const currentForm = evaluation?.forms.find((item) => item.slotId === assignment.slotId) ?? null;
+      const snapshot = evaluation?.roundHistory.find(
+        (entry) => entry.roundNumber === assignment.roundNumber
+      );
+      const historicalForm = snapshot?.forms.find((item) => item.slotId === assignment.slotId) ?? null;
+      const form = currentForm ?? historicalForm;
       const candidate = evaluation?.candidateId ? candidateMap.get(evaluation.candidateId) ?? undefined : undefined;
+      const processStatus =
+        assignment.roundNumber === (evaluation?.roundNumber ?? assignment.roundNumber)
+          ? evaluation?.processStatus ?? 'draft'
+          : snapshot?.processStatus ?? 'completed';
+      const evaluationUpdatedAt = snapshot?.completedAt ?? evaluation?.updatedAt ?? assignment.createdAt;
       return {
         evaluationId: assignment.evaluationId,
         slotId: assignment.slotId,
         interviewerEmail: assignment.interviewerEmail,
         interviewerName: assignment.interviewerName,
         invitationSentAt: assignment.invitationSentAt,
-        evaluationUpdatedAt: evaluation?.updatedAt ?? assignment.createdAt,
-        evaluationProcessStatus: evaluation?.processStatus ?? 'draft',
+        roundNumber: assignment.roundNumber,
+        evaluationUpdatedAt,
+        evaluationProcessStatus: processStatus,
         candidate: candidate ?? undefined,
         caseFolder: caseMap.get(assignment.caseFolderId) ?? undefined,
         fitQuestion: questionMap.get(assignment.fitQuestionId) ?? undefined,

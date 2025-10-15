@@ -185,10 +185,16 @@ const createTables = async () => {
       interviewer_name TEXT NOT NULL,
       case_folder_id UUID NOT NULL,
       fit_question_id UUID NOT NULL,
+      round_number INTEGER NOT NULL DEFAULT 1,
       invitation_sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       UNIQUE (evaluation_id, slot_id)
     );
+  `);
+
+  await postgresPool.query(`
+    ALTER TABLE evaluation_assignments
+      ADD COLUMN IF NOT EXISTS round_number INTEGER NOT NULL DEFAULT 1;
   `);
 
   await postgresPool.query(`

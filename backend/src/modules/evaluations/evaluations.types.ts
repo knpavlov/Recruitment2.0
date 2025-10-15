@@ -69,6 +69,7 @@ export interface EvaluationInvitationState {
 export interface InterviewAssignmentRecord extends InterviewAssignmentModel {
   id: string;
   evaluationId: string;
+  roundNumber: number;
   invitationSentAt: string;
   createdAt: string;
 }
@@ -109,6 +110,7 @@ export interface InterviewerAssignmentView {
   interviewerEmail: string;
   interviewerName: string;
   invitationSentAt: string;
+  roundNumber: number;
   evaluationUpdatedAt: string;
   evaluationProcessStatus: EvaluationProcessStatus;
   candidate?: CandidateRecord;

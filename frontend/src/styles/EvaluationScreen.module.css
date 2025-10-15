@@ -97,10 +97,18 @@
 }
 
 .actionsCell {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+  padding: 0;
+}
+
+.actionsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
   align-items: stretch;
+}
+
+.actionCell {
+  display: flex;
 }
 
 .actionButton {
@@ -108,7 +116,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 10px 16px;
+  padding: 8px 16px;
   border-radius: 12px;
   border: none;
   font-size: 14px;
@@ -140,12 +148,6 @@
   background: rgba(148, 163, 184, 0.12);
   color: #64748b;
   border-color: rgba(148, 163, 184, 0.28);
-}
-
-.actionsRow {
-  display: grid;
-  gap: 12px;
-  align-items: stretch;
 }
 
 .buttonWithMenu {
@@ -228,11 +230,8 @@
 
 
 @media (max-width: 960px) {
-  .actionsCell {
-    gap: 12px;
-  }
-
-  .actionsRow {
+  .actionsGrid {
+    grid-template-columns: 1fr;
     gap: 10px;
   }
 
