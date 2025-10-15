@@ -160,22 +160,73 @@ export class EvaluationWorkflowService {
   }
 
   private async loadContext(assignments: InterviewAssignmentModel[], evaluation: EvaluationRecord) {
-    const candidate = evaluation.candidateId ? await this.candidates.getCandidate(evaluation.candidateId) : null;
+    const candidate = await this.loadCandidate(evaluation.candidateId);
 
     const uniqueCaseIds = Array.from(new Set(assignments.map((item) => item.caseFolderId)));
     const uniqueQuestionIds = Array.from(new Set(assignments.map((item) => item.fitQuestionId)));
 
     const caseMap = new Map<string, Awaited<ReturnType<CasesService['getFolder']>> | null>();
     for (const id of uniqueCaseIds) {
-      caseMap.set(id, await this.cases.getFolder(id));
+      const folder = await this.loadCaseFolder(id);
+      caseMap.set(id, folder);
     }
 
     const questionMap = new Map<string, Awaited<ReturnType<QuestionsService['getQuestion']>> | null>();
     for (const id of uniqueQuestionIds) {
-      questionMap.set(id, await this.questions.getQuestion(id));
+      const question = await this.loadFitQuestion(id);
+      questionMap.set(id, question);
     }
 
     return { candidate, caseMap, questionMap };
+  }
+
+  private async loadCandidate(
+    id: string | undefined
+  ): Promise<Awaited<ReturnType<CandidatesService['getCandidate']>> | null> {
+    if (!id) {
+      return null;
+    }
+    try {
+      return await this.candidates.getCandidate(id);
+    } catch (error) {
+      if (this.isMissingResourceError(error)) {
+        console.warn('Не удалось загрузить кандидата для интервью', id, error);
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  private async loadCaseFolder(
+    id: string
+  ): Promise<Awaited<ReturnType<CasesService['getFolder']>> | null> {
+    try {
+      return await this.cases.getFolder(id);
+    } catch (error) {
+      if (this.isMissingResourceError(error)) {
+        console.warn('Не удалось загрузить кейс для интервью', id, error);
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  private async loadFitQuestion(
+    id: string
+  ): Promise<Awaited<ReturnType<QuestionsService['getQuestion']>> | null> {
+    try {
+      return await this.questions.getQuestion(id);
+    } catch (error) {
+      if (this.isMissingResourceError(error)) {
+        console.warn('Не удалось загрузить fit-вопрос для интервью', id, error);
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  private isMissingResourceError(error: unknown): boolean {
+    return error instanceof Error && (error.message === 'NOT_FOUND' || error.message === 'INVALID_INPUT');
   }
 
   private async deliverInvitations(
