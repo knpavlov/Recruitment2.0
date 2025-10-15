@@ -229,6 +229,9 @@ interface AssignmentRow extends Record<string, unknown> {
   fit_question_id: string;
   invitation_sent_at: Date;
   created_at: Date;
+  round_number: number | null;
+  is_active: boolean | null;
+  archived_at: Date | null;
 }
 
 const mapRowToAssignment = (row: AssignmentRow): InterviewAssignmentRecord => ({
@@ -240,7 +243,10 @@ const mapRowToAssignment = (row: AssignmentRow): InterviewAssignmentRecord => ({
   caseFolderId: row.case_folder_id,
   fitQuestionId: row.fit_question_id,
   invitationSentAt: row.invitation_sent_at.toISOString(),
-  createdAt: row.created_at.toISOString()
+  createdAt: row.created_at.toISOString(),
+  roundNumber: typeof row.round_number === 'number' && Number.isFinite(row.round_number) ? row.round_number : 1,
+  isActive: row.is_active !== false,
+  archivedAt: row.archived_at ? row.archived_at.toISOString() : undefined
 });
 
 export class EvaluationsRepository {
@@ -402,6 +408,7 @@ export class EvaluationsRepository {
       status: EvaluationRecord['processStatus'];
       refreshSlotIds: string[];
       updateStartedAt: boolean;
+      roundNumber: number;
     }
   ): Promise<void> {
     const client = await (postgresPool as unknown as { connect: () => Promise<any> }).connect();
@@ -421,8 +428,16 @@ export class EvaluationsRepository {
       const slotIds = assignments.map((assignment) => assignment.slotId);
 
       await client.query(
-        'DELETE FROM evaluation_assignments WHERE evaluation_id = $1 AND NOT (slot_id = ANY($2::text[]));',
-        [evaluationId, slotIds]
+        `UPDATE evaluation_assignments
+            SET is_active = FALSE,
+                archived_at = COALESCE(archived_at, NOW())
+          WHERE evaluation_id = $1
+            AND (
+              round_number <> $2
+              OR NOT (slot_id = ANY($3::text[]))
+            )
+            AND is_active IS DISTINCT FROM FALSE;`,
+        [evaluationId, options.roundNumber, slotIds]
       );
 
       const refreshIds = Array.from(new Set(options.refreshSlotIds));
@@ -438,17 +453,22 @@ export class EvaluationsRepository {
              interviewer_name,
              case_folder_id,
              fit_question_id,
+             round_number,
+             is_active,
              invitation_sent_at,
              created_at
-           ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
-           ON CONFLICT (evaluation_id, slot_id)
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE, NOW(), NOW())
+           ON CONFLICT (evaluation_id, slot_id, round_number)
            DO UPDATE SET
              interviewer_email = EXCLUDED.interviewer_email,
              interviewer_name = EXCLUDED.interviewer_name,
              case_folder_id = EXCLUDED.case_folder_id,
              fit_question_id = EXCLUDED.fit_question_id,
+             round_number = EXCLUDED.round_number,
+             is_active = TRUE,
+             archived_at = NULL,
              invitation_sent_at = CASE
-               WHEN EXCLUDED.slot_id = ANY($8::text[])
+               WHEN EXCLUDED.slot_id = ANY($9::text[])
                  THEN NOW()
                ELSE evaluation_assignments.invitation_sent_at
              END;`,
@@ -460,6 +480,7 @@ export class EvaluationsRepository {
             assignment.interviewerName,
             assignment.caseFolderId,
             assignment.fitQuestionId,
+            options.roundNumber,
             refreshIds
           ]
         );
@@ -496,10 +517,13 @@ export class EvaluationsRepository {
               case_folder_id,
               fit_question_id,
               invitation_sent_at,
-              created_at
+              created_at,
+              round_number,
+              is_active,
+              archived_at
          FROM evaluation_assignments
         WHERE lower(interviewer_email) = lower($1)
-        ORDER BY invitation_sent_at DESC, created_at DESC;`,
+        ORDER BY is_active DESC, round_number DESC, invitation_sent_at DESC, created_at DESC;`,
       [email]
     );
     return result.rows.map((row) => mapRowToAssignment(row));
@@ -515,9 +539,12 @@ export class EvaluationsRepository {
               case_folder_id,
               fit_question_id,
               invitation_sent_at,
-              created_at
+              created_at,
+              round_number,
+              is_active,
+              archived_at
          FROM evaluation_assignments
-        WHERE evaluation_id = $1
+        WHERE evaluation_id = $1 AND is_active IS DISTINCT FROM FALSE
         ORDER BY invitation_sent_at DESC, created_at DESC;`,
       [evaluationId]
     );
@@ -537,9 +564,12 @@ export class EvaluationsRepository {
               case_folder_id,
               fit_question_id,
               invitation_sent_at,
-              created_at
+              created_at,
+              round_number,
+              is_active,
+              archived_at
          FROM evaluation_assignments
-        WHERE evaluation_id = $1 AND slot_id = $2
+        WHERE evaluation_id = $1 AND slot_id = $2 AND is_active IS DISTINCT FROM FALSE
         LIMIT 1;`,
       [evaluationId, slotId]
     );

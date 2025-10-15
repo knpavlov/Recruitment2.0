@@ -3,4 +3,5 @@ node_modules
 .vscode
 .DS_Store
 dist
+frontend/dist-tests
 *.log

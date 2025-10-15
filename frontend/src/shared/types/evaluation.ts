@@ -72,6 +72,7 @@ export interface EvaluationInvitationState {
 }
 
 export interface InterviewerAssignmentView {
+  assignmentId: string;
   evaluationId: string;
   slotId: string;
   interviewerEmail: string;
@@ -83,4 +84,7 @@ export interface InterviewerAssignmentView {
   caseFolder?: import('./caseLibrary').CaseFolder;
   fitQuestion?: import('./fitQuestion').FitQuestion;
   form: InterviewStatusRecord | null;
+  roundNumber: number;
+  isActive: boolean;
+  archivedAt?: string;
 }

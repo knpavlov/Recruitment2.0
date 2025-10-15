@@ -65,6 +65,23 @@
   margin-bottom: 4px;
 }
 
+.listItemHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.roundPill {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(250, 204, 21, 0.16);
+  color: #92400e;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .listItemMetaRow {
   display: flex;
   align-items: center;
@@ -98,6 +115,12 @@
   background: #dcfce7;
   color: #166534;
   border-color: #bbf7d0;
+}
+
+.statusPillArchived {
+  background: #e2e8f0;
+  color: #475569;
+  border-color: #cbd5f5;
 }
 
 .detailPanel {
@@ -154,6 +177,11 @@
 .badgeSuccess {
   background: #dcfce7;
   color: #166534;
+}
+
+.badgeArchived {
+  background: #e2e8f0;
+  color: #475569;
 }
 
 .detailMeta {

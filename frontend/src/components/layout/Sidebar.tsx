@@ -1,6 +1,13 @@
 import { NavigationItem, NavigationKey } from '../../app/navigation';
 import styles from '../../styles/Sidebar.module.css';
 import { useAuth } from '../../modules/auth/AuthContext';
+import { AccountRole } from '../../shared/types/account';
+
+const roleLabels: Record<AccountRole, string> = {
+  'super-admin': 'Super admin',
+  admin: 'Admin',
+  user: 'User'
+};
 
 interface SidebarProps {
   navigationItems: NavigationItem[];
@@ -32,7 +39,12 @@ export const Sidebar = ({ navigationItems, activeItem, onNavigate }: SidebarProp
         ))}
       </nav>
       <div className={styles.logoutBlock}>
-        {session && <p className={styles.sessionInfo}>{session.email}</p>}
+        {session && (
+          <div className={styles.accountInfo}>
+            <p className={styles.sessionEmail}>{session.email}</p>
+            <span className={styles.roleBadge}>{roleLabels[session.role]}</span>
+          </div>
+        )}
         <button
           className={styles.logoutButton}
           onClick={() => logout()}
