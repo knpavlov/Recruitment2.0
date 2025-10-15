@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { CaseFolder, CaseFileRecord } from '../../../shared/types/caseLibrary';
 import styles from '../../../styles/CasesScreen.module.css';
+import { formatAustralianDate } from '../../../shared/utils/dateFormat';
 
 interface CaseFolderCardProps {
   folder: CaseFolder;
@@ -67,7 +68,7 @@ export const CaseFolderCard = ({ folder, onRename, onDelete, onUpload, onRemoveF
       <div className={styles.fileInfo}>
         <p className={styles.fileName}>{file.fileName}</p>
         <p className={styles.fileMeta}>
-          {Math.round(file.size / 1024)} KB · {new Date(file.uploadedAt).toLocaleString('en-US')}
+          {Math.round(file.size / 1024)} KB · {formatAustralianDate(file.uploadedAt)}
         </p>
       </div>
       <div className={styles.fileActionsInline}>
@@ -150,7 +151,7 @@ export const CaseFolderCard = ({ folder, onRename, onDelete, onUpload, onRemoveF
       </header>
 
       <div className={styles.folderMetaRow}>
-        <span>Updated: {new Date(folder.updatedAt).toLocaleString('en-US')}</span>
+        <span>Updated: {formatAustralianDate(folder.updatedAt)}</span>
         <span>Version: {folder.version}</span>
       </div>
 

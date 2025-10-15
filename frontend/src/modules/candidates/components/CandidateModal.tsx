@@ -8,6 +8,7 @@ import styles from '../../../styles/CandidateModal.module.css';
 import { generateId } from '../../../shared/ui/generateId';
 import { convertFileToResume } from '../services/resumeAdapter';
 import { parseResumeText } from '../services/resumeParser';
+import { formatAustralianDate } from '../../../shared/utils/dateFormat';
 
 interface CandidateModalProps {
   initialProfile: CandidateProfile | null;
@@ -183,7 +184,7 @@ export const CandidateModal = ({
                   <p className={styles.resumeName}>{resume.fileName}</p>
                 </a>
                 <p className={styles.resumeMeta}>
-                  Uploaded {new Date(resume.uploadedAt).toLocaleString('en-US')} · {(resume.size / 1024).toFixed(1)} KB
+                  Uploaded {formatAustralianDate(resume.uploadedAt)} · {(resume.size / 1024).toFixed(1)} KB
                 </p>
               </>
             ) : (

@@ -10,6 +10,7 @@ import {
 import { CaseFolder } from '../../shared/types/caseLibrary';
 import { ApiError } from '../../shared/api/httpClient';
 import { useCaseCriteriaState } from '../../app/state/AppStateContext';
+import { formatAustralianDate } from '../../shared/utils/dateFormat';
 
 interface Banner {
   type: 'info' | 'error';
@@ -118,16 +119,7 @@ const createFormState = (assignment: InterviewerAssignmentView | null): FormStat
   };
 };
 
-const formatDateTime = (value: string | undefined) => {
-  if (!value) {
-    return '—';
-  }
-  try {
-    return new Date(value).toLocaleString('en-US');
-  } catch {
-    return value;
-  }
-};
+const formatDate = (value: string | undefined) => formatAustralianDate(value);
 
 const OFFER_OPTIONS: Array<{ value: OfferRecommendationValue; label: string }> = [
   { value: 'yes_priority', label: 'Yes, priority' },
@@ -160,6 +152,8 @@ const formatScoreValue = (value: number | null | undefined): string => {
   }
   return (Math.round(value * 10) / 10).toFixed(1);
 };
+
+const getAssignmentStatusLabel = (submitted: boolean) => (submitted ? 'Completed' : 'Assigned');
 
 const CASE_CRITERIA_ORDER = [
   'Conceptual problem solving / Problem Structuring and Framing',
@@ -362,7 +356,7 @@ export const InterviewerScreen = () => {
             ? `${assignment.candidate.lastName} ${assignment.candidate.firstName}`.trim()
             : 'Candidate not assigned';
           const submitted = assignment.form?.submitted ?? false;
-          const statusLabel = submitted ? 'Completed' : 'Assigned';
+          const statusLabel = getAssignmentStatusLabel(submitted);
           const roundLabel = `Round ${assignment.roundNumber}`;
           return (
             <li
@@ -376,7 +370,7 @@ export const InterviewerScreen = () => {
                 <span className={`${styles.statusPill} ${submitted ? styles.statusPillCompleted : styles.statusPillAssigned}`}>
                   {statusLabel}
                 </span>
-                <span className={styles.listItemMetaText}>Assigned {formatDateTime(assignment.invitationSentAt)}</span>
+                <span className={styles.listItemMetaText}>Assigned {formatDate(assignment.invitationSentAt)}</span>
               </div>
             </li>
           );
@@ -439,7 +433,7 @@ export const InterviewerScreen = () => {
     );
     const roundLabel = `Round ${selectedAssignment.roundNumber}`;
     const submittedAtLabel = selectedAssignment.form?.submittedAt
-      ? formatDateTime(selectedAssignment.form?.submittedAt)
+      ? formatDate(selectedAssignment.form?.submittedAt)
       : null;
     const storedFitScore =
       typeof selectedAssignment.form?.fitScore === 'number' && Number.isFinite(selectedAssignment.form?.fitScore)
@@ -467,8 +461,12 @@ export const InterviewerScreen = () => {
               {targetOffice && <span className={styles.detailMetaItem}>Target office: {targetOffice}</span>}
             </div>
           </div>
-          <span className={`${styles.badge} ${isSubmitted ? styles.badgeSuccess : ''}`}>
-            {isSubmitted ? 'Submitted' : 'In progress'}
+          <span
+            className={`${styles.statusPill} ${styles.detailStatusPill} ${
+              isSubmitted ? styles.statusPillCompleted : styles.statusPillAssigned
+            }`}
+          >
+            {getAssignmentStatusLabel(isSubmitted)}
           </span>
         </div>
         <div className={styles.detailColumns}>

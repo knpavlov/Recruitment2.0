@@ -1,4 +1,5 @@
 import styles from '../../../styles/CandidatesScreen.module.css';
+import { formatAustralianDate } from '../../../shared/utils/dateFormat';
 
 export type CandidateSortKey =
   | 'firstName'
@@ -39,14 +40,6 @@ interface CandidateTableProps {
   sortDirection: 'asc' | 'desc';
   onSortChange: (key: CandidateSortKey) => void;
 }
-
-const formatDate = (input: string) => {
-  const date = new Date(input);
-  return new Intl.DateTimeFormat('en-US', {
-    dateStyle: 'medium',
-    timeStyle: 'short'
-  }).format(date);
-};
 
 const SORTABLE_COLUMNS: Array<{ key: CandidateSortKey; title: string }> = [
   { key: 'firstName', title: 'First name' },
@@ -115,7 +108,7 @@ export const CandidateTable = ({ rows, sortDirection, sortKey, onSortChange }: C
               <td>{row.phone}</td>
               <td>{row.email}</td>
               <td>{row.totalExperience}</td>
-              <td>{formatDate(row.updatedAt)}</td>
+              <td>{formatAustralianDate(row.updatedAt)}</td>
               <td>
                 {row.hasResume ? (
                   <button

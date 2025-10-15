@@ -11,6 +11,7 @@ import {
 } from '../../app/state/AppStateContext';
 import { EvaluationConfig } from '../../shared/types/evaluation';
 import { EvaluationTable, EvaluationTableRow } from './components/EvaluationTable';
+import { formatAustralianDate } from '../../shared/utils/dateFormat';
 
 type Banner = { type: 'info' | 'error'; text: string } | null;
 
@@ -156,10 +157,7 @@ export const EvaluationScreen = () => {
       const candidateName = metadata?.name ?? 'Not selected';
       const candidatePosition = metadata?.position ?? '—';
       const createdAtIso = evaluation.createdAt ?? null;
-      const createdDate = createdAtIso ? new Date(createdAtIso) : null;
-      const createdOn = createdDate && !Number.isNaN(createdDate.getTime())
-        ? createdDate.toLocaleDateString('ru-RU')
-        : '—';
+      const createdOn = formatAustralianDate(createdAtIso);
 
       const currentRound = evaluation.roundNumber ?? 1;
       const storedSelection = roundSelections[evaluation.id];

@@ -1,5 +1,6 @@
 import { FitQuestion } from '../../../shared/types/fitQuestion';
 import styles from '../../../styles/FitQuestionCard.module.css';
+import { formatAustralianDate } from '../../../shared/utils/dateFormat';
 
 interface FitQuestionCardProps {
   question: FitQuestion;
@@ -8,11 +9,7 @@ interface FitQuestionCardProps {
 
 export const FitQuestionCard = ({ question, onOpen }: FitQuestionCardProps) => {
   // Форматируем дату обновления для карточки
-  const updatedAt = new Date(question.updatedAt);
-  const formatted = new Intl.DateTimeFormat('en-US', {
-    dateStyle: 'medium',
-    timeStyle: 'short'
-  }).format(updatedAt);
+  const formatted = formatAustralianDate(question.updatedAt);
 
   return (
     <button className={styles.card} onClick={onOpen}>
