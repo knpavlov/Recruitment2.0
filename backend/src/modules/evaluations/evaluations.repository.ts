@@ -232,6 +232,29 @@ interface AssignmentRow extends Record<string, unknown> {
   created_at: Date;
 }
 
+interface ExistingAssignmentRow extends Record<string, unknown> {
+  id: string;
+  slot_id: string;
+  invitation_sent_at: Date;
+  created_at: Date;
+  round_number: number | null;
+}
+
+const normalizeRoundNumber = (value: unknown): number => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    const normalized = Math.trunc(value);
+    return normalized > 0 ? normalized : 1;
+  }
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      const normalized = Math.trunc(parsed);
+      return normalized > 0 ? normalized : 1;
+    }
+  }
+  return 1;
+};
+
 const mapRowToAssignment = (row: AssignmentRow): InterviewAssignmentRecord => ({
   id: row.id,
   evaluationId: row.evaluation_id,
@@ -240,7 +263,7 @@ const mapRowToAssignment = (row: AssignmentRow): InterviewAssignmentRecord => ({
   interviewerName: row.interviewer_name,
   caseFolderId: row.case_folder_id,
   fitQuestionId: row.fit_question_id,
-  roundNumber: Number(row.round_number ?? 1) || 1,
+  roundNumber: normalizeRoundNumber(row.round_number),
   invitationSentAt: row.invitation_sent_at.toISOString(),
   createdAt: row.created_at.toISOString()
 });
@@ -421,57 +444,113 @@ export class EvaluationsRepository {
         throw new Error('NOT_FOUND');
       }
 
-      const slotIds = assignments.map((assignment) => assignment.slotId);
-      const normalizedRound = Number.isFinite(options.roundNumber)
-        ? Math.max(1, Math.trunc(options.roundNumber))
-        : 1;
+      const normalizedRound = normalizeRoundNumber(options.roundNumber);
 
-      await client.query(
-        'DELETE FROM evaluation_assignments WHERE evaluation_id = $1 AND round_number = $3 AND NOT (slot_id = ANY($2::text[]));',
-        [evaluationId, slotIds, normalizedRound]
+      // Загружаем все назначения для оценки, чтобы аккуратно переиспользовать существующие строки
+      const existingAssignmentsResult = await client.query(
+        `SELECT id, slot_id, round_number, invitation_sent_at, created_at
+           FROM evaluation_assignments
+          WHERE evaluation_id = $1;`,
+        [evaluationId]
       );
 
-      const refreshIds = Array.from(new Set(options.refreshSlotIds));
+      const existingRows = (existingAssignmentsResult.rows as ExistingAssignmentRow[]).map((row) => ({
+        id: row.id,
+        slotId: row.slot_id,
+        invitationSentAt: row.invitation_sent_at,
+        createdAt: row.created_at,
+        roundNumber: normalizeRoundNumber(row.round_number)
+      }));
+
+      const existingBySlot = new Map(existingRows.map((row) => [row.slotId, row]));
+
+      const refreshIdSet = new Set(
+        (options.refreshSlotIds ?? [])
+          .filter((id): id is string => typeof id === 'string')
+          .map((id) => id.trim())
+          .filter((id) => id.length > 0)
+      );
+
+      const slotIds = assignments.map((assignment) => assignment.slotId);
+      const slotIdSet = new Set(slotIds);
+
+      // Удаляем только те записи текущего раунда, которые больше не привязаны ни к одному слоту
+      const staleIds = existingRows
+        .filter((row) => row.roundNumber === normalizedRound && !slotIdSet.has(row.slotId))
+        .map((row) => row.id);
+
+      if (staleIds.length > 0) {
+        await client.query(
+          `DELETE FROM evaluation_assignments
+            WHERE id = ANY($1::uuid[]);`,
+          [Array.from(new Set(staleIds))]
+        );
+      }
 
       for (const assignment of assignments) {
-        const assignmentId = randomUUID();
-        await client.query(
-          `INSERT INTO evaluation_assignments (
-             id,
-             evaluation_id,
-             slot_id,
-             interviewer_email,
-             interviewer_name,
-             case_folder_id,
-             fit_question_id,
-             round_number,
-             invitation_sent_at,
-             created_at
-           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
-           ON CONFLICT (evaluation_id, slot_id)
-           DO UPDATE SET
-             interviewer_email = EXCLUDED.interviewer_email,
-             interviewer_name = EXCLUDED.interviewer_name,
-             case_folder_id = EXCLUDED.case_folder_id,
-             fit_question_id = EXCLUDED.fit_question_id,
-             round_number = EXCLUDED.round_number,
-             invitation_sent_at = CASE
-               WHEN EXCLUDED.slot_id = ANY($9::text[])
-                 THEN NOW()
-              ELSE evaluation_assignments.invitation_sent_at
-            END;`,
-          [
-            assignmentId,
-            evaluationId,
-            assignment.slotId,
-            assignment.interviewerEmail,
-            assignment.interviewerName,
-            assignment.caseFolderId,
-            assignment.fitQuestionId,
-            normalizedRound,
-            refreshIds
-          ]
-        );
+        const existing = existingBySlot.get(assignment.slotId);
+        const shouldRefresh = refreshIdSet.has(assignment.slotId) || !existing;
+
+        if (existing) {
+          await client.query(
+            `UPDATE evaluation_assignments
+                SET interviewer_email = $2,
+                    interviewer_name = $3,
+                    case_folder_id = $4,
+                    fit_question_id = $5,
+                    round_number = $6,
+                    invitation_sent_at = CASE
+                      WHEN $7::boolean THEN NOW()
+                      ELSE invitation_sent_at
+                    END
+              WHERE id = $1;`,
+            [
+              existing.id,
+              assignment.interviewerEmail,
+              assignment.interviewerName,
+              assignment.caseFolderId,
+              assignment.fitQuestionId,
+              normalizedRound,
+              shouldRefresh
+            ]
+          );
+        } else {
+          await client.query(
+            `INSERT INTO evaluation_assignments (
+               id,
+               evaluation_id,
+               slot_id,
+               interviewer_email,
+               interviewer_name,
+               case_folder_id,
+               fit_question_id,
+               round_number,
+               invitation_sent_at,
+               created_at
+             ) VALUES (
+               $1,
+               $2,
+               $3,
+               $4,
+               $5,
+               $6,
+               $7,
+               $8,
+               NOW(),
+               NOW()
+             );`,
+            [
+              randomUUID(),
+              evaluationId,
+              assignment.slotId,
+              assignment.interviewerEmail,
+              assignment.interviewerName,
+              assignment.caseFolderId,
+              assignment.fitQuestionId,
+              normalizedRound
+            ]
+          );
+        }
       }
 
       await client.query(
