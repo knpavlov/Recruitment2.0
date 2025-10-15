@@ -36,11 +36,15 @@ interface SummaryCellDetail {
   text: string;
 }
 
+type SummaryTableCellEmphasis = 'default' | 'note';
+
 interface SummaryTableCell {
   primary?: string;
   secondary?: string | null;
   tone?: SummaryCellTone;
   details?: SummaryCellDetail[];
+  emphasis?: SummaryTableCellEmphasis;
+  muted?: boolean;
 }
 
 interface SummaryTableRowData {
@@ -129,30 +133,6 @@ const buildInterviewerColumns = (evaluation: EvaluationConfig): InterviewerColum
   return columns;
 };
 
-const collectInterviewerComments = (
-  form: EvaluationConfig['forms'][number] | undefined
-): SummaryCellDetail[] => {
-  if (!form) {
-    return [];
-  }
-
-  const entries: SummaryCellDetail[] = [];
-  const addEntry = (label: string, value: string | undefined | null) => {
-    const trimmed = value?.trim();
-    if (trimmed) {
-      entries.push({ label, text: trimmed });
-    }
-  };
-
-  addEntry('Fit notes', form.fitNotes);
-  addEntry('Case notes', form.caseNotes);
-  addEntry('Interest level notes', form.interestNotes);
-  addEntry('Issues to test in next interview', form.issuesToTest);
-  addEntry('General notes', form.notes);
-
-  return entries;
-};
-
 const buildGeneralRows = (columns: InterviewerColumn[]): SummaryTableRowData[] => {
   const statusRow: SummaryTableRowData = {
     label: 'Status',
@@ -189,18 +169,61 @@ const buildGeneralRows = (columns: InterviewerColumn[]): SummaryTableRowData[] =
     }))
   };
 
-  const commentsRow: SummaryTableRowData = {
-    label: 'Interviewer comments',
-    cells: columns.map((column) => {
-      const details = collectInterviewerComments(column.form);
-      if (details.length === 0) {
-        return { primary: '—' };
-      }
-      return { details };
-    })
-  };
+  return [statusRow, fitScoreRow, caseScoreRow, offerRow];
+};
 
-  return [statusRow, fitScoreRow, caseScoreRow, offerRow, commentsRow];
+const COMMENT_DESCRIPTORS: Array<{
+  id: string;
+  label: string;
+  extract: (form: EvaluationConfig['forms'][number] | undefined) => string | undefined | null;
+}> = [
+  {
+    id: 'fit-notes',
+    label: 'Fit notes',
+    extract: (form) => form?.fitNotes
+  },
+  {
+    id: 'case-notes',
+    label: 'Case notes',
+    extract: (form) => form?.caseNotes
+  },
+  {
+    id: 'interest-notes',
+    label: 'Interest level notes',
+    extract: (form) => form?.interestNotes
+  },
+  {
+    id: 'issues-next-interview',
+    label: 'Issues to test next',
+    extract: (form) => form?.issuesToTest
+  },
+  {
+    id: 'general-notes',
+    label: 'General notes',
+    extract: (form) => form?.notes
+  }
+];
+
+const buildCommentRows = (columns: InterviewerColumn[]): SummaryTableRowData[] => {
+  const rows: SummaryTableRowData[] = [];
+
+  COMMENT_DESCRIPTORS.forEach((descriptor) => {
+    const cells = columns.map((column) => {
+      const raw = descriptor.extract(column.form);
+      const text = raw?.trim();
+      if (text && text.length > 0) {
+        return { primary: text, emphasis: 'note' } satisfies SummaryTableCell;
+      }
+      return { primary: '—', emphasis: 'note', muted: true } satisfies SummaryTableCell;
+    });
+
+    const hasContent = cells.some((cell) => cell.primary && cell.primary !== '—');
+    if (hasContent) {
+      rows.push({ label: descriptor.label, cells });
+    }
+  });
+
+  return rows;
 };
 
 const buildCriteriaRows = (
@@ -261,6 +284,11 @@ export const EvaluationStatusModal = ({
   const summarySections: SummaryTableSection[] = [];
   if (interviewerColumns.length > 0) {
     summarySections.push({ title: 'Overall summary', rows: buildGeneralRows(interviewerColumns) });
+
+    const commentRows = buildCommentRows(interviewerColumns);
+    if (commentRows.length > 0) {
+      summarySections.push({ title: 'Interviewer comments', rows: commentRows });
+    }
 
     const fitCriteriaRows = buildCriteriaRows(
       interviewerColumns,
@@ -334,7 +362,7 @@ export const EvaluationStatusModal = ({
                       <tr>
                         <th scope="col">Criteria</th>
                         {interviewerColumns.map((column) => (
-                          <th scope="col" key={column.id}>
+                          <th scope="col" key={column.id} className={styles.summaryTableColumn}>
                             {column.label}
                           </th>
                         ))}
@@ -350,7 +378,10 @@ export const EvaluationStatusModal = ({
                             <tr key={row.label}>
                               <th scope="row">{row.label}</th>
                               {row.cells.map((cell, index) => (
-                                <td key={`${section.title}-${row.label}-${interviewerColumns[index].id}`}>
+                                <td
+                                  key={`${section.title}-${row.label}-${interviewerColumns[index].id}`}
+                                  className={styles.summaryTableColumn}
+                                >
                                   <div className={styles.summaryTableCell}>
                                     {cell.tone ? (
                                       <span
@@ -364,7 +395,17 @@ export const EvaluationStatusModal = ({
                                       </span>
                                     ) : (
                                       cell.primary && (
-                                        <span className={styles.summaryTablePrimary}>{cell.primary}</span>
+                                        <span
+                                          className={
+                                            `${
+                                              cell.emphasis === 'note'
+                                                ? styles.summaryTablePrimaryNote
+                                                : styles.summaryTablePrimary
+                                            } ${cell.muted ? styles.summaryTablePrimaryMuted : ''}`.trim()
+                                          }
+                                        >
+                                          {cell.primary}
+                                        </span>
                                       )
                                     )}
                                     {cell.details && (

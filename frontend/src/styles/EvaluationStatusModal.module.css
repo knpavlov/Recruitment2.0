@@ -10,7 +10,7 @@
 }
 
 .modal {
-  width: min(1180px, 100%);
+  width: min(1320px, 95vw);
   max-height: 100%;
   overflow: auto;
   background: #f8fafc;
@@ -135,7 +135,7 @@
 .summaryTable {
   width: 100%;
   border-collapse: collapse;
-  min-width: 720px;
+  min-width: 920px;
 }
 
 .summaryTable thead th {
@@ -150,6 +150,10 @@
   text-align: left;
   border-bottom: 1px solid rgba(203, 213, 225, 0.4);
   vertical-align: top;
+}
+
+.summaryTableColumn {
+  min-width: 220px;
 }
 
 .summaryTableGroupRow td {
@@ -168,6 +172,18 @@
 .summaryTablePrimary {
   font-weight: 600;
   color: #0f172a;
+}
+
+.summaryTablePrimaryNote {
+  font-weight: 500;
+  color: #1e293b;
+  font-size: 14px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.summaryTablePrimaryMuted {
+  color: #94a3b8;
 }
 
 .summaryTableSecondary {
