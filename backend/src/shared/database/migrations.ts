@@ -220,6 +220,53 @@ const createTables = async () => {
       ADD COLUMN IF NOT EXISTS fit_question_id UUID;
   `);
 
+  // Удаляем возможные дубликаты назначений до добавления уникального ограничения
+  await postgresPool.query(`
+    WITH ranked_assignments AS (
+      SELECT
+        id,
+        ROW_NUMBER() OVER (
+          PARTITION BY evaluation_id, slot_id
+          ORDER BY invitation_sent_at DESC NULLS LAST, created_at DESC, id DESC
+        ) AS row_num
+      FROM evaluation_assignments
+    )
+    DELETE FROM evaluation_assignments ea
+    USING ranked_assignments ranked
+    WHERE ea.id = ranked.id
+      AND ranked.row_num > 1;
+  `);
+
+  // Гарантируем уникальность пары (evaluation_id, slot_id) даже в старых схемах
+  await postgresPool.query(`
+    DO $$
+    DECLARE
+      has_constraint BOOLEAN;
+    BEGIN
+      SELECT EXISTS (
+        SELECT 1
+          FROM pg_constraint c
+          JOIN LATERAL (
+            SELECT array_agg(att.attname ORDER BY att.attname) AS columns
+              FROM unnest(c.conkey) AS attr(attnum)
+              JOIN pg_attribute att
+                ON att.attrelid = c.conrelid
+               AND att.attnum = attr.attnum
+          ) cols ON TRUE
+         WHERE c.conrelid = 'evaluation_assignments'::regclass
+           AND c.contype = 'u'
+           AND cols.columns = ARRAY['evaluation_id', 'slot_id']
+      ) INTO has_constraint;
+
+      IF NOT has_constraint THEN
+        ALTER TABLE evaluation_assignments
+          ADD CONSTRAINT evaluation_assignments_evaluation_slot_unique
+            UNIQUE (evaluation_id, slot_id);
+      END IF;
+    END;
+    $$;
+  `);
+
   await postgresPool.query(`
     WITH slot_data AS (
       SELECT
