@@ -421,20 +421,55 @@ export class EvaluationsRepository {
         throw new Error('NOT_FOUND');
       }
 
-      const slotIds = assignments.map((assignment) => assignment.slotId);
       const normalizedRound = Number.isFinite(options.roundNumber)
         ? Math.max(1, Math.trunc(options.roundNumber))
         : 1;
 
-      await client.query(
-        'DELETE FROM evaluation_assignments WHERE evaluation_id = $1 AND round_number = $3 AND NOT (slot_id = ANY($2::text[]));',
-        [evaluationId, slotIds, normalizedRound]
+      const refreshIdSet = new Set(
+        (options.refreshSlotIds ?? [])
+          .filter((id): id is string => typeof id === 'string')
+          .map((id) => id.trim())
+          .filter((id) => id.length > 0)
       );
 
-      const refreshIds = Array.from(new Set(options.refreshSlotIds));
+      // Перечитываем текущие назначения раунда, чтобы сохранить идентификаторы и временные метки
+      const existingAssignmentsResult = await client.query(
+        `SELECT id,
+                slot_id,
+                invitation_sent_at,
+                created_at
+           FROM evaluation_assignments
+          WHERE evaluation_id = $1 AND round_number = $2
+          FOR UPDATE;`,
+        [evaluationId, normalizedRound]
+      );
+
+      const existingBySlot = new Map(
+        (existingAssignmentsResult.rows as Array<{
+          id: string;
+          slot_id: string;
+          invitation_sent_at: Date;
+          created_at: Date;
+        }>).map((row) => [row.slot_id, row])
+      );
+
+      // Полностью пересобираем набор назначений для раунда в рамках транзакции
+      await client.query(
+        `DELETE FROM evaluation_assignments
+          WHERE evaluation_id = $1 AND round_number = $2;`,
+        [evaluationId, normalizedRound]
+      );
 
       for (const assignment of assignments) {
-        const assignmentId = randomUUID();
+        const existing = existingBySlot.get(assignment.slotId);
+        const assignmentId = existing?.id ?? randomUUID();
+        const shouldRefresh = refreshIdSet.has(assignment.slotId) || !existing;
+        const timestamp = new Date();
+        const createdAt = existing?.created_at ?? timestamp;
+        const invitationSentAt = shouldRefresh
+          ? timestamp
+          : existing?.invitation_sent_at ?? timestamp;
+
         await client.query(
           `INSERT INTO evaluation_assignments (
              id,
@@ -447,19 +482,7 @@ export class EvaluationsRepository {
              round_number,
              invitation_sent_at,
              created_at
-           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
-           ON CONFLICT (evaluation_id, slot_id)
-           DO UPDATE SET
-             interviewer_email = EXCLUDED.interviewer_email,
-             interviewer_name = EXCLUDED.interviewer_name,
-             case_folder_id = EXCLUDED.case_folder_id,
-             fit_question_id = EXCLUDED.fit_question_id,
-             round_number = EXCLUDED.round_number,
-             invitation_sent_at = CASE
-               WHEN EXCLUDED.slot_id = ANY($9::text[])
-                 THEN NOW()
-              ELSE evaluation_assignments.invitation_sent_at
-            END;`,
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);`,
           [
             assignmentId,
             evaluationId,
@@ -469,7 +492,8 @@ export class EvaluationsRepository {
             assignment.caseFolderId,
             assignment.fitQuestionId,
             normalizedRound,
-            refreshIds
+            invitationSentAt,
+            createdAt
           ]
         );
       }
