@@ -35,6 +35,9 @@ const handleError = (error: unknown, res: Response) => {
           message: 'Some referenced cases or fit questions are no longer available. Reassign interviews before sending invites.'
         });
       return;
+    case 'INVALID_INVITATION_TARGETS':
+      res.status(400).json({ code: 'invalid-invitation-targets', message: 'Select at least one interviewer to notify.' });
+      return;
     case 'MAILER_UNAVAILABLE':
       res
         .status(503)
@@ -47,6 +50,14 @@ const handleError = (error: unknown, res: Response) => {
           code: 'invalid-portal-url',
           message:
             'Provide a valid interviewer portal URL (environment override or request origin) that interviewers can access.'
+        });
+      return;
+    case 'INVITATION_DELIVERY_FAILED':
+      res
+        .status(502)
+        .json({
+          code: 'invitation-delivery-failed',
+          message: 'Some invitations were not delivered. Check email addresses and try again.'
         });
       return;
     case 'VERSION_CONFLICT':
@@ -86,13 +97,15 @@ router.post('/:id/start', async (req, res) => {
 
 router.post('/:id/invitations', async (req, res) => {
   try {
-    const body = (req.body ?? {}) as { scope?: unknown; portalBaseUrl?: unknown };
-    const scope = body.scope === 'updated' ? 'updated' : 'all';
+    const body = (req.body ?? {}) as { slotIds?: unknown; portalBaseUrl?: unknown };
+    const slotIds = Array.isArray(body.slotIds)
+      ? body.slotIds.filter((value): value is string => typeof value === 'string')
+      : undefined;
     const portalBaseUrl = typeof body.portalBaseUrl === 'string' ? body.portalBaseUrl.trim() : undefined;
     const requestOrigin = req.get('origin');
     const resolvedBase = portalBaseUrl && portalBaseUrl.length > 0 ? portalBaseUrl : requestOrigin;
     const evaluation = await evaluationWorkflowService.sendInvitations(req.params.id, {
-      scope,
+      slotIds,
       portalBaseUrl: resolvedBase
     });
     res.json(evaluation);

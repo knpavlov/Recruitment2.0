@@ -11,6 +11,8 @@ export type DomainErrorCode =
   | 'invalid-assignment-resources'
   | 'access-denied'
   | 'invalid-portal-url'
+  | 'invalid-invitation-targets'
+  | 'invitation-delivery-failed'
   | 'form-locked'
   | 'unknown';
 

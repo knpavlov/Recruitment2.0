@@ -16,52 +16,33 @@ export const computeInvitationState = (
   );
   const slotMap = new Map(evaluation.interviews.map((slot) => [slot.id, slot]));
   const matchingAssignments = currentAssignments.filter((assignment) => slotMap.has(assignment.slotId));
+  const assignmentBySlot = new Map(matchingAssignments.map((assignment) => [assignment.slotId, assignment]));
   const hasInvitations = matchingAssignments.length > 0;
 
-  let hasPendingChanges = false;
+  const slotStates = evaluation.interviews.map((slot) => {
+    const assignment = assignmentBySlot.get(slot.id) ?? null;
+    const sameEmail = assignment
+      ? normalize(slot.interviewerEmail) === normalize(assignment.interviewerEmail)
+      : false;
+    const sameCase = (slot.caseFolderId ?? '') === (assignment?.caseFolderId ?? '');
+    const sameQuestion = (slot.fitQuestionId ?? '') === (assignment?.fitQuestionId ?? '');
+    const slotName = (slot.interviewerName ?? '').trim();
+    const assignmentName = (assignment?.interviewerName ?? '').trim();
+    const sameName = slotName === assignmentName;
+    const hasPendingChanges = !assignment || !sameEmail || !sameCase || !sameQuestion || !sameName;
+    return {
+      slotId: slot.id,
+      interviewerName: slot.interviewerName,
+      interviewerEmail: slot.interviewerEmail,
+      lastSentAt: assignment?.invitationSentAt ?? undefined,
+      hasPendingChanges
+    };
+  });
 
-  if (!hasInvitations) {
-    hasPendingChanges = true;
-  }
-
-  if (!hasPendingChanges) {
-    for (const [slotId, slot] of slotMap.entries()) {
-      const assignment = matchingAssignments.find((item) => item.slotId === slotId);
-      if (!assignment) {
-        hasPendingChanges = true;
-        break;
-      }
-      if (normalize(slot.interviewerEmail) !== normalize(assignment.interviewerEmail)) {
-        hasPendingChanges = true;
-        break;
-      }
-      const slotCase = slot.caseFolderId ?? '';
-      const assignmentCase = assignment.caseFolderId ?? '';
-      if (slotCase !== assignmentCase) {
-        hasPendingChanges = true;
-        break;
-      }
-      const slotFit = slot.fitQuestionId ?? '';
-      const assignmentFit = assignment.fitQuestionId ?? '';
-      if (slotFit !== assignmentFit) {
-        hasPendingChanges = true;
-        break;
-      }
-      const slotName = (slot.interviewerName ?? '').trim();
-      const assignmentName = (assignment.interviewerName ?? '').trim();
-      if (slotName !== assignmentName) {
-        hasPendingChanges = true;
-        break;
-      }
-    }
-  }
-
-  if (!hasPendingChanges) {
-    const currentSlotIds = new Set(slotMap.keys());
-    if (currentAssignments.some((assignment) => !currentSlotIds.has(assignment.slotId))) {
-      hasPendingChanges = true;
-    }
-  }
+  const hasPendingChanges =
+    !hasInvitations ||
+    slotStates.some((slot) => slot.hasPendingChanges) ||
+    currentAssignments.some((assignment) => !slotMap.has(assignment.slotId));
 
   const lastSentAt = matchingAssignments.length
     ? matchingAssignments
@@ -73,6 +54,7 @@ export const computeInvitationState = (
   return {
     hasInvitations,
     hasPendingChanges,
-    lastSentAt: lastSentAt ? new Date(lastSentAt).toISOString() : undefined
+    lastSentAt: lastSentAt ? new Date(lastSentAt).toISOString() : undefined,
+    slots: slotStates
   };
 };

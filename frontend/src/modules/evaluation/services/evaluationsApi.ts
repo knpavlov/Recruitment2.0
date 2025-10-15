@@ -100,16 +100,37 @@ const normalizeRoundHistory = (value: unknown): EvaluationRoundSnapshot[] => {
   return rounds.sort((a, b) => a.roundNumber - b.roundNumber);
 };
 
+const normalizeInvitationSlot = (value: unknown): EvaluationInvitationState['slots'][number] | null => {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const payload = value as Record<string, unknown>;
+  const slotId = normalizeString(payload.slotId)?.trim();
+  if (!slotId) {
+    return null;
+  }
+  const interviewerName = normalizeString(payload.interviewerName) ?? 'Interviewer';
+  const interviewerEmail = normalizeString(payload.interviewerEmail) ?? '';
+  const lastSentAt = normalizeIsoString(payload.lastSentAt) ?? undefined;
+  const hasPendingChanges = typeof payload.hasPendingChanges === 'boolean' ? payload.hasPendingChanges : false;
+  return { slotId, interviewerName, interviewerEmail, lastSentAt, hasPendingChanges };
+};
+
 const normalizeInvitationState = (value: unknown): EvaluationInvitationState => {
   if (!value || typeof value !== 'object') {
-    return { hasInvitations: false, hasPendingChanges: true };
+    return { hasInvitations: false, hasPendingChanges: true, slots: [] };
   }
   const payload = value as Record<string, unknown>;
   const hasInvitations = typeof payload.hasInvitations === 'boolean' ? payload.hasInvitations : false;
   const hasPendingChanges =
     typeof payload.hasPendingChanges === 'boolean' ? payload.hasPendingChanges : !hasInvitations;
   const lastSentAt = normalizeIsoString(payload.lastSentAt) ?? undefined;
-  return { hasInvitations, hasPendingChanges, lastSentAt };
+  const slots = Array.isArray(payload.slots)
+    ? payload.slots
+        .map((item) => normalizeInvitationSlot(item))
+        .filter((slot): slot is EvaluationInvitationState['slots'][number] => Boolean(slot))
+    : [];
+  return { hasInvitations, hasPendingChanges, lastSentAt, slots };
 };
 
 const normalizeSlot = (value: unknown): InterviewSlot | null => {
@@ -392,11 +413,14 @@ export const evaluationsApi = {
       method: 'POST',
       body: { portalBaseUrl: computePortalBaseUrl() }
     }),
-  sendInvitations: async (id: string, scope: 'all' | 'updated') =>
+  sendInvitations: async (
+    id: string,
+    options?: { slotIds?: string[] }
+  ) =>
     ensureEvaluation(
       await apiRequest<unknown>(`/evaluations/${id}/invitations`, {
         method: 'POST',
-        body: { scope, portalBaseUrl: computePortalBaseUrl() }
+        body: { slotIds: options?.slotIds, portalBaseUrl: computePortalBaseUrl() }
       })
     ),
   advance: async (id: string) =>

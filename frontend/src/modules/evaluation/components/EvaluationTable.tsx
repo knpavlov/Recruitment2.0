@@ -25,9 +25,9 @@ export interface EvaluationTableRow {
   invitesButtonLabel: string;
   invitesDisabled: boolean;
   invitesTooltip?: string;
-  invitesMenuAvailable: boolean;
-  onSendInvitesAll: () => void;
-  onSendInvitesUpdated: () => void;
+  invitesMode: 'initial' | 'resend';
+  onSendInvites: () => void;
+  onOpenResend?: () => void;
   onEdit: () => void;
   onOpenStatus: () => void;
   decisionDisabled: boolean;
@@ -63,11 +63,9 @@ const DECISION_OPTIONS: Array<{ option: DecisionOption; label: string }> = [
 
 export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: EvaluationTableProps) => {
   const [openDecisionId, setOpenDecisionId] = useState<string | null>(null);
-  const [openInvitesId, setOpenInvitesId] = useState<string | null>(null);
 
   const closeMenus = () => {
     setOpenDecisionId(null);
-    setOpenInvitesId(null);
   };
 
   if (rows.length === 0) {
@@ -124,7 +122,6 @@ export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: 
             const avgCaseLabel = row.avgCaseScore != null ? row.avgCaseScore.toFixed(1) : '—';
             const selectedRoundOption = row.roundOptions.find((option) => option.value === row.selectedRound);
             const roundLabel = selectedRoundOption?.label ?? `Round ${row.selectedRound}`;
-            const isInvitesMenuOpen = openInvitesId === row.id;
             const isDecisionMenuOpen = openDecisionId === row.id;
             const decisionButtonClassName = `${styles.actionButton} ${styles.decisionButton} ${
               row.decisionState === 'offer'
@@ -145,20 +142,18 @@ export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: 
               if (row.invitesDisabled) {
                 return;
               }
-              if (!row.invitesMenuAvailable) {
-                closeMenus();
-                row.onSendInvitesAll();
+              closeMenus();
+              if (row.invitesMode === 'resend' && row.onOpenResend) {
+                row.onOpenResend();
                 return;
               }
-              setOpenDecisionId(null);
-              setOpenInvitesId((current) => (current === row.id ? null : row.id));
+              row.onSendInvites();
             };
 
             const handleDecisionToggle = () => {
               if (row.decisionDisabled) {
                 return;
               }
-              setOpenInvitesId(null);
               setOpenDecisionId((current) => (current === row.id ? null : row.id));
             };
 
@@ -205,42 +200,18 @@ export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: 
                       </button>
                     </div>
                     <div className={styles.actionCell}>
-                      <div className={styles.buttonWithMenu}>
-                        <button
-                          type="button"
-                          className={`${styles.actionButton} ${styles.neutralButton}`}
-                          onClick={handleInvitesClick}
-                          disabled={row.invitesDisabled}
-                          data-tooltip={row.invitesTooltip ?? undefined}
-                        >
-                          {row.invitesButtonLabel}
-                        </button>
-                        {row.invitesMenuAvailable && isInvitesMenuOpen && (
-                          <div className={styles.dropdownMenu}>
-                            <button
-                              type="button"
-                              className={styles.dropdownItem}
-                              onClick={() => {
-                                closeMenus();
-                                row.onSendInvitesAll();
-                              }}
-                            >
-                              Send invites to all interviewers
-                            </button>
-                            <button
-                              type="button"
-                              className={styles.dropdownItem}
-                              onClick={() => {
-                                closeMenus();
-                                row.onSendInvitesUpdated();
-                              }}
-                            >
-                              Send invites only to updated interviewers
-                            </button>
-                          </div>
-                        )}
-                      </div>
+                    <div className={styles.buttonWithMenu}>
+                      <button
+                        type="button"
+                        className={`${styles.actionButton} ${styles.neutralButton}`}
+                        onClick={handleInvitesClick}
+                        disabled={row.invitesDisabled}
+                        data-tooltip={row.invitesTooltip ?? undefined}
+                      >
+                        {row.invitesButtonLabel}
+                      </button>
                     </div>
+                  </div>
                     <div className={styles.actionCell}>
                       <button
                         type="button"

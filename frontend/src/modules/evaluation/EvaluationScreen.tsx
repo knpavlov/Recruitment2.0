@@ -11,6 +11,7 @@ import {
 } from '../../app/state/AppStateContext';
 import { EvaluationConfig } from '../../shared/types/evaluation';
 import { EvaluationTable, EvaluationTableRow } from './components/EvaluationTable';
+import { ResendInvitesDialog } from './components/ResendInvitesDialog';
 import { formatDate } from '../../shared/utils/date';
 
 type Banner = { type: 'info' | 'error'; text: string } | null;
@@ -46,6 +47,7 @@ export const EvaluationScreen = () => {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [roundSelections, setRoundSelections] = useState<Record<string, number>>({});
   const [decisionSelections, setDecisionSelections] = useState<Record<string, DecisionOption | null>>({});
+  const [resendEvaluationId, setResendEvaluationId] = useState<string | null>(null);
 
   const candidateIndex = useMemo(() => {
     const map = new Map<
@@ -64,53 +66,66 @@ export const EvaluationScreen = () => {
   }, [candidates]);
 
   const handleSendInvites = useCallback(
-    async (evaluation: EvaluationConfig, scope: 'all' | 'updated') => {
-      const result = await sendInvitations(evaluation.id, scope);
+    async (evaluation: EvaluationConfig, slotIds?: string[]) => {
+      const payload = slotIds && slotIds.length > 0 ? { slotIds } : undefined;
+      const result = await sendInvitations(evaluation.id, payload);
       if (!result.ok) {
         if (result.error === 'missing-assignment-data') {
           setBanner({
             type: 'error',
             text: 'Assign interviewers, cases, and fit questions to every slot before sending invites.'
           });
-          return;
+          return false;
         }
         if (result.error === 'invalid-assignment-data') {
           setBanner({
             type: 'error',
             text: 'Use valid cases and fit questions for every interview slot before sending invites.'
           });
-          return;
+          return false;
         }
         if (result.error === 'invalid-assignment-resources') {
           setBanner({
             type: 'error',
             text: 'Some selected cases or fit questions are no longer available. Update assignments and try again.'
           });
-          return;
+          return false;
         }
         if (result.error === 'mailer-unavailable') {
           setBanner({ type: 'error', text: 'Email delivery is not configured. Interviewers were not notified.' });
-          return;
+          return false;
         }
         if (result.error === 'invalid-portal-url') {
           setBanner({
             type: 'error',
             text: 'Provide a reachable interviewer portal URL (environment variable or current site origin).'
           });
-          return;
+          return false;
         }
         if (result.error === 'not-found') {
           setBanner({ type: 'error', text: 'Evaluation not found. Refresh the page.' });
-          return;
+          return false;
+        }
+        if (result.error === 'invalid-invitation-targets') {
+          setBanner({ type: 'error', text: 'Select at least one interviewer to resend invitations.' });
+          return false;
+        }
+        if (result.error === 'invitation-delivery-failed') {
+          setBanner({
+            type: 'error',
+            text: 'Some invitations were not delivered. Check email addresses and try again.'
+          });
+          return false;
         }
         setBanner({ type: 'error', text: 'Failed to send invitations.' });
-        return;
+        return false;
       }
       const message =
-        scope === 'all'
-          ? 'Invitations sent to interviewers.'
-          : 'Updated invitations sent to selected interviewers.';
+        slotIds && slotIds.length > 0
+          ? 'Invitations sent to selected interviewers.'
+          : 'Invitations sent to interviewers.';
       setBanner({ type: 'info', text: message });
+      return true;
     },
     [sendInvitations]
   );
@@ -149,6 +164,33 @@ export const EvaluationScreen = () => {
       });
     },
     [advanceRound]
+  );
+
+  const resendEvaluation = useMemo(
+    () => (resendEvaluationId ? list.find((item) => item.id === resendEvaluationId) ?? null : null),
+    [list, resendEvaluationId]
+  );
+
+  const handleOpenResend = useCallback((evaluation: EvaluationConfig) => {
+    setResendEvaluationId(evaluation.id);
+  }, []);
+
+  const handleCloseResend = useCallback(() => {
+    setResendEvaluationId(null);
+  }, []);
+
+  const handleSubmitResend = useCallback(
+    async (slotIds: string[]) => {
+      if (!resendEvaluation) {
+        setResendEvaluationId(null);
+        return;
+      }
+      const success = await handleSendInvites(resendEvaluation, slotIds);
+      if (success) {
+        setResendEvaluationId(null);
+      }
+    },
+    [handleSendInvites, resendEvaluation]
   );
 
   const tableRows = useMemo<EvaluationTableRow[]>(() => {
@@ -247,10 +289,9 @@ export const EvaluationScreen = () => {
         invitesTooltip = 'Complete all interviewer, case and fit question assignments before sending invites.';
       }
 
-      const invitesMenuAvailable =
-        evaluation.invitationState.hasInvitations && evaluation.invitationState.hasPendingChanges && !isHistoricalView;
-      const invitesButtonLabel = evaluation.invitationState.hasInvitations ? 'Send Invites Again' : 'Send Invites';
-      if (!invitesDisabled && evaluation.invitationState.hasInvitations && !evaluation.invitationState.hasPendingChanges) {
+      const invitesMode: 'initial' | 'resend' = evaluation.invitationState.hasInvitations ? 'resend' : 'initial';
+      const invitesButtonLabel = invitesMode === 'resend' ? 'Send Invites Again' : 'Send Invites';
+      if (!invitesDisabled && invitesMode === 'resend' && !evaluation.invitationState.hasPendingChanges) {
         invitesTooltip = 'Invitations were already sent. Use this action to resend the same details.';
       }
 
@@ -290,12 +331,12 @@ export const EvaluationScreen = () => {
         setRoundSelections((prev) => ({ ...prev, [evaluation.id]: round }));
       };
 
-      const sendAll = () => {
-        void handleSendInvites(evaluation, 'all');
+      const sendInitial = () => {
+        void handleSendInvites(evaluation);
       };
 
-      const sendUpdated = () => {
-        void handleSendInvites(evaluation, 'updated');
+      const openResend = () => {
+        handleOpenResend(evaluation);
       };
 
       const decide = (option: DecisionOption) => {
@@ -334,9 +375,9 @@ export const EvaluationScreen = () => {
         invitesButtonLabel,
         invitesDisabled,
         invitesTooltip,
-        invitesMenuAvailable,
-        onSendInvitesAll: sendAll,
-        onSendInvitesUpdated: sendUpdated,
+        invitesMode,
+        onSendInvites: sendInitial,
+        onOpenResend: invitesMode === 'resend' ? openResend : undefined,
         onEdit: () => {
           setModalEvaluation(evaluation);
           setIsModalOpen(true);
@@ -362,7 +403,8 @@ export const EvaluationScreen = () => {
     decisionSelections,
     handleSendInvites,
     handleAdvanceRound,
-    setBanner
+    setBanner,
+    handleOpenResend
   ]);
 
   const sortedRows = useMemo(() => {
@@ -519,6 +561,11 @@ export const EvaluationScreen = () => {
           onClose={() => setStatusContext(null)}
         />
       )}
+      <ResendInvitesDialog
+        evaluation={resendEvaluation}
+        onSubmit={handleSubmitResend}
+        onClose={handleCloseResend}
+      />
     </section>
   );
 };
