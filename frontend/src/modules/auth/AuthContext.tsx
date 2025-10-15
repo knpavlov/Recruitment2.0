@@ -18,7 +18,13 @@ export interface AuthSession {
   expiresAt: number;
 }
 
-export type RequestCodeError = 'not-found' | 'forbidden' | 'mailer-unavailable' | 'unknown';
+export type RequestCodeError =
+  | 'not-found'
+  | 'forbidden'
+  | 'mailer-unavailable'
+  | 'mailer-domain'
+  | 'mailer-provider'
+  | 'unknown';
 export type VerifyCodeError = 'invalid' | 'expired' | 'unknown';
 
 interface RequestCodeSuccess {
@@ -170,6 +176,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
           if (error.status === 503) {
             return { ok: false, error: 'mailer-unavailable' };
+          }
+          if (error.status === 424) {
+            return { ok: false, error: 'mailer-domain' };
+          }
+          if (error.status === 502) {
+            return { ok: false, error: 'mailer-provider' };
           }
         }
         console.error('Failed to request access code:', error);

@@ -23,6 +23,18 @@ router.post('/request-code', async (req, res) => {
           .json({ message: 'Email delivery is temporarily unavailable. Configure SMTP and try again.' });
         return;
       }
+      if (error.message === 'MAILER_DOMAIN_NOT_VERIFIED') {
+        res
+          .status(424)
+          .json({ message: 'Sender domain is not verified. Confirm DNS records in Resend and retry.' });
+        return;
+      }
+      if (error.message === 'MAILER_DELIVERY_FAILED') {
+        res
+          .status(502)
+          .json({ message: 'Email provider rejected the request. Check your Resend settings and try again.' });
+        return;
+      }
     }
     res.status(500).json({ message: 'Failed to request an access code.' });
   }

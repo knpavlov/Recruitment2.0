@@ -16,6 +16,10 @@ const mapRequestError = (error: RequestCodeError) => {
       return 'Your account is not allowed to sign in yet.';
     case 'mailer-unavailable':
       return 'Email delivery is not configured. Contact your system administrator to set up SMTP.';
+    case 'mailer-domain':
+      return 'The sender domain is not verified. Confirm DNS records in Resend and try again.';
+    case 'mailer-provider':
+      return 'Email provider rejected the request. Review your Resend settings and retry.';
     default:
       return 'Unable to send the access code. Try again in a moment.';
   }
