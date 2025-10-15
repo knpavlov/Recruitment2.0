@@ -228,22 +228,28 @@ interface AssignmentRow extends Record<string, unknown> {
   case_folder_id: string;
   fit_question_id: string;
   round_number: number;
-  invitation_sent_at: Date;
-  created_at: Date;
+  invitation_sent_at: Date | null;
+  created_at: Date | null;
 }
 
-const mapRowToAssignment = (row: AssignmentRow): InterviewAssignmentRecord => ({
-  id: row.id,
-  evaluationId: row.evaluation_id,
-  slotId: row.slot_id,
-  interviewerEmail: row.interviewer_email,
-  interviewerName: row.interviewer_name,
-  caseFolderId: row.case_folder_id,
-  fitQuestionId: row.fit_question_id,
-  roundNumber: Number(row.round_number ?? 1) || 1,
-  invitationSentAt: row.invitation_sent_at.toISOString(),
-  createdAt: row.created_at.toISOString()
-});
+const mapRowToAssignment = (row: AssignmentRow): InterviewAssignmentRecord => {
+  // При чтении старых записей колонка invitation_sent_at может быть NULL, поэтому страхуемся.
+  const invitationTimestamp = row.invitation_sent_at ?? row.created_at ?? new Date();
+  const createdTimestamp = row.created_at ?? row.invitation_sent_at ?? new Date();
+
+  return {
+    id: row.id,
+    evaluationId: row.evaluation_id,
+    slotId: row.slot_id,
+    interviewerEmail: row.interviewer_email,
+    interviewerName: row.interviewer_name,
+    caseFolderId: row.case_folder_id,
+    fitQuestionId: row.fit_question_id,
+    roundNumber: Number(row.round_number ?? 1) || 1,
+    invitationSentAt: invitationTimestamp.toISOString(),
+    createdAt: createdTimestamp.toISOString()
+  };
+};
 
 export class EvaluationsRepository {
   async listEvaluations(): Promise<EvaluationRecord[]> {
