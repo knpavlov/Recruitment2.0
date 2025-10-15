@@ -584,6 +584,12 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
             if (error.code === 'missing-assignment-data') {
               return { ok: false, error: 'missing-assignment-data' };
             }
+            if (error.code === 'invalid-assignment-data') {
+              return { ok: false, error: 'invalid-assignment-data' };
+            }
+            if (error.code === 'invalid-assignment-resources') {
+              return { ok: false, error: 'invalid-assignment-resources' };
+            }
             if (error.code === 'mailer-unavailable') {
               return { ok: false, error: 'mailer-unavailable' };
             }
