@@ -9,6 +9,7 @@ import {
 } from '../../shared/types/evaluation';
 import { CaseFolder } from '../../shared/types/caseLibrary';
 import { ApiError } from '../../shared/api/httpClient';
+import { useCaseCriteriaState } from '../../app/state/AppStateContext';
 
 interface Banner {
   type: 'info' | 'error';
@@ -181,6 +182,7 @@ const sortCaseCriteria = (criteria: CriterionDefinition[]): CriterionDefinition[
 
 export const InterviewerScreen = () => {
   const { session } = useAuth();
+  const { list: globalCaseCriteria } = useCaseCriteriaState();
   const [assignments, setAssignments] = useState<InterviewerAssignmentView[]>([]);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [banner, setBanner] = useState<Banner | null>(null);
@@ -413,8 +415,21 @@ export const InterviewerScreen = () => {
       : 'Candidate not assigned';
     const fitQuestion = selectedAssignment.fitQuestion;
     const fitCriteria: CriterionDefinition[] = fitQuestion?.criteria ?? [];
-    const caseCriteriaRaw: CriterionDefinition[] = selectedAssignment.caseFolder?.evaluationCriteria ?? [];
-    const caseCriteria = sortCaseCriteria(caseCriteriaRaw);
+    const mergedCaseCriteriaMap = new Map<string, CriterionDefinition>();
+
+    (selectedAssignment.caseFolder?.evaluationCriteria ?? []).forEach((criterion) => {
+      mergedCaseCriteriaMap.set(criterion.id, criterion);
+    });
+
+    globalCaseCriteria.forEach((criterion) => {
+      mergedCaseCriteriaMap.set(criterion.id, {
+        id: criterion.id,
+        title: criterion.title,
+        ratings: criterion.ratings
+      });
+    });
+
+    const caseCriteria = sortCaseCriteria(Array.from(mergedCaseCriteriaMap.values()));
     const resumeLink = candidate?.resume ? (
       <a className={styles.fileLink} href={candidate.resume.dataUrl} download={candidate.resume.fileName}>
         Download resume ({candidate.resume.fileName})
