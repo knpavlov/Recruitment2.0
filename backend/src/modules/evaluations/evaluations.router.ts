@@ -22,6 +22,19 @@ const handleError = (error: unknown, res: Response) => {
     case 'MISSING_ASSIGNMENT_DATA':
       res.status(400).json({ code: 'missing-assignment-data', message: 'Fill in interviewers, cases and fit questions.' });
       return;
+    case 'INVALID_ASSIGNMENT_DATA':
+      res
+        .status(400)
+        .json({ code: 'invalid-assignment-data', message: 'Provide valid case and fit question identifiers for every slot.' });
+      return;
+    case 'INVALID_ASSIGNMENT_RESOURCES':
+      res
+        .status(400)
+        .json({
+          code: 'invalid-assignment-resources',
+          message: 'Some referenced cases or fit questions are no longer available. Reassign interviews before sending invites.'
+        });
+      return;
     case 'MAILER_UNAVAILABLE':
       res
         .status(503)

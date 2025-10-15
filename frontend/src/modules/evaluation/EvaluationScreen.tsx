@@ -73,6 +73,20 @@ export const EvaluationScreen = () => {
           });
           return;
         }
+        if (result.error === 'invalid-assignment-data') {
+          setBanner({
+            type: 'error',
+            text: 'Use valid cases and fit questions for every interview slot before sending invites.'
+          });
+          return;
+        }
+        if (result.error === 'invalid-assignment-resources') {
+          setBanner({
+            type: 'error',
+            text: 'Some selected cases or fit questions are no longer available. Update assignments and try again.'
+          });
+          return;
+        }
         if (result.error === 'mailer-unavailable') {
           setBanner({ type: 'error', text: 'Email delivery is not configured. Interviewers were not notified.' });
           return;

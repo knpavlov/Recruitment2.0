@@ -33,6 +33,8 @@ const resolvePortalBaseUrl = (override?: string): string => {
   throw new Error('INVALID_PORTAL_URL');
 };
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const buildPortalLink = (baseUrl: string, evaluationId: string, slotId: string) => {
   const url = new URL(baseUrl);
   url.searchParams.set('evaluation', evaluationId);
@@ -142,6 +144,9 @@ export class EvaluationWorkflowService {
       if (!email || !caseId || !questionId) {
         throw new Error('MISSING_ASSIGNMENT_DATA');
       }
+      if (!this.isUuid(caseId) || !this.isUuid(questionId)) {
+        throw new Error('INVALID_ASSIGNMENT_DATA');
+      }
       assignments.push({
         slotId: slot.id,
         interviewerEmail: email,
@@ -153,6 +158,10 @@ export class EvaluationWorkflowService {
     return assignments;
   }
 
+  private isUuid(value: string): boolean {
+    return UUID_PATTERN.test(value);
+  }
+
   private async ensureAccounts(assignments: InterviewAssignmentModel[]) {
     for (const assignment of assignments) {
       await this.accounts.ensureUserAccount(assignment.interviewerEmail);
@@ -160,22 +169,99 @@ export class EvaluationWorkflowService {
   }
 
   private async loadContext(assignments: InterviewAssignmentModel[], evaluation: EvaluationRecord) {
-    const candidate = evaluation.candidateId ? await this.candidates.getCandidate(evaluation.candidateId) : null;
+    const candidate = await this.loadCandidate(evaluation.candidateId);
 
     const uniqueCaseIds = Array.from(new Set(assignments.map((item) => item.caseFolderId)));
     const uniqueQuestionIds = Array.from(new Set(assignments.map((item) => item.fitQuestionId)));
 
     const caseMap = new Map<string, Awaited<ReturnType<CasesService['getFolder']>> | null>();
     for (const id of uniqueCaseIds) {
-      caseMap.set(id, await this.cases.getFolder(id));
+      const folder = await this.loadCaseFolder(id);
+      caseMap.set(id, folder);
     }
 
     const questionMap = new Map<string, Awaited<ReturnType<QuestionsService['getQuestion']>> | null>();
     for (const id of uniqueQuestionIds) {
-      questionMap.set(id, await this.questions.getQuestion(id));
+      const question = await this.loadFitQuestion(id);
+      questionMap.set(id, question);
     }
 
     return { candidate, caseMap, questionMap };
+  }
+
+  private async loadCandidate(
+    id: string | undefined
+  ): Promise<Awaited<ReturnType<CandidatesService['getCandidate']>> | null> {
+    if (!id) {
+      return null;
+    }
+    try {
+      return await this.candidates.getCandidate(id);
+    } catch (error) {
+      if (this.isMissingResourceError(error)) {
+        console.warn('Не удалось загрузить кандидата для интервью', id, error);
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  private async loadCaseFolder(
+    id: string
+  ): Promise<Awaited<ReturnType<CasesService['getFolder']>> | null> {
+    try {
+      return await this.cases.getFolder(id);
+    } catch (error) {
+      if (this.isMissingResourceError(error) || this.isInvalidUuidError(error)) {
+        console.warn('Не удалось загрузить кейс для интервью', id, error);
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  private async loadFitQuestion(
+    id: string
+  ): Promise<Awaited<ReturnType<QuestionsService['getQuestion']>> | null> {
+    try {
+      return await this.questions.getQuestion(id);
+    } catch (error) {
+      if (this.isMissingResourceError(error) || this.isInvalidUuidError(error)) {
+        console.warn('Не удалось загрузить fit-вопрос для интервью', id, error);
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  private isMissingResourceError(error: unknown): boolean {
+    return error instanceof Error && (error.message === 'NOT_FOUND' || error.message === 'INVALID_INPUT');
+  }
+
+  private isInvalidUuidError(error: unknown): boolean {
+    if (!(error instanceof Error)) {
+      return false;
+    }
+    const withCode = error as { code?: unknown };
+    if (withCode.code === '22P02') {
+      return true;
+    }
+    return /invalid input syntax for type uuid/i.test(error.message);
+  }
+
+  private ensureContextResources(
+    assignments: InterviewAssignmentModel[],
+    context: {
+      candidate: Awaited<ReturnType<CandidatesService['getCandidate']>> | null;
+      caseMap: Map<string, Awaited<ReturnType<CasesService['getFolder']>> | null>;
+      questionMap: Map<string, Awaited<ReturnType<QuestionsService['getQuestion']>> | null>;
+    }
+  ) {
+    const missingCases = assignments.filter((assignment) => !context.caseMap.get(assignment.caseFolderId));
+    const missingQuestions = assignments.filter((assignment) => !context.questionMap.get(assignment.fitQuestionId));
+    if (missingCases.length > 0 || missingQuestions.length > 0) {
+      throw new Error('INVALID_ASSIGNMENT_RESOURCES');
+    }
   }
 
   private async deliverInvitations(
@@ -269,6 +355,7 @@ export class EvaluationWorkflowService {
     if (assignmentsToSend.length > 0) {
       await this.ensureAccounts(assignmentsToSend);
       const context = await this.loadContext(assignmentsToSend, evaluation);
+      this.ensureContextResources(assignmentsToSend, context);
       const portalBaseUrl = resolvePortalBaseUrl(options.portalBaseUrl);
 
       try {
@@ -281,12 +368,19 @@ export class EvaluationWorkflowService {
       }
     }
 
-    await this.evaluations.storeAssignments(trimmed, assignments, {
-      status: 'in-progress',
-      refreshSlotIds,
-      updateStartedAt: evaluation.processStatus === 'draft',
-      roundNumber: evaluation.roundNumber ?? 1
-    });
+    try {
+      await this.evaluations.storeAssignments(trimmed, assignments, {
+        status: 'in-progress',
+        refreshSlotIds,
+        updateStartedAt: evaluation.processStatus === 'draft',
+        roundNumber: evaluation.roundNumber ?? 1
+      });
+    } catch (error) {
+      if (this.isInvalidUuidError(error)) {
+        throw new Error('INVALID_ASSIGNMENT_RESOURCES');
+      }
+      throw error;
+    }
 
     return this.loadEvaluationWithState(trimmed);
   }
