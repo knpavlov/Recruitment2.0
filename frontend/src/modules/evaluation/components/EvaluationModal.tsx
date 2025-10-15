@@ -48,7 +48,8 @@ const createDefaultConfig = (): EvaluationConfig => {
     roundHistory: [],
     invitationState: {
       hasInvitations: false,
-      hasPendingChanges: true
+      hasPendingChanges: true,
+      slots: []
     }
   };
 };
@@ -119,7 +120,7 @@ export const EvaluationModal = ({
         interviewCount: interviews.length,
         forms,
         invitationState: {
-          ...(prev.invitationState ?? { hasInvitations: false, hasPendingChanges: true }),
+          ...(prev.invitationState ?? { hasInvitations: false, hasPendingChanges: true, slots: [] }),
           hasPendingChanges: true
         }
       };

@@ -69,6 +69,15 @@ export interface EvaluationInvitationState {
   hasInvitations: boolean;
   hasPendingChanges: boolean;
   lastSentAt?: string;
+  slots: EvaluationInvitationSlotState[];
+}
+
+export interface EvaluationInvitationSlotState {
+  slotId: string;
+  interviewerName: string;
+  interviewerEmail: string;
+  lastSentAt?: string;
+  hasPendingChanges: boolean;
 }
 
 export interface InterviewerAssignmentView {

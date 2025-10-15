@@ -215,7 +215,7 @@ const mapRowToRecord = (row: EvaluationRow): EvaluationRecord => {
     processStatus: (row.process_status as EvaluationRecord['processStatus']) ?? 'draft',
     processStartedAt: row.process_started_at ? row.process_started_at.toISOString() : undefined,
     roundHistory: mapRoundHistory(row.round_history),
-    invitationState: { hasInvitations: false, hasPendingChanges: false }
+    invitationState: { hasInvitations: false, hasPendingChanges: false, slots: [] }
   } satisfies EvaluationRecord;
 };
 
@@ -493,7 +493,7 @@ export class EvaluationsRepository {
         const existing = existingBySlot.get(assignment.slotId);
         const isSameRound = existing?.roundNumber === normalizedRound;
         const assignmentId = isSameRound && existing?.id ? existing.id : randomUUID();
-        const shouldRefresh = refreshIdSet.has(assignment.slotId) || !existing || !isSameRound;
+        const shouldRefresh = refreshIdSet.has(assignment.slotId);
         const previousInvitation = isSameRound ? existing?.invitationSentAt ?? null : null;
         const previousCreatedAt = isSameRound ? existing?.createdAt ?? null : null;
         await client.query(
@@ -517,23 +517,25 @@ export class EvaluationsRepository {
              $6,
              $7,
              $8,
-             CASE
-               WHEN $9::boolean THEN NOW()
-               ELSE COALESCE($10::timestamptz, NOW())
-             END,
-             COALESCE($11::timestamptz, NOW())
-           )
-           ON CONFLICT (evaluation_id, slot_id) DO UPDATE
-             SET interviewer_email = EXCLUDED.interviewer_email,
-                 interviewer_name = EXCLUDED.interviewer_name,
-                 case_folder_id = EXCLUDED.case_folder_id,
-                 fit_question_id = EXCLUDED.fit_question_id,
-                 round_number = EXCLUDED.round_number,
-                 invitation_sent_at = CASE
-                   WHEN $9::boolean THEN NOW()
-                   ELSE COALESCE($10::timestamptz, evaluation_assignments.invitation_sent_at)
-                 END,
-                 id = EXCLUDED.id;`,
+            CASE
+              WHEN $9::boolean THEN NOW()
+              WHEN $10::timestamptz IS NOT NULL THEN $10::timestamptz
+              ELSE NULL
+            END,
+            COALESCE($11::timestamptz, NOW())
+          )
+          ON CONFLICT (evaluation_id, slot_id) DO UPDATE
+            SET interviewer_email = EXCLUDED.interviewer_email,
+                interviewer_name = EXCLUDED.interviewer_name,
+                case_folder_id = EXCLUDED.case_folder_id,
+                fit_question_id = EXCLUDED.fit_question_id,
+                round_number = EXCLUDED.round_number,
+                invitation_sent_at = CASE
+                  WHEN $9::boolean THEN NOW()
+                  WHEN $10::timestamptz IS NOT NULL THEN $10::timestamptz
+                  ELSE evaluation_assignments.invitation_sent_at
+                END,
+                id = EXCLUDED.id;`,
           [
             assignmentId,
             evaluationId,

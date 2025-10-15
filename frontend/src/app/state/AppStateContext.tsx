@@ -63,7 +63,7 @@ interface AppStateContextValue {
       expectedVersion: number | null
     ) => Promise<DomainResult<EvaluationConfig>>;
     removeEvaluation: (id: string) => Promise<DomainResult<string>>;
-    sendInvitations: (id: string, scope: 'all' | 'updated') => Promise<DomainResult<EvaluationConfig>>;
+    sendInvitations: (id: string, options?: { slotIds?: string[] }) => Promise<DomainResult<EvaluationConfig>>;
     advanceRound: (id: string) => Promise<DomainResult<EvaluationConfig>>;
   };
   accounts: {
@@ -574,9 +574,9 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
           return { ok: false, error: 'unknown' };
         }
       },
-      sendInvitations: async (id, scope) => {
+      sendInvitations: async (id, options) => {
         try {
-          const updated = await evaluationsApi.sendInvitations(id, scope);
+          const updated = await evaluationsApi.sendInvitations(id, options);
           setEvaluations((prev) => prev.map((item) => (item.id === id ? updated : item)));
           return { ok: true, data: updated };
         } catch (error) {
@@ -598,6 +598,12 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
             }
             if (error.code === 'not-found') {
               return { ok: false, error: 'not-found' };
+            }
+            if (error.code === 'invalid-invitation-targets') {
+              return { ok: false, error: 'invalid-invitation-targets' };
+            }
+            if (error.code === 'invitation-delivery-failed') {
+              return { ok: false, error: 'invitation-delivery-failed' };
             }
           }
           console.error('Failed to send invitations:', error);

@@ -264,8 +264,8 @@ export class EvaluationWorkflowService {
     }
   }
 
-  private async deliverInvitations(
-    assignments: InterviewAssignmentModel[],
+  private async sendInvitationEmail(
+    assignment: InterviewAssignmentModel,
     evaluation: EvaluationRecord,
     portalBaseUrl: string,
     context: {
@@ -277,19 +277,16 @@ export class EvaluationWorkflowService {
     const candidateName = context.candidate
       ? `${context.candidate.lastName} ${context.candidate.firstName}`.trim() || context.candidate.id
       : 'candidate';
-
-    for (const assignment of assignments) {
-      const caseFolder = context.caseMap.get(assignment.caseFolderId);
-      const question = context.questionMap.get(assignment.fitQuestionId);
-      const link = buildPortalLink(portalBaseUrl, evaluation.id, assignment.slotId);
-      await this.mailer.sendInterviewAssignment(assignment.interviewerEmail, {
-        candidateName,
-        interviewerName: assignment.interviewerName,
-        caseTitle: caseFolder?.name ?? 'Case',
-        fitQuestionTitle: question?.shortTitle ?? 'Fit question',
-        link
-      });
-    }
+    const caseFolder = context.caseMap.get(assignment.caseFolderId);
+    const question = context.questionMap.get(assignment.fitQuestionId);
+    const link = buildPortalLink(portalBaseUrl, evaluation.id, assignment.slotId);
+    await this.mailer.sendInterviewAssignment(assignment.interviewerEmail, {
+      candidateName,
+      interviewerName: assignment.interviewerName,
+      caseTitle: caseFolder?.name ?? 'Case',
+      fitQuestionTitle: question?.shortTitle ?? 'Fit question',
+      link
+    });
   }
 
   async startProcess(id: string, options?: { portalBaseUrl?: string }) {
@@ -297,13 +294,13 @@ export class EvaluationWorkflowService {
     if (!trimmed) {
       throw new Error('INVALID_INPUT');
     }
-    await this.sendInvitations(trimmed, { scope: 'all', portalBaseUrl: options?.portalBaseUrl });
+    await this.sendInvitations(trimmed, { portalBaseUrl: options?.portalBaseUrl });
     return { id: trimmed };
   }
 
   async sendInvitations(
     id: string,
-    options: { scope: 'all' | 'updated'; portalBaseUrl?: string }
+    options: { slotIds?: string[]; portalBaseUrl?: string }
   ): Promise<EvaluationRecord> {
     const trimmed = id.trim();
     if (!trimmed) {
@@ -312,66 +309,33 @@ export class EvaluationWorkflowService {
 
     const evaluation = await this.loadEvaluationWithState(trimmed);
     const assignments = this.buildAssignments(evaluation);
-    const existingAssignments = await this.evaluations.listAssignmentsForEvaluation(trimmed);
+    const normalizedSelection = Array.isArray(options.slotIds)
+      ? Array.from(
+          new Set(
+            options.slotIds
+              .map((slotId) => (typeof slotId === 'string' ? slotId.trim() : ''))
+              .filter((slotId) => slotId.length > 0)
+          )
+        )
+      : [];
+    const targetAll = normalizedSelection.length === 0 && !Array.isArray(options.slotIds);
+    const assignmentSlotSet = new Set(assignments.map((assignment) => assignment.slotId));
+    const targetSlotIds = targetAll
+      ? Array.from(assignmentSlotSet)
+      : normalizedSelection.filter((slotId) => assignmentSlotSet.has(slotId));
 
-    const existingBySlot = new Map(existingAssignments.map((item) => [item.slotId, item]));
-    const newSlotIds = new Set(assignments.map((assignment) => assignment.slotId));
-    const changedSlotIds = new Set<string>();
-
-    for (const assignment of assignments) {
-      const existing = existingBySlot.get(assignment.slotId);
-      if (!existing) {
-        changedSlotIds.add(assignment.slotId);
-        continue;
-      }
-      const sameEmail = normalizeEmail(existing.interviewerEmail) === assignment.interviewerEmail;
-      const sameName = (existing.interviewerName ?? '').trim() === assignment.interviewerName.trim();
-      const sameCase = (existing.caseFolderId ?? '') === assignment.caseFolderId;
-      const sameQuestion = (existing.fitQuestionId ?? '') === assignment.fitQuestionId;
-      if (!sameEmail || !sameName || !sameCase || !sameQuestion) {
-        changedSlotIds.add(assignment.slotId);
-      }
+    if (!targetAll && targetSlotIds.length === 0) {
+      throw new Error('INVALID_INVITATION_TARGETS');
     }
 
-    const removedSlots = existingAssignments.filter((item) => !newSlotIds.has(item.slotId));
-    const structuralChange = removedSlots.length > 0;
-
-    const scope: 'all' | 'updated' = evaluation.processStatus === 'draft' ? 'all' : options.scope;
-
-    if (scope === 'updated' && changedSlotIds.size === 0 && !structuralChange) {
-      return evaluation;
-    }
-
-    const refreshSlotIds =
-      scope === 'all'
-        ? assignments.map((assignment) => assignment.slotId)
-        : Array.from(changedSlotIds);
-
-    const assignmentsToSend =
-      scope === 'all'
-        ? assignments
-        : assignments.filter((assignment) => changedSlotIds.has(assignment.slotId));
-
-    if (assignmentsToSend.length > 0) {
-      await this.ensureAccounts(assignmentsToSend);
-      const context = await this.loadContext(assignmentsToSend, evaluation);
-      this.ensureContextResources(assignmentsToSend, context);
-      const portalBaseUrl = resolvePortalBaseUrl(options.portalBaseUrl);
-
-      try {
-        await this.deliverInvitations(assignmentsToSend, evaluation, portalBaseUrl, context);
-      } catch (error) {
-        if (error instanceof Error && error.message === MAILER_NOT_CONFIGURED) {
-          throw new Error('MAILER_UNAVAILABLE');
-        }
-        throw error;
-      }
-    }
+    await this.ensureAccounts(assignments);
+    const context = await this.loadContext(assignments, evaluation);
+    this.ensureContextResources(assignments, context);
 
     try {
       await this.evaluations.storeAssignments(trimmed, assignments, {
         status: 'in-progress',
-        refreshSlotIds,
+        refreshSlotIds: [],
         updateStartedAt: evaluation.processStatus === 'draft',
         roundNumber: evaluation.roundNumber ?? 1
       });
@@ -380,6 +344,53 @@ export class EvaluationWorkflowService {
         throw new Error('INVALID_ASSIGNMENT_RESOURCES');
       }
       throw error;
+    }
+
+    const assignmentsToSend = assignments.filter((assignment) => targetSlotIds.includes(assignment.slotId));
+
+    const successfulSlots: string[] = [];
+    const deliveryErrors: Array<{ slotId: string; error: unknown }> = [];
+
+    if (assignmentsToSend.length > 0) {
+      const portalBaseUrl = resolvePortalBaseUrl(options.portalBaseUrl);
+      for (const assignment of assignmentsToSend) {
+        try {
+          await this.sendInvitationEmail(assignment, evaluation, portalBaseUrl, context);
+          successfulSlots.push(assignment.slotId);
+        } catch (error) {
+          if (error instanceof Error && error.message === MAILER_NOT_CONFIGURED) {
+            throw new Error('MAILER_UNAVAILABLE');
+          }
+          deliveryErrors.push({ slotId: assignment.slotId, error });
+        }
+      }
+    }
+
+    if (successfulSlots.length > 0) {
+      try {
+        await this.evaluations.storeAssignments(trimmed, assignments, {
+          status: 'in-progress',
+          refreshSlotIds: successfulSlots,
+          updateStartedAt: false,
+          roundNumber: evaluation.roundNumber ?? 1
+        });
+      } catch (error) {
+        if (this.isInvalidUuidError(error)) {
+          throw new Error('INVALID_ASSIGNMENT_RESOURCES');
+        }
+        throw error;
+      }
+    }
+
+    if (deliveryErrors.length > 0) {
+      const aggregated = new Error('INVITATION_DELIVERY_FAILED');
+      (aggregated as Error & { details?: Array<{ slotId: string; reason: string }> }).details = deliveryErrors.map(
+        (entry) => ({
+          slotId: entry.slotId,
+          reason: entry.error instanceof Error ? entry.error.message : 'UNKNOWN'
+        })
+      );
+      throw aggregated;
     }
 
     return this.loadEvaluationWithState(trimmed);
