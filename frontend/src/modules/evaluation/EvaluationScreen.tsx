@@ -11,6 +11,7 @@ import {
 } from '../../app/state/AppStateContext';
 import { EvaluationConfig } from '../../shared/types/evaluation';
 import { EvaluationTable, EvaluationTableRow } from './components/EvaluationTable';
+import { formatDate } from '../../shared/utils/date';
 
 type Banner = { type: 'info' | 'error'; text: string } | null;
 
@@ -155,11 +156,8 @@ export const EvaluationScreen = () => {
       const metadata = evaluation.candidateId ? candidateIndex.get(evaluation.candidateId) : undefined;
       const candidateName = metadata?.name ?? 'Not selected';
       const candidatePosition = metadata?.position ?? '—';
-      const createdAtIso = evaluation.createdAt ?? null;
-      const createdDate = createdAtIso ? new Date(createdAtIso) : null;
-      const createdOn = createdDate && !Number.isNaN(createdDate.getTime())
-        ? createdDate.toLocaleDateString('ru-RU')
-        : '—';
+      const createdAt = evaluation.createdAt ?? null;
+      const createdOn = formatDate(createdAt);
 
       const currentRound = evaluation.roundNumber ?? 1;
       const storedSelection = roundSelections[evaluation.id];
@@ -320,7 +318,7 @@ export const EvaluationScreen = () => {
         id: evaluation.id,
         candidateName,
         candidatePosition,
-        createdAt: createdAtIso,
+        createdAt,
         createdOn,
         roundOptions,
         selectedRound: effectiveSelectedRound,

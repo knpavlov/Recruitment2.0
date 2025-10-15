@@ -4,6 +4,7 @@ import { EvaluationConfig, OfferRecommendationValue } from '../../../shared/type
 import { FitQuestion } from '../../../shared/types/fitQuestion';
 import { CaseFolder } from '../../../shared/types/caseLibrary';
 import { CaseCriterion } from '../../../shared/types/caseCriteria';
+import { formatDate } from '../../../shared/utils/date';
 
 interface EvaluationStatusModalProps {
   evaluation: EvaluationConfig;
@@ -15,17 +16,6 @@ interface EvaluationStatusModalProps {
   caseFolders: CaseFolder[];
   onClose: () => void;
 }
-
-const formatDateTime = (value: string | undefined) => {
-  if (!value) {
-    return '';
-  }
-  try {
-    return new Date(value).toLocaleString('en-US');
-  } catch {
-    return value;
-  }
-};
 
 const formatScore = (value: number | undefined | null) =>
   typeof value === 'number' && Number.isFinite(value)
@@ -172,7 +162,7 @@ const buildGeneralRows = (columns: InterviewerColumn[]): SummaryTableRowData[] =
         primary: submitted ? 'Complete' : 'Pending',
         secondary: submitted
           ? column.form?.submittedAt
-            ? `Submitted ${formatDateTime(column.form.submittedAt)}`
+            ? `Submitted ${formatDate(column.form.submittedAt, '')}`
             : null
           : 'Awaiting submission',
         tone: submitted ? 'success' : 'warning'

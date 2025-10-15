@@ -10,6 +10,7 @@ import {
 import { CaseFolder } from '../../shared/types/caseLibrary';
 import { ApiError } from '../../shared/api/httpClient';
 import { useCaseCriteriaState } from '../../app/state/AppStateContext';
+import { formatDate } from '../../shared/utils/date';
 
 interface Banner {
   type: 'info' | 'error';
@@ -116,17 +117,6 @@ const createFormState = (assignment: InterviewerAssignmentView | null): FormStat
     fitCriteria: toCriteriaMap(assignment.form.fitCriteria),
     caseCriteria: toCriteriaMap(assignment.form.caseCriteria)
   };
-};
-
-const formatDateTime = (value: string | undefined) => {
-  if (!value) {
-    return '—';
-  }
-  try {
-    return new Date(value).toLocaleString('en-US');
-  } catch {
-    return value;
-  }
 };
 
 const OFFER_OPTIONS: Array<{ value: OfferRecommendationValue; label: string }> = [
@@ -376,7 +366,7 @@ export const InterviewerScreen = () => {
                 <span className={`${styles.statusPill} ${submitted ? styles.statusPillCompleted : styles.statusPillAssigned}`}>
                   {statusLabel}
                 </span>
-                <span className={styles.listItemMetaText}>Assigned {formatDateTime(assignment.invitationSentAt)}</span>
+                <span className={styles.listItemMetaText}>Assigned {formatDate(assignment.invitationSentAt)}</span>
               </div>
             </li>
           );
@@ -439,7 +429,7 @@ export const InterviewerScreen = () => {
     );
     const roundLabel = `Round ${selectedAssignment.roundNumber}`;
     const submittedAtLabel = selectedAssignment.form?.submittedAt
-      ? formatDateTime(selectedAssignment.form?.submittedAt)
+      ? formatDate(selectedAssignment.form?.submittedAt)
       : null;
     const storedFitScore =
       typeof selectedAssignment.form?.fitScore === 'number' && Number.isFinite(selectedAssignment.form?.fitScore)
@@ -467,8 +457,10 @@ export const InterviewerScreen = () => {
               {targetOffice && <span className={styles.detailMetaItem}>Target office: {targetOffice}</span>}
             </div>
           </div>
-          <span className={`${styles.badge} ${isSubmitted ? styles.badgeSuccess : ''}`}>
-            {isSubmitted ? 'Submitted' : 'In progress'}
+          <span
+            className={`${styles.statusPill} ${isSubmitted ? styles.statusPillCompleted : styles.statusPillAssigned}`}
+          >
+            {isSubmitted ? 'Completed' : 'Assigned'}
           </span>
         </div>
         <div className={styles.detailColumns}>
