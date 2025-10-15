@@ -71,6 +71,7 @@ export interface InterviewAssignmentRecord extends InterviewAssignmentModel {
   evaluationId: string;
   invitationSentAt: string;
   createdAt: string;
+  roundNumber: number;
 }
 
 export interface EvaluationRecord {
@@ -111,6 +112,7 @@ export interface InterviewerAssignmentView {
   invitationSentAt: string;
   evaluationUpdatedAt: string;
   evaluationProcessStatus: EvaluationProcessStatus;
+  roundNumber: number;
   candidate?: CandidateRecord;
   caseFolder?: CaseFolder;
   fitQuestion?: FitQuestionRecord;

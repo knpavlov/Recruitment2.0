@@ -329,6 +329,16 @@ const normalizeAssignment = (value: unknown): InterviewerAssignmentView | null =
     return null;
   }
 
+  const roundNumberValue = (() => {
+    if (typeof (payload as { roundNumber?: unknown }).roundNumber === 'number') {
+      return Number.isFinite((payload as { roundNumber?: number }).roundNumber!)
+        ? (payload as { roundNumber?: number }).roundNumber!
+        : 1;
+    }
+    const parsed = Number(normalizeString((payload as { roundNumber?: unknown }).roundNumber as string));
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+  })();
+
   return {
     evaluationId,
     slotId,
@@ -338,6 +348,7 @@ const normalizeAssignment = (value: unknown): InterviewerAssignmentView | null =
     evaluationUpdatedAt: normalizeIso(payload.evaluationUpdatedAt) ?? new Date().toISOString(),
     evaluationProcessStatus:
       (normalizeString(payload.evaluationProcessStatus) as InterviewerAssignmentView['evaluationProcessStatus']) ?? 'draft',
+    roundNumber: roundNumberValue,
     candidate: normalizeCandidate(payload.candidate),
     caseFolder: normalizeCaseFolder(payload.caseFolder),
     fitQuestion: normalizeFitQuestion(payload.fitQuestion),

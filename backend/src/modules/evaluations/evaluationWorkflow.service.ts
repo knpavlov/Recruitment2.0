@@ -281,10 +281,16 @@ export class EvaluationWorkflowService {
       }
     }
 
+    const historicalSlotIds = evaluation.roundHistory.flatMap((round) =>
+      round.interviews.map((slot) => slot.id)
+    );
+
     await this.evaluations.storeAssignments(trimmed, assignments, {
       status: 'in-progress',
       refreshSlotIds,
-      updateStartedAt: evaluation.processStatus === 'draft'
+      updateStartedAt: evaluation.processStatus === 'draft',
+      roundNumber: evaluation.roundNumber ?? 1,
+      preserveSlotIds: historicalSlotIds
     });
 
     return this.loadEvaluationWithState(trimmed);
@@ -406,6 +412,23 @@ export class EvaluationWorkflowService {
       const evaluation = evaluationMap.get(assignment.evaluationId);
       const form = evaluation?.forms.find((item) => item.slotId === assignment.slotId) ?? null;
       const candidate = evaluation?.candidateId ? candidateMap.get(evaluation.candidateId) ?? undefined : undefined;
+
+      const storedRound = Number.isFinite(Number(assignment.roundNumber))
+        ? Number(assignment.roundNumber)
+        : undefined;
+      let roundNumber = storedRound && storedRound > 0 ? storedRound : undefined;
+      if (!roundNumber && evaluation) {
+        if (evaluation.interviews.some((slot) => slot.id === assignment.slotId)) {
+          roundNumber = evaluation.roundNumber ?? 1;
+        } else {
+          const historyEntry = evaluation.roundHistory.find((round) =>
+            round.interviews.some((slot) => slot.id === assignment.slotId)
+          );
+          roundNumber = historyEntry?.roundNumber;
+        }
+      }
+      roundNumber = roundNumber && roundNumber > 0 ? roundNumber : 1;
+
       return {
         evaluationId: assignment.evaluationId,
         slotId: assignment.slotId,
@@ -414,6 +437,7 @@ export class EvaluationWorkflowService {
         invitationSentAt: assignment.invitationSentAt,
         evaluationUpdatedAt: evaluation?.updatedAt ?? assignment.createdAt,
         evaluationProcessStatus: evaluation?.processStatus ?? 'draft',
+        roundNumber,
         candidate: candidate ?? undefined,
         caseFolder: caseMap.get(assignment.caseFolderId) ?? undefined,
         fitQuestion: questionMap.get(assignment.fitQuestionId) ?? undefined,
