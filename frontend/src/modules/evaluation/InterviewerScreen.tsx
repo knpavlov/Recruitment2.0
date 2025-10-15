@@ -9,6 +9,7 @@ import {
 } from '../../shared/types/evaluation';
 import { CaseFolder } from '../../shared/types/caseLibrary';
 import { ApiError } from '../../shared/api/httpClient';
+import { useCaseCriteriaState } from '../../app/state/AppStateContext';
 
 interface Banner {
   type: 'info' | 'error';
@@ -19,6 +20,7 @@ type CriterionDefinition = {
   id: string;
   title: string;
   ratings: Partial<Record<1 | 2 | 3 | 4 | 5, string>>;
+  position?: number;
 };
 
 interface FormState {
@@ -170,6 +172,11 @@ const CASE_CRITERIA_ORDER = [
 const sortCaseCriteria = (criteria: CriterionDefinition[]): CriterionDefinition[] => {
   const orderMap = new Map(CASE_CRITERIA_ORDER.map((title, index) => [title.toLowerCase(), index]));
   return [...criteria].sort((a, b) => {
+    const positionA = typeof a.position === 'number' ? a.position : Number.POSITIVE_INFINITY;
+    const positionB = typeof b.position === 'number' ? b.position : Number.POSITIVE_INFINITY;
+    if (positionA !== positionB) {
+      return positionA - positionB;
+    }
     const aIndex = orderMap.get(a.title.toLowerCase()) ?? CASE_CRITERIA_ORDER.length;
     const bIndex = orderMap.get(b.title.toLowerCase()) ?? CASE_CRITERIA_ORDER.length;
     if (aIndex !== bIndex) {
@@ -187,6 +194,7 @@ export const InterviewerScreen = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formState, setFormState] = useState<FormState>(createFormState(null));
+  const { list: globalCaseCriteria } = useCaseCriteriaState();
 
   const selectedAssignment = useMemo(() => {
     if (!selectedSlot) {
@@ -413,8 +421,23 @@ export const InterviewerScreen = () => {
       : 'Candidate not assigned';
     const fitQuestion = selectedAssignment.fitQuestion;
     const fitCriteria: CriterionDefinition[] = fitQuestion?.criteria ?? [];
-    const caseCriteriaRaw: CriterionDefinition[] = selectedAssignment.caseFolder?.evaluationCriteria ?? [];
-    const caseCriteria = sortCaseCriteria(caseCriteriaRaw);
+    const caseCriteriaSource = selectedAssignment?.caseCriteria && selectedAssignment.caseCriteria.length > 0
+      ? selectedAssignment.caseCriteria
+      : globalCaseCriteria.length > 0
+        ? globalCaseCriteria
+        : selectedAssignment.caseFolder?.evaluationCriteria ?? [];
+
+    const caseCriteria = sortCaseCriteria(
+      caseCriteriaSource.map((criterion, index) => ({
+        id: criterion.id,
+        title: criterion.title,
+        ratings: criterion.ratings,
+        position:
+          typeof (criterion as { position?: number }).position === 'number'
+            ? (criterion as { position?: number }).position
+            : index
+      }))
+    );
     const resumeLink = candidate?.resume ? (
       <a className={styles.fileLink} href={candidate.resume.dataUrl} download={candidate.resume.fileName}>
         Download resume ({candidate.resume.fileName})
