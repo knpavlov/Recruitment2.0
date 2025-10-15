@@ -232,6 +232,14 @@ interface AssignmentRow extends Record<string, unknown> {
   created_at: Date;
 }
 
+interface ExistingAssignmentRow extends Record<string, unknown> {
+  id: string;
+  slot_id: string;
+  round_number: number | null;
+  invitation_sent_at: Date;
+  created_at: Date;
+}
+
 const mapRowToAssignment = (row: AssignmentRow): InterviewAssignmentRecord => ({
   id: row.id,
   evaluationId: row.evaluation_id,
@@ -421,20 +429,73 @@ export class EvaluationsRepository {
         throw new Error('NOT_FOUND');
       }
 
-      const slotIds = assignments.map((assignment) => assignment.slotId);
       const normalizedRound = Number.isFinite(options.roundNumber)
         ? Math.max(1, Math.trunc(options.roundNumber))
         : 1;
 
-      await client.query(
-        'DELETE FROM evaluation_assignments WHERE evaluation_id = $1 AND round_number = $3 AND NOT (slot_id = ANY($2::text[]));',
-        [evaluationId, slotIds, normalizedRound]
+      const existingAssignmentsResult = await client.query(
+        `SELECT id, slot_id, round_number, invitation_sent_at, created_at
+           FROM evaluation_assignments
+          WHERE evaluation_id = $1;`,
+        [evaluationId]
       );
 
-      const refreshIds = Array.from(new Set(options.refreshSlotIds));
+      const normalizeRowRound = (value: number | null): number => {
+        if (typeof value === 'number' && Number.isInteger(value) && value > 0) {
+          return value;
+        }
+        return 1;
+      };
+
+      const existingRows = existingAssignmentsResult.rows as ExistingAssignmentRow[];
+      const existingBySlot = new Map(
+        existingRows.map((row) => [
+          row.slot_id,
+          {
+            id: row.id,
+            roundNumber: normalizeRowRound(row.round_number),
+            invitationSentAt: row.invitation_sent_at,
+            createdAt: row.created_at
+          }
+        ])
+      );
+
+      const currentSlotIds = new Set(assignments.map((assignment) => assignment.slotId));
+      const slotsToRemove = existingRows
+        .filter((row) => normalizeRowRound(row.round_number) === normalizedRound)
+        .map((row) => row.slot_id)
+        .filter((slotId) => !currentSlotIds.has(slotId));
+
+      if (assignments.length === 0) {
+        await client.query(
+          `DELETE FROM evaluation_assignments
+            WHERE evaluation_id = $1 AND round_number = $2;`,
+          [evaluationId, normalizedRound]
+        );
+      } else if (slotsToRemove.length > 0) {
+        await client.query(
+          `DELETE FROM evaluation_assignments
+            WHERE evaluation_id = $1
+              AND round_number = $3
+              AND slot_id = ANY($2::text[]);`,
+          [evaluationId, slotsToRemove, normalizedRound]
+        );
+      }
+
+      const refreshIdSet = new Set(
+        (options.refreshSlotIds ?? [])
+          .filter((id): id is string => typeof id === 'string')
+          .map((id) => id.trim())
+          .filter((id) => id.length > 0)
+      );
 
       for (const assignment of assignments) {
-        const assignmentId = randomUUID();
+        const existing = existingBySlot.get(assignment.slotId);
+        const isSameRound = existing?.roundNumber === normalizedRound;
+        const assignmentId = isSameRound && existing?.id ? existing.id : randomUUID();
+        const shouldRefresh = refreshIdSet.has(assignment.slotId) || !existing || !isSameRound;
+        const previousInvitation = isSameRound ? existing?.invitationSentAt ?? null : null;
+        const previousCreatedAt = isSameRound ? existing?.createdAt ?? null : null;
         await client.query(
           `INSERT INTO evaluation_assignments (
              id,
@@ -447,19 +508,32 @@ export class EvaluationsRepository {
              round_number,
              invitation_sent_at,
              created_at
-           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
-           ON CONFLICT (evaluation_id, slot_id)
-           DO UPDATE SET
-             interviewer_email = EXCLUDED.interviewer_email,
-             interviewer_name = EXCLUDED.interviewer_name,
-             case_folder_id = EXCLUDED.case_folder_id,
-             fit_question_id = EXCLUDED.fit_question_id,
-             round_number = EXCLUDED.round_number,
-             invitation_sent_at = CASE
-               WHEN EXCLUDED.slot_id = ANY($9::text[])
-                 THEN NOW()
-              ELSE evaluation_assignments.invitation_sent_at
-            END;`,
+           ) VALUES (
+             $1,
+             $2,
+             $3,
+             $4,
+             $5,
+             $6,
+             $7,
+             $8,
+             CASE
+               WHEN $9::boolean THEN NOW()
+               ELSE COALESCE($10::timestamptz, NOW())
+             END,
+             COALESCE($11::timestamptz, NOW())
+           )
+           ON CONFLICT (evaluation_id, slot_id) DO UPDATE
+             SET interviewer_email = EXCLUDED.interviewer_email,
+                 interviewer_name = EXCLUDED.interviewer_name,
+                 case_folder_id = EXCLUDED.case_folder_id,
+                 fit_question_id = EXCLUDED.fit_question_id,
+                 round_number = EXCLUDED.round_number,
+                 invitation_sent_at = CASE
+                   WHEN $9::boolean THEN NOW()
+                   ELSE COALESCE($10::timestamptz, evaluation_assignments.invitation_sent_at)
+                 END,
+                 id = EXCLUDED.id;`,
           [
             assignmentId,
             evaluationId,
@@ -469,7 +543,9 @@ export class EvaluationsRepository {
             assignment.caseFolderId,
             assignment.fitQuestionId,
             normalizedRound,
-            refreshIds
+            shouldRefresh,
+            previousInvitation,
+            previousCreatedAt
           ]
         );
       }
