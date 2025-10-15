@@ -176,6 +176,28 @@
   z-index: 10;
 }
 
+.inviteOptions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 240px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.inviteOption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #0f172a;
+}
+
+.inviteOption input {
+  width: 16px;
+  height: 16px;
+}
+
 .dropdownItem {
   border: none;
   background: rgba(148, 163, 184, 0.14);
@@ -191,6 +213,25 @@
 .dropdownItem:hover,
 .dropdownItem:focus-visible {
   background: rgba(59, 130, 246, 0.2);
+}
+
+.dropdownSendButton {
+  margin-top: 8px;
+  width: 100%;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  color: #ffffff;
+  padding: 10px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dropdownSendButton:disabled {
+  background: rgba(148, 163, 184, 0.3);
+  color: rgba(15, 23, 42, 0.6);
+  cursor: not-allowed;
 }
 
 .decisionButton {

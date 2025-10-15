@@ -60,17 +60,52 @@ export interface EvaluationRoundSnapshot {
   createdAt: string;
 }
 
+export type InvitationSlotStatus = 'pending' | 'delivered' | 'stale' | 'failed' | 'unassigned';
+
+export interface InvitationSlotState {
+  slotId: string;
+  interviewerName: string;
+  interviewerEmail: string;
+  status: InvitationSlotStatus;
+  invitationSentAt?: string | null;
+  lastDeliveryAttemptAt?: string | null;
+  lastDeliveryErrorCode?: string | null;
+  lastDeliveryError?: string | null;
+}
+
 export interface EvaluationInvitationState {
   hasInvitations: boolean;
   hasPendingChanges: boolean;
   lastSentAt?: string;
+  slots: InvitationSlotState[];
+}
+
+export interface InvitationDeliveryFailure {
+  slotId: string;
+  errorCode?: string;
+  errorMessage?: string;
+}
+
+export interface InvitationDeliveryReport {
+  sent: string[];
+  failed: InvitationDeliveryFailure[];
+  skipped: string[];
+}
+
+export interface StoredInterviewAssignmentModel extends InterviewAssignmentModel {
+  detailsChecksum: string;
 }
 
 export interface InterviewAssignmentRecord extends InterviewAssignmentModel {
   id: string;
   evaluationId: string;
   roundNumber: number;
-  invitationSentAt: string;
+  invitationSentAt?: string | null;
+  detailsChecksum: string;
+  lastSentChecksum?: string | null;
+  lastDeliveryErrorCode?: string | null;
+  lastDeliveryError?: string | null;
+  lastDeliveryAttemptAt?: string | null;
   createdAt: string;
 }
 
@@ -109,7 +144,7 @@ export interface InterviewerAssignmentView {
   slotId: string;
   interviewerEmail: string;
   interviewerName: string;
-  invitationSentAt: string;
+  invitationSentAt?: string | null;
   roundNumber: number;
   evaluationUpdatedAt: string;
   evaluationProcessStatus: EvaluationProcessStatus;

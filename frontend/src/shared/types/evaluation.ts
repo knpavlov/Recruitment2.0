@@ -69,6 +69,32 @@ export interface EvaluationInvitationState {
   hasInvitations: boolean;
   hasPendingChanges: boolean;
   lastSentAt?: string;
+  slots: InvitationSlotState[];
+}
+
+export type InvitationSlotStatus = 'pending' | 'delivered' | 'stale' | 'failed' | 'unassigned';
+
+export interface InvitationSlotState {
+  slotId: string;
+  interviewerName: string;
+  interviewerEmail: string;
+  status: InvitationSlotStatus;
+  invitationSentAt?: string | null;
+  lastDeliveryAttemptAt?: string | null;
+  lastDeliveryErrorCode?: string | null;
+  lastDeliveryError?: string | null;
+}
+
+export interface InvitationDeliveryFailure {
+  slotId: string;
+  errorCode?: string;
+  errorMessage?: string;
+}
+
+export interface InvitationDeliveryReport {
+  sent: string[];
+  failed: InvitationDeliveryFailure[];
+  skipped: string[];
 }
 
 export interface InterviewerAssignmentView {

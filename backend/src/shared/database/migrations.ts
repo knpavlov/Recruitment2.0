@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { postgresPool } from './postgres.client.js';
 
 const SUPER_ADMIN_EMAIL = process.env.SUPER_ADMIN_EMAIL ?? 'knpavlov@gmail.com';
@@ -221,6 +221,16 @@ const createTables = async () => {
   `);
 
   await postgresPool.query(`
+    ALTER TABLE evaluation_assignments
+      ALTER COLUMN invitation_sent_at DROP NOT NULL;
+  `);
+
+  await postgresPool.query(`
+    ALTER TABLE evaluation_assignments
+      ALTER COLUMN invitation_sent_at DROP DEFAULT;
+  `);
+
+  await postgresPool.query(`
     WITH slot_data AS (
       SELECT
         ea.id,
@@ -281,6 +291,60 @@ const createTables = async () => {
   await postgresPool.query(`
     ALTER TABLE evaluation_assignments
       ADD COLUMN IF NOT EXISTS round_number INTEGER NOT NULL DEFAULT 1;
+  `);
+
+  await postgresPool.query(`
+    ALTER TABLE evaluation_assignments
+      ADD COLUMN IF NOT EXISTS details_checksum TEXT,
+      ADD COLUMN IF NOT EXISTS last_sent_checksum TEXT,
+      ADD COLUMN IF NOT EXISTS last_delivery_error_code TEXT,
+      ADD COLUMN IF NOT EXISTS last_delivery_error TEXT,
+      ADD COLUMN IF NOT EXISTS last_delivery_attempt_at TIMESTAMPTZ;
+  `);
+
+  const checksumRows = await postgresPool.query<{
+    id: string;
+    interviewer_email: string;
+    interviewer_name: string;
+    case_folder_id: string | null;
+    fit_question_id: string | null;
+  }>(
+    `SELECT id, interviewer_email, interviewer_name, case_folder_id, fit_question_id
+       FROM evaluation_assignments
+      WHERE details_checksum IS NULL;`
+  );
+
+  for (const row of checksumRows.rows) {
+    if (!row.case_folder_id || !row.fit_question_id) {
+      continue;
+    }
+    const hash = createHash('sha256');
+    hash.update(row.interviewer_email ?? '');
+    hash.update('|');
+    hash.update(row.interviewer_name?.trim() ?? '');
+    hash.update('|');
+    hash.update(row.case_folder_id);
+    hash.update('|');
+    hash.update(row.fit_question_id);
+    const checksum = hash.digest('hex');
+    await postgresPool.query(`UPDATE evaluation_assignments SET details_checksum = $2 WHERE id = $1;`, [
+      row.id,
+      checksum
+    ]);
+  }
+
+  await postgresPool.query(`
+    UPDATE evaluation_assignments
+       SET last_sent_checksum = details_checksum
+     WHERE invitation_sent_at IS NOT NULL
+       AND last_sent_checksum IS NULL;
+  `);
+
+  await postgresPool.query(`
+    UPDATE evaluation_assignments
+       SET last_delivery_attempt_at = invitation_sent_at
+     WHERE invitation_sent_at IS NOT NULL
+       AND last_delivery_attempt_at IS NULL;
   `);
 
   // Удаляем возможные дубли записей по слоту, оставляя самую свежую отправку
