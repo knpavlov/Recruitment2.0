@@ -1,6 +1,7 @@
 import { NavigationItem, NavigationKey } from '../../app/navigation';
 import styles from '../../styles/Sidebar.module.css';
 import { useAuth } from '../../modules/auth/AuthContext';
+import { getAccountRoleLabel } from '../../shared/ui/accountRoleLabels';
 
 interface SidebarProps {
   navigationItems: NavigationItem[];
@@ -32,7 +33,12 @@ export const Sidebar = ({ navigationItems, activeItem, onNavigate }: SidebarProp
         ))}
       </nav>
       <div className={styles.logoutBlock}>
-        {session && <p className={styles.sessionInfo}>{session.email}</p>}
+        {session && (
+          <div className={styles.sessionMeta}>
+            <p className={styles.sessionEmail}>{session.email}</p>
+            <span className={styles.sessionRole}>{getAccountRoleLabel(session.role)}</span>
+          </div>
+        )}
         <button
           className={styles.logoutButton}
           onClick={() => logout()}

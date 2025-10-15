@@ -1,0 +1,192 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.subtitle {
+  margin: 8px 0 0;
+  color: #475569;
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.primaryButton {
+  padding: 12px 20px;
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  color: #f8fafc;
+  border: none;
+  border-radius: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.primaryButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.primaryButton:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px rgba(37, 99, 235, 0.25);
+}
+
+.secondaryButton {
+  padding: 12px 20px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: transparent;
+  color: #0f172a;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.secondaryButton:hover {
+  background: rgba(148, 163, 184, 0.15);
+}
+
+.dangerButton {
+  padding: 12px 20px;
+  border-radius: 12px;
+  border: none;
+  background: linear-gradient(135deg, #dc2626, #f87171);
+  color: #f8fafc;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.dangerButton:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px rgba(220, 38, 38, 0.3);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.criterionCard {
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.criterionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fieldGroup span {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.fieldGroup input,
+.fieldGroup textarea {
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: rgba(248, 250, 252, 0.9);
+  font-size: 14px;
+  color: #0f172a;
+}
+
+.fieldGroup textarea {
+  resize: vertical;
+}
+
+.ratingsTable {
+  display: grid;
+  gap: 12px;
+}
+
+.ratingRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ratingLabel {
+  font-size: 13px;
+  color: #475569;
+  font-weight: 600;
+}
+
+.ratingTextarea {
+  min-height: 80px;
+}
+
+.cardActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.feedbackInfo {
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: rgba(59, 130, 246, 0.1);
+  color: #1d4ed8;
+  font-size: 13px;
+}
+
+.feedbackError {
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: rgba(220, 38, 38, 0.12);
+  color: #b91c1c;
+  font-size: 13px;
+}
+
+.emptyState {
+  border: 1px dashed rgba(148, 163, 184, 0.5);
+  border-radius: 16px;
+  padding: 32px;
+  text-align: center;
+  color: #475569;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.banner {
+  padding: 16px 20px;
+  border-radius: 16px;
+  font-weight: 500;
+}
+
+.bannerInfo {
+  background: rgba(59, 130, 246, 0.12);
+  color: #1d4ed8;
+}
+
+.bannerError {
+  background: rgba(220, 38, 38, 0.12);
+  color: #b91c1c;
+}

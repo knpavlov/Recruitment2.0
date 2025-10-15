@@ -11,6 +11,7 @@ import {
   CandidateTargetPractice
 } from '../../../shared/types/candidate';
 import { CaseFileRecord, CaseFolder } from '../../../shared/types/caseLibrary';
+import { CaseCriterion } from '../../../shared/types/caseCriteria';
 import { FitQuestion } from '../../../shared/types/fitQuestion';
 
 const normalizeString = (value: unknown): string | undefined => {
@@ -233,6 +234,43 @@ const normalizeCaseFolder = (value: unknown): CaseFolder | undefined => {
   };
 };
 
+const normalizeCaseCriterion = (value: unknown): CaseCriterion | undefined => {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+  const payload = value as Partial<CaseCriterion> & { id?: unknown };
+  const id = normalizeString(payload.id)?.trim();
+  const title = normalizeString(payload.title)?.trim();
+  if (!id || !title) {
+    return undefined;
+  }
+  const ratings: CaseCriterion['ratings'] = {};
+  const source = payload.ratings && typeof payload.ratings === 'object' ? (payload.ratings as Record<string, unknown>) : {};
+  for (const score of [1, 2, 3, 4, 5] as const) {
+    const valueRaw = normalizeString(source[String(score)]);
+    if (valueRaw) {
+      ratings[score] = valueRaw;
+    }
+  }
+  return {
+    id,
+    title,
+    ratings,
+    version: normalizeNumber(payload.version) ?? 1,
+    createdAt: normalizeIso(payload.createdAt) ?? new Date().toISOString(),
+    updatedAt: normalizeIso(payload.updatedAt) ?? new Date().toISOString()
+  };
+};
+
+const normalizeCaseCriteriaList = (value: unknown): CaseCriterion[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((item) => normalizeCaseCriterion(item))
+    .filter((criterion): criterion is CaseCriterion => Boolean(criterion));
+};
+
 const normalizeFitQuestion = (value: unknown): FitQuestion | undefined => {
   if (!value || typeof value !== 'object') {
     return undefined;
@@ -320,6 +358,8 @@ const normalizeAssignment = (value: unknown): InterviewerAssignmentView | null =
     caseFolder?: unknown;
     fitQuestion?: unknown;
     form?: unknown;
+    roundNumber?: unknown;
+    caseCriteria?: unknown;
   };
 
   const evaluationId = normalizeString(payload.evaluationId)?.trim();
@@ -338,9 +378,14 @@ const normalizeAssignment = (value: unknown): InterviewerAssignmentView | null =
     evaluationUpdatedAt: normalizeIso(payload.evaluationUpdatedAt) ?? new Date().toISOString(),
     evaluationProcessStatus:
       (normalizeString(payload.evaluationProcessStatus) as InterviewerAssignmentView['evaluationProcessStatus']) ?? 'draft',
+    roundNumber: normalizeNumber(payload.roundNumber) ?? 1,
     candidate: normalizeCandidate(payload.candidate),
     caseFolder: normalizeCaseFolder(payload.caseFolder),
     fitQuestion: normalizeFitQuestion(payload.fitQuestion),
+    caseCriteria: (() => {
+      const list = normalizeCaseCriteriaList(payload.caseCriteria);
+      return list.length ? list : undefined;
+    })(),
     form: normalizeForm(payload.form)
   };
 };

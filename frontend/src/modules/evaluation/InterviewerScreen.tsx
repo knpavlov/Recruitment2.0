@@ -361,13 +361,17 @@ export const InterviewerScreen = () => {
             : 'Candidate not assigned';
           const submitted = assignment.form?.submitted ?? false;
           const statusLabel = submitted ? 'Completed' : 'Assigned';
+          const roundLabel = `Round ${assignment.roundNumber ?? 1}`;
           return (
             <li
               key={assignment.slotId}
               className={`${styles.listItem} ${selectedSlot === assignment.slotId ? styles.listItemActive : ''}`}
               onClick={() => setSelectedSlot(assignment.slotId)}
             >
-              <div className={styles.listItemTitle}>{candidateName}</div>
+              <div className={styles.listItemTitleRow}>
+                <span className={styles.listItemTitle}>{candidateName}</span>
+                <span className={styles.roundBadge}>{roundLabel}</span>
+              </div>
               <div className={styles.listItemMetaRow}>
                 <span className={`${styles.statusPill} ${submitted ? styles.statusPillCompleted : styles.statusPillAssigned}`}>
                   {statusLabel}
@@ -411,8 +415,19 @@ export const InterviewerScreen = () => {
       : 'Candidate not assigned';
     const fitQuestion = selectedAssignment.fitQuestion;
     const fitCriteria: CriterionDefinition[] = fitQuestion?.criteria ?? [];
-    const caseCriteriaRaw: CriterionDefinition[] = selectedAssignment.caseFolder?.evaluationCriteria ?? [];
-    const caseCriteria = sortCaseCriteria(caseCriteriaRaw);
+    const caseCriteriaSource: CriterionDefinition[] =
+      selectedAssignment.caseCriteria && selectedAssignment.caseCriteria.length > 0
+        ? selectedAssignment.caseCriteria.map((criterion) => ({
+            id: criterion.id,
+            title: criterion.title,
+            ratings: criterion.ratings
+          }))
+        : (selectedAssignment.caseFolder?.evaluationCriteria ?? []).map((criterion) => ({
+            id: criterion.id,
+            title: criterion.title,
+            ratings: criterion.ratings
+          }));
+    const caseCriteria = sortCaseCriteria(caseCriteriaSource);
     const resumeLink = candidate?.resume ? (
       <a className={styles.fileLink} href={candidate.resume.dataUrl} download={candidate.resume.fileName}>
         Download resume ({candidate.resume.fileName})

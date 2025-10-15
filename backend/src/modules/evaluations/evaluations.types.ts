@@ -46,6 +46,7 @@ export interface InterviewAssignmentModel {
   interviewerName: string;
   caseFolderId: string;
   fitQuestionId: string;
+  roundNumber: number;
 }
 
 export interface EvaluationRoundSnapshot {
@@ -111,8 +112,10 @@ export interface InterviewerAssignmentView {
   invitationSentAt: string;
   evaluationUpdatedAt: string;
   evaluationProcessStatus: EvaluationProcessStatus;
+  roundNumber: number;
   candidate?: CandidateRecord;
   caseFolder?: CaseFolder;
   fitQuestion?: FitQuestionRecord;
+  caseCriteria?: import('../caseCriteria/caseCriteria.types.js').CaseCriterionRecord[];
   form: InterviewStatusModel | null;
 }

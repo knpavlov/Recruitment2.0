@@ -6,7 +6,8 @@ import {
   useEvaluationsState,
   useCandidatesState,
   useCasesState,
-  useFitQuestionsState
+  useFitQuestionsState,
+  useCaseCriteriaState
 } from '../../app/state/AppStateContext';
 import { EvaluationConfig } from '../../shared/types/evaluation';
 import { EvaluationTable, EvaluationTableRow } from './components/EvaluationTable';
@@ -35,6 +36,7 @@ export const EvaluationScreen = () => {
   const { list: candidates } = useCandidatesState();
   const { folders } = useCasesState();
   const { list: fitQuestions } = useFitQuestionsState();
+  const { list: caseCriteria } = useCaseCriteriaState();
   const [banner, setBanner] = useState<Banner>(null);
   const [modalEvaluation, setModalEvaluation] = useState<EvaluationConfig | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -501,6 +503,7 @@ export const EvaluationScreen = () => {
           roundLabel={statusContext.roundLabel}
           fitQuestions={fitQuestions}
           caseFolders={folders}
+          caseCriteria={caseCriteria}
           onClose={() => setStatusContext(null)}
         />
       )}
