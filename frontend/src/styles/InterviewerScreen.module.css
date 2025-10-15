@@ -50,6 +50,31 @@
   transition: border-color 0.2s ease, background-color 0.2s ease;
 }
 
+.listItemLayout {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: start;
+}
+
+.roundBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: #e0e7ff;
+  color: #312e81;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.listItemBody {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .listItem:hover {
   border-color: #6366f1;
 }
@@ -62,7 +87,7 @@
 .listItemTitle {
   font-size: 16px;
   font-weight: 600;
-  margin-bottom: 4px;
+  margin: 0;
 }
 
 .listItemMetaRow {

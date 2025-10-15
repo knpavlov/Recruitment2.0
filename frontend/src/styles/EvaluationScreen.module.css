@@ -72,7 +72,7 @@
 }
 
 .actionsHeader {
-  width: 360px;
+  width: 320px;
 }
 
 .sortButton {
@@ -97,10 +97,8 @@
 }
 
 .actionsCell {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  align-items: stretch;
+  padding: 16px;
+  vertical-align: top;
 }
 
 .actionButton {
@@ -108,7 +106,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 10px 16px;
+  padding: 8px 16px;
   border-radius: 12px;
   border: none;
   font-size: 14px;
@@ -142,9 +140,10 @@
   border-color: rgba(148, 163, 184, 0.28);
 }
 
-.actionsRow {
+.actionsGrid {
   display: grid;
-  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
   align-items: stretch;
 }
 
@@ -228,12 +227,8 @@
 
 
 @media (max-width: 960px) {
-  .actionsCell {
-    gap: 12px;
-  }
-
-  .actionsRow {
-    gap: 10px;
+  .actionsGrid {
+    gap: 8px;
   }
 
   .dropdownMenu {

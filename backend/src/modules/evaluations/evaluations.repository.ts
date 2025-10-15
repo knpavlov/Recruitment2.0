@@ -229,6 +229,7 @@ interface AssignmentRow extends Record<string, unknown> {
   fit_question_id: string;
   invitation_sent_at: Date;
   created_at: Date;
+  round_number?: number | null;
 }
 
 const mapRowToAssignment = (row: AssignmentRow): InterviewAssignmentRecord => ({
@@ -240,7 +241,10 @@ const mapRowToAssignment = (row: AssignmentRow): InterviewAssignmentRecord => ({
   caseFolderId: row.case_folder_id,
   fitQuestionId: row.fit_question_id,
   invitationSentAt: row.invitation_sent_at.toISOString(),
-  createdAt: row.created_at.toISOString()
+  createdAt: row.created_at.toISOString(),
+  roundNumber: typeof row.round_number === 'number' && Number.isFinite(row.round_number)
+    ? row.round_number
+    : 1
 });
 
 export class EvaluationsRepository {
@@ -402,6 +406,8 @@ export class EvaluationsRepository {
       status: EvaluationRecord['processStatus'];
       refreshSlotIds: string[];
       updateStartedAt: boolean;
+      roundNumber: number;
+      preserveSlotIds?: string[];
     }
   ): Promise<void> {
     const client = await (postgresPool as unknown as { connect: () => Promise<any> }).connect();
@@ -419,11 +425,26 @@ export class EvaluationsRepository {
       }
 
       const slotIds = assignments.map((assignment) => assignment.slotId);
+      const keepIds = new Set<string>();
+      for (const id of slotIds) {
+        if (id) {
+          keepIds.add(id);
+        }
+      }
+      for (const preserved of options.preserveSlotIds ?? []) {
+        if (preserved) {
+          keepIds.add(preserved);
+        }
+      }
 
-      await client.query(
-        'DELETE FROM evaluation_assignments WHERE evaluation_id = $1 AND NOT (slot_id = ANY($2::text[]));',
-        [evaluationId, slotIds]
-      );
+      if (keepIds.size > 0) {
+        await client.query(
+          'DELETE FROM evaluation_assignments WHERE evaluation_id = $1 AND NOT (slot_id = ANY($2::text[]));',
+          [evaluationId, Array.from(keepIds)]
+        );
+      } else {
+        await client.query('DELETE FROM evaluation_assignments WHERE evaluation_id = $1;', [evaluationId]);
+      }
 
       const refreshIds = Array.from(new Set(options.refreshSlotIds));
 
@@ -439,16 +460,18 @@ export class EvaluationsRepository {
              case_folder_id,
              fit_question_id,
              invitation_sent_at,
-             created_at
-           ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+             created_at,
+             round_number
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW(), $8)
            ON CONFLICT (evaluation_id, slot_id)
            DO UPDATE SET
              interviewer_email = EXCLUDED.interviewer_email,
              interviewer_name = EXCLUDED.interviewer_name,
              case_folder_id = EXCLUDED.case_folder_id,
              fit_question_id = EXCLUDED.fit_question_id,
+             round_number = EXCLUDED.round_number,
              invitation_sent_at = CASE
-               WHEN EXCLUDED.slot_id = ANY($8::text[])
+               WHEN EXCLUDED.slot_id = ANY($9::text[])
                  THEN NOW()
                ELSE evaluation_assignments.invitation_sent_at
              END;`,
@@ -460,6 +483,7 @@ export class EvaluationsRepository {
             assignment.interviewerName,
             assignment.caseFolderId,
             assignment.fitQuestionId,
+            options.roundNumber,
             refreshIds
           ]
         );
@@ -495,6 +519,7 @@ export class EvaluationsRepository {
               interviewer_name,
               case_folder_id,
               fit_question_id,
+              round_number,
               invitation_sent_at,
               created_at
          FROM evaluation_assignments
@@ -514,6 +539,7 @@ export class EvaluationsRepository {
               interviewer_name,
               case_folder_id,
               fit_question_id,
+              round_number,
               invitation_sent_at,
               created_at
          FROM evaluation_assignments
@@ -536,6 +562,7 @@ export class EvaluationsRepository {
               interviewer_name,
               case_folder_id,
               fit_question_id,
+              round_number,
               invitation_sent_at,
               created_at
          FROM evaluation_assignments

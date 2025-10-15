@@ -361,18 +361,28 @@ export const InterviewerScreen = () => {
             : 'Candidate not assigned';
           const submitted = assignment.form?.submitted ?? false;
           const statusLabel = submitted ? 'Completed' : 'Assigned';
+          const roundLabel = `Round ${assignment.roundNumber}`;
           return (
             <li
               key={assignment.slotId}
               className={`${styles.listItem} ${selectedSlot === assignment.slotId ? styles.listItemActive : ''}`}
               onClick={() => setSelectedSlot(assignment.slotId)}
             >
-              <div className={styles.listItemTitle}>{candidateName}</div>
-              <div className={styles.listItemMetaRow}>
-                <span className={`${styles.statusPill} ${submitted ? styles.statusPillCompleted : styles.statusPillAssigned}`}>
-                  {statusLabel}
-                </span>
-                <span className={styles.listItemMetaText}>Assigned {formatDateTime(assignment.invitationSentAt)}</span>
+              <div className={styles.listItemLayout}>
+                <span className={styles.roundBadge}>{roundLabel}</span>
+                <div className={styles.listItemBody}>
+                  <div className={styles.listItemTitle}>{candidateName}</div>
+                  <div className={styles.listItemMetaRow}>
+                    <span
+                      className={`${styles.statusPill} ${submitted ? styles.statusPillCompleted : styles.statusPillAssigned}`}
+                    >
+                      {statusLabel}
+                    </span>
+                    <span className={styles.listItemMetaText}>
+                      Assigned {formatDateTime(assignment.invitationSentAt)}
+                    </span>
+                  </div>
+                </div>
               </div>
             </li>
           );
@@ -437,18 +447,28 @@ export const InterviewerScreen = () => {
     const displayCaseScore = calculatedCaseScore ?? storedCaseScore;
     const targetOffice = candidate?.targetOffice?.trim();
     const targetRole = candidate?.desiredPosition?.trim();
+    const assignedLabel = selectedAssignment.invitationSentAt
+      ? formatDateTime(selectedAssignment.invitationSentAt)
+      : null;
+    const metaItems: string[] = [
+      `Round ${selectedAssignment.roundNumber}`,
+      ...(assignedLabel ? [`Assigned ${assignedLabel}`] : []),
+      ...(targetRole ? [`Target role: ${targetRole}`] : []),
+      ...(targetOffice ? [`Target office: ${targetOffice}`] : [])
+    ];
 
     return (
       <div className={styles.detailPanel}>
         <div className={styles.detailHeader}>
           <div>
             <h2 className={styles.detailTitle}>{candidateName}</h2>
-            {(targetRole || targetOffice) && (
-              <div className={styles.detailMeta}>
-                {targetRole && <span className={styles.detailMetaItem}>Target role: {targetRole}</span>}
-                {targetOffice && <span className={styles.detailMetaItem}>Target office: {targetOffice}</span>}
-              </div>
-            )}
+            <div className={styles.detailMeta}>
+              {metaItems.map((item, index) => (
+                <span key={`${item}-${index}`} className={styles.detailMetaItem}>
+                  {item}
+                </span>
+              ))}
+            </div>
           </div>
           <span className={`${styles.badge} ${isSubmitted ? styles.badgeSuccess : ''}`}>
             {isSubmitted ? 'Submitted' : 'In progress'}
