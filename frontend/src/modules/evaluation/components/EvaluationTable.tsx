@@ -1,9 +1,15 @@
-import { ChangeEvent, useState } from 'react';
+import { ChangeEvent, useEffect, useState } from 'react';
 import styles from '../../../styles/EvaluationScreen.module.css';
 
 type DecisionOption = 'offer' | 'progress' | 'reject';
 
 type SortableColumnKey = 'name' | 'position' | 'created' | 'round' | 'avgFit' | 'avgCase';
+
+type InviteOption = {
+  slotId: string;
+  name: string;
+  email: string;
+};
 
 export interface EvaluationTableRow {
   id: string;
@@ -25,9 +31,10 @@ export interface EvaluationTableRow {
   invitesButtonLabel: string;
   invitesDisabled: boolean;
   invitesTooltip?: string;
-  invitesMenuAvailable: boolean;
-  onSendInvitesAll: () => void;
-  onSendInvitesUpdated: () => void;
+  hasInvitations: boolean;
+  invitesPendingChanges: boolean;
+  inviteOptions: InviteOption[];
+  onSendInvites: (slotIds: string[] | null) => void;
   onEdit: () => void;
   onOpenStatus: () => void;
   decisionDisabled: boolean;
@@ -60,6 +67,127 @@ const DECISION_OPTIONS: Array<{ option: DecisionOption; label: string }> = [
   { option: 'progress', label: 'Progress to next round' },
   { option: 'reject', label: 'Reject' }
 ];
+
+interface ResendInvitesControlProps {
+  buttonLabel: string;
+  disabled: boolean;
+  tooltip?: string;
+  open: boolean;
+  onToggle: () => void;
+  onClose: () => void;
+  options: InviteOption[];
+  hasPendingChanges: boolean;
+  onSend: (slotIds: string[]) => void;
+}
+
+const ResendInvitesControl = ({
+  buttonLabel,
+  disabled,
+  tooltip,
+  open,
+  onToggle,
+  onClose,
+  options,
+  hasPendingChanges,
+  onSend
+}: ResendInvitesControlProps) => {
+  const [selection, setSelection] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (open) {
+      setSelection(new Set(options.map((item) => item.slotId)));
+    } else {
+      setSelection(new Set());
+    }
+  }, [open, options]);
+
+  const toggleSlot = (slotId: string) => {
+    setSelection((current) => {
+      const next = new Set(current);
+      if (next.has(slotId)) {
+        next.delete(slotId);
+      } else {
+        next.add(slotId);
+      }
+      return next;
+    });
+  };
+
+  const allSelected = options.length > 0 && selection.size === options.length;
+
+  const toggleAll = () => {
+    if (allSelected) {
+      setSelection(new Set());
+      return;
+    }
+    setSelection(new Set(options.map((item) => item.slotId)));
+  };
+
+  const sendDisabled = selection.size === 0;
+
+  const handleSend = () => {
+    if (sendDisabled) {
+      return;
+    }
+    onSend(Array.from(selection));
+    onClose();
+  };
+
+  const helperText = hasPendingChanges
+    ? 'Share the latest updates with selected interviewers.'
+    : 'Resend invitations to selected interviewers.';
+
+  return (
+    <div className={styles.buttonWithMenu}>
+      <button
+        type="button"
+        className={`${styles.actionButton} ${styles.neutralButton}`}
+        onClick={() => {
+          if (disabled) {
+            return;
+          }
+          onToggle();
+        }}
+        disabled={disabled}
+        data-tooltip={tooltip ?? undefined}
+      >
+        {buttonLabel}
+      </button>
+      {open && (
+        <div className={styles.invitesMenu}>
+          <p className={styles.invitesMenuHeader}>{helperText}</p>
+          <label className={styles.invitesSelectAll}>
+            <input type="checkbox" checked={allSelected} onChange={toggleAll} />
+            <span>Select all</span>
+          </label>
+          <div className={styles.invitesList}>
+            {options.map((option) => (
+              <label key={option.slotId} className={styles.invitesOption}>
+                <input
+                  type="checkbox"
+                  checked={selection.has(option.slotId)}
+                  onChange={() => toggleSlot(option.slotId)}
+                />
+                <div className={styles.invitesOptionText}>
+                  <span className={styles.invitesOptionName}>{option.name}</span>
+                  <span className={styles.invitesOptionEmail}>{option.email}</span>
+                </div>
+              </label>
+            ))}
+          </div>
+          <button
+            type="button"
+            className={styles.invitesSendButton}
+            disabled={sendDisabled}
+            onClick={handleSend}
+          >
+            Send
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: EvaluationTableProps) => {
   const [openDecisionId, setOpenDecisionId] = useState<string | null>(null);
@@ -142,12 +270,7 @@ export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: 
             };
 
             const handleInvitesClick = () => {
-              if (row.invitesDisabled) {
-                return;
-              }
-              if (!row.invitesMenuAvailable) {
-                closeMenus();
-                row.onSendInvitesAll();
+              if (row.invitesDisabled || !row.hasInvitations) {
                 return;
               }
               setOpenDecisionId(null);
@@ -205,41 +328,37 @@ export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: 
                       </button>
                     </div>
                     <div className={styles.actionCell}>
-                      <div className={styles.buttonWithMenu}>
-                        <button
-                          type="button"
-                          className={`${styles.actionButton} ${styles.neutralButton}`}
-                          onClick={handleInvitesClick}
+                      {row.hasInvitations ? (
+                        <ResendInvitesControl
+                          buttonLabel={row.invitesButtonLabel}
                           disabled={row.invitesDisabled}
-                          data-tooltip={row.invitesTooltip ?? undefined}
-                        >
-                          {row.invitesButtonLabel}
-                        </button>
-                        {row.invitesMenuAvailable && isInvitesMenuOpen && (
-                          <div className={styles.dropdownMenu}>
-                            <button
-                              type="button"
-                              className={styles.dropdownItem}
-                              onClick={() => {
-                                closeMenus();
-                                row.onSendInvitesAll();
-                              }}
-                            >
-                              Send invites to all interviewers
-                            </button>
-                            <button
-                              type="button"
-                              className={styles.dropdownItem}
-                              onClick={() => {
-                                closeMenus();
-                                row.onSendInvitesUpdated();
-                              }}
-                            >
-                              Send invites only to updated interviewers
-                            </button>
-                          </div>
-                        )}
-                      </div>
+                          tooltip={row.invitesTooltip}
+                          open={isInvitesMenuOpen}
+                          onToggle={handleInvitesClick}
+                          onClose={closeMenus}
+                          options={row.inviteOptions}
+                          hasPendingChanges={row.invitesPendingChanges}
+                          onSend={(slotIds) => {
+                            closeMenus();
+                            row.onSendInvites(slotIds);
+                          }}
+                        />
+                      ) : (
+                        <div className={styles.buttonWithMenu}>
+                          <button
+                            type="button"
+                            className={`${styles.actionButton} ${styles.neutralButton}`}
+                            onClick={() => {
+                              closeMenus();
+                              row.onSendInvites(null);
+                            }}
+                            disabled={row.invitesDisabled}
+                            data-tooltip={row.invitesTooltip ?? undefined}
+                          >
+                            {row.invitesButtonLabel}
+                          </button>
+                        </div>
+                      )}
                     </div>
                     <div className={styles.actionCell}>
                       <button

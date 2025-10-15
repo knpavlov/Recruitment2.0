@@ -193,6 +193,110 @@
   background: rgba(59, 130, 246, 0.2);
 }
 
+.invitesMenu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  min-width: 280px;
+  max-width: 320px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.18);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  z-index: 12;
+}
+
+.invitesMenuHeader {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #475569;
+}
+
+.invitesSelectAll {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+  cursor: pointer;
+}
+
+.invitesSelectAll input {
+  width: 16px;
+  height: 16px;
+}
+
+.invitesList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.invitesOption {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px;
+  border-radius: 10px;
+  background: rgba(148, 163, 184, 0.12);
+  cursor: pointer;
+}
+
+.invitesOption input {
+  margin-top: 2px;
+}
+
+.invitesOptionText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.invitesOptionName {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.invitesOptionEmail {
+  font-size: 12px;
+  color: #475569;
+  word-break: break-word;
+}
+
+.invitesSendButton {
+  align-self: flex-end;
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: none;
+  background: linear-gradient(135deg, #3b82f6, #6366f1);
+  color: #ffffff;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.invitesSendButton:disabled {
+  background: rgba(148, 163, 184, 0.35);
+  color: #475569;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.invitesSendButton:not(:disabled):hover,
+.invitesSendButton:not(:disabled):focus-visible {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px rgba(59, 130, 246, 0.3);
+}
+
 .decisionButton {
   color: #ffffff;
   border: none;

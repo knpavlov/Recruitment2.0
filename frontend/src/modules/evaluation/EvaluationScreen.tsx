@@ -64,8 +64,12 @@ export const EvaluationScreen = () => {
   }, [candidates]);
 
   const handleSendInvites = useCallback(
-    async (evaluation: EvaluationConfig, scope: 'all' | 'updated') => {
-      const result = await sendInvitations(evaluation.id, scope);
+    async (evaluation: EvaluationConfig, slotIds?: string[] | null) => {
+      const normalizedIds =
+        Array.isArray(slotIds) && slotIds.length > 0
+          ? Array.from(new Set(slotIds.map((id) => id.trim()).filter((id) => id.length > 0)))
+          : undefined;
+      const result = await sendInvitations(evaluation.id, normalizedIds);
       if (!result.ok) {
         if (result.error === 'missing-assignment-data') {
           setBanner({
@@ -106,10 +110,17 @@ export const EvaluationScreen = () => {
         setBanner({ type: 'error', text: 'Failed to send invitations.' });
         return;
       }
-      const message =
-        scope === 'all'
-          ? 'Invitations sent to interviewers.'
-          : 'Updated invitations sent to selected interviewers.';
+      const totalSlots = evaluation.interviews.length;
+      let message = 'Invitations sent to interviewers.';
+      if (evaluation.invitationState.hasInvitations) {
+        if (!normalizedIds || normalizedIds.length === 0) {
+          message = 'Invitations resent to all interviewers.';
+        } else if (normalizedIds.length === totalSlots) {
+          message = 'Invitations resent to all interviewers.';
+        } else {
+          message = `Invitations resent to ${normalizedIds.length} interviewer(s).`;
+        }
+      }
       setBanner({ type: 'info', text: message });
     },
     [sendInvitations]
@@ -247,12 +258,18 @@ export const EvaluationScreen = () => {
         invitesTooltip = 'Complete all interviewer, case and fit question assignments before sending invites.';
       }
 
-      const invitesMenuAvailable =
-        evaluation.invitationState.hasInvitations && evaluation.invitationState.hasPendingChanges && !isHistoricalView;
-      const invitesButtonLabel = evaluation.invitationState.hasInvitations ? 'Send Invites Again' : 'Send Invites';
-      if (!invitesDisabled && evaluation.invitationState.hasInvitations && !evaluation.invitationState.hasPendingChanges) {
+      const hasInvitations = evaluation.invitationState.hasInvitations;
+      const invitesPendingChanges = evaluation.invitationState.hasPendingChanges;
+      const invitesButtonLabel = hasInvitations ? 'Send invites again' : 'Send invites';
+      if (!invitesDisabled && hasInvitations && !invitesPendingChanges) {
         invitesTooltip = 'Invitations were already sent. Use this action to resend the same details.';
       }
+
+      const inviteOptions = evaluation.interviews.map((slot) => ({
+        slotId: slot.id,
+        name: slot.interviewerName.trim() || 'Interviewer',
+        email: slot.interviewerEmail.trim() || '—'
+      }));
 
       const decisionDisabled = isHistoricalView || !allFormsSubmitted;
       let decisionTooltip: string | undefined;
@@ -290,12 +307,11 @@ export const EvaluationScreen = () => {
         setRoundSelections((prev) => ({ ...prev, [evaluation.id]: round }));
       };
 
-      const sendAll = () => {
-        void handleSendInvites(evaluation, 'all');
-      };
-
-      const sendUpdated = () => {
-        void handleSendInvites(evaluation, 'updated');
+      const dispatchInvites = (slots: string[] | null) => {
+        if (Array.isArray(slots) && slots.length === 0) {
+          return;
+        }
+        void handleSendInvites(evaluation, slots);
       };
 
       const decide = (option: DecisionOption) => {
@@ -334,9 +350,10 @@ export const EvaluationScreen = () => {
         invitesButtonLabel,
         invitesDisabled,
         invitesTooltip,
-        invitesMenuAvailable,
-        onSendInvitesAll: sendAll,
-        onSendInvitesUpdated: sendUpdated,
+        hasInvitations,
+        invitesPendingChanges,
+        inviteOptions,
+        onSendInvites: dispatchInvites,
         onEdit: () => {
           setModalEvaluation(evaluation);
           setIsModalOpen(true);

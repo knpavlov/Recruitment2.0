@@ -86,13 +86,15 @@ router.post('/:id/start', async (req, res) => {
 
 router.post('/:id/invitations', async (req, res) => {
   try {
-    const body = (req.body ?? {}) as { scope?: unknown; portalBaseUrl?: unknown };
-    const scope = body.scope === 'updated' ? 'updated' : 'all';
+    const body = (req.body ?? {}) as { slotIds?: unknown; portalBaseUrl?: unknown };
     const portalBaseUrl = typeof body.portalBaseUrl === 'string' ? body.portalBaseUrl.trim() : undefined;
     const requestOrigin = req.get('origin');
     const resolvedBase = portalBaseUrl && portalBaseUrl.length > 0 ? portalBaseUrl : requestOrigin;
+    const slotIds = Array.isArray(body.slotIds)
+      ? body.slotIds.filter((value): value is string => typeof value === 'string')
+      : undefined;
     const evaluation = await evaluationWorkflowService.sendInvitations(req.params.id, {
-      scope,
+      slotIds,
       portalBaseUrl: resolvedBase
     });
     res.json(evaluation);

@@ -63,7 +63,7 @@ interface AppStateContextValue {
       expectedVersion: number | null
     ) => Promise<DomainResult<EvaluationConfig>>;
     removeEvaluation: (id: string) => Promise<DomainResult<string>>;
-    sendInvitations: (id: string, scope: 'all' | 'updated') => Promise<DomainResult<EvaluationConfig>>;
+    sendInvitations: (id: string, slotIds?: string[]) => Promise<DomainResult<EvaluationConfig>>;
     advanceRound: (id: string) => Promise<DomainResult<EvaluationConfig>>;
   };
   accounts: {
@@ -574,9 +574,9 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
           return { ok: false, error: 'unknown' };
         }
       },
-      sendInvitations: async (id, scope) => {
+      sendInvitations: async (id, slotIds) => {
         try {
-          const updated = await evaluationsApi.sendInvitations(id, scope);
+          const updated = await evaluationsApi.sendInvitations(id, slotIds);
           setEvaluations((prev) => prev.map((item) => (item.id === id ? updated : item)));
           return { ok: true, data: updated };
         } catch (error) {
