@@ -1,6 +1,7 @@
 import type { CandidateRecord } from '../candidates/candidates.types.js';
 import type { CaseFolder } from '../cases/cases.types.js';
 import type { FitQuestionRecord } from '../questions/questions.types.js';
+import type { CaseCriterionRecord } from '../caseCriteria/caseCriteria.types.js';
 
 export interface InterviewSlotModel {
   id: string;
@@ -116,5 +117,7 @@ export interface InterviewerAssignmentView {
   candidate?: CandidateRecord;
   caseFolder?: CaseFolder;
   fitQuestion?: FitQuestionRecord;
+  caseCriteria?: CaseCriterionRecord[];
+  caseCriteriaVersion?: number;
   form: InterviewStatusModel | null;
 }

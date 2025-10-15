@@ -11,6 +11,7 @@ import {
   CandidateTargetPractice
 } from '../../../shared/types/candidate';
 import { CaseFileRecord, CaseFolder } from '../../../shared/types/caseLibrary';
+import { CaseCriterion } from '../../../shared/types/caseCriteria';
 import { FitQuestion } from '../../../shared/types/fitQuestion';
 
 const normalizeString = (value: unknown): string | undefined => {
@@ -183,6 +184,36 @@ const normalizeCaseFile = (value: unknown): CaseFileRecord | undefined => {
   };
 };
 
+const normalizeCaseCriterion = (value: unknown): CaseCriterion | undefined => {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+  const payload = value as Partial<CaseCriterion> & { id?: unknown };
+  const id = normalizeString(payload.id)?.trim();
+  const title = normalizeString(payload.title)?.trim();
+  if (!id || !title) {
+    return undefined;
+  }
+  const ratings: CaseCriterion['ratings'] = {};
+  const source = (payload.ratings ?? {}) as Record<string, unknown>;
+  for (const score of [1, 2, 3, 4, 5] as const) {
+    const valueRaw = normalizeString(source[String(score)]);
+    if (valueRaw) {
+      ratings[score] = valueRaw;
+    }
+  }
+  return { id, title, ratings };
+};
+
+const normalizeCaseCriteriaList = (value: unknown): CaseCriterion[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((item) => normalizeCaseCriterion(item))
+    .filter((criterion): criterion is CaseCriterion => Boolean(criterion));
+};
+
 const normalizeCaseFolder = (value: unknown): CaseFolder | undefined => {
   if (!value || typeof value !== 'object') {
     return undefined;
@@ -321,6 +352,8 @@ const normalizeAssignment = (value: unknown): InterviewerAssignmentView | null =
     caseFolder?: unknown;
     fitQuestion?: unknown;
     form?: unknown;
+    caseCriteria?: unknown;
+    caseCriteriaVersion?: unknown;
   };
 
   const evaluationId = normalizeString(payload.evaluationId)?.trim();
@@ -343,6 +376,8 @@ const normalizeAssignment = (value: unknown): InterviewerAssignmentView | null =
     candidate: normalizeCandidate(payload.candidate),
     caseFolder: normalizeCaseFolder(payload.caseFolder),
     fitQuestion: normalizeFitQuestion(payload.fitQuestion),
+    caseCriteria: normalizeCaseCriteriaList(payload.caseCriteria),
+    caseCriteriaVersion: normalizeNumber(payload.caseCriteriaVersion),
     form: normalizeForm(payload.form)
   };
 };
