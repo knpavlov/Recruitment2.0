@@ -44,6 +44,8 @@ Adjust the value to the real backend origin. Если фронтенд и бэк
 «frontend/backend» или вы переключитесь на собственный домен, задайте явный адрес API, например
 `https://your-backend-service.up.railway.app`.
 
+> ℹ️ Ранее использовалась переменная `VITE_API_BASE_URL`. Фронтенд всё ещё понимает это имя для обратной совместимости, но рекомендуется переименовать её в `VITE_API_URL`, чтобы конфигурация совпадала с документацией и будущими инструкциями по миграции.
+
 ## 4. DNS and domain checklist
 
 1. Point the desired subdomain (for example, `app.nboard.au`) to your frontend hosting provider.

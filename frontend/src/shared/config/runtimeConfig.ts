@@ -177,9 +177,20 @@ const resolveApiBaseUrl = (): string => {
   const browser = isBrowserEnvironment();
   const fallbackOrigin = browser ? window.location.origin : 'http://localhost:4000';
 
-  const fromEnv = import.meta.env.VITE_API_URL?.trim();
-  if (fromEnv) {
-    return normalizeUrl(fromEnv, fallbackOrigin);
+  const explicitEnvCandidates = [
+    import.meta.env.VITE_API_URL,
+    import.meta.env.VITE_API_BASE_URL,
+  ];
+
+  for (const candidate of explicitEnvCandidates) {
+    const value = candidate?.trim();
+
+    if (value) {
+      // Поддерживаем как новое имя переменной (`VITE_API_URL`),
+      // так и старое (`VITE_API_BASE_URL`), чтобы не ломать
+      // существующие деплои при смене домена.
+      return normalizeUrl(value, fallbackOrigin);
+    }
   }
 
   const fromGlobal = readGlobalConfig();
