@@ -221,6 +221,26 @@ const createTables = async () => {
   `);
 
   await postgresPool.query(`
+    ALTER TABLE evaluation_assignments
+      ADD COLUMN IF NOT EXISTS invitation_sent_at TIMESTAMPTZ;
+  `);
+
+  await postgresPool.query(`
+    UPDATE evaluation_assignments
+       SET invitation_sent_at = COALESCE(invitation_sent_at, created_at, NOW());
+  `);
+
+  await postgresPool.query(`
+    ALTER TABLE evaluation_assignments
+      ALTER COLUMN invitation_sent_at SET DEFAULT NOW();
+  `);
+
+  await postgresPool.query(`
+    ALTER TABLE evaluation_assignments
+      ALTER COLUMN invitation_sent_at SET NOT NULL;
+  `);
+
+  await postgresPool.query(`
     WITH slot_data AS (
       SELECT
         ea.id,
