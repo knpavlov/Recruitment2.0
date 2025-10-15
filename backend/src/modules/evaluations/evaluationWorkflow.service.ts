@@ -14,6 +14,7 @@ import type { AccountsService } from '../accounts/accounts.service.js';
 import type { CandidatesService } from '../candidates/candidates.service.js';
 import type { CasesService } from '../cases/cases.service.js';
 import type { QuestionsService } from '../questions/questions.service.js';
+import type { CaseCriteriaService } from '../caseCriteria/caseCriteria.service.js';
 
 const normalizeEmail = (value: string): string => value.trim().toLowerCase();
 
@@ -117,6 +118,7 @@ export class EvaluationWorkflowService {
     private readonly candidates: CandidatesService,
     private readonly cases: CasesService,
     private readonly questions: QuestionsService,
+    private readonly caseCriteria: CaseCriteriaService,
     private readonly mailer = new MailerService()
   ) {}
 
@@ -403,6 +405,8 @@ export class EvaluationWorkflowService {
       }
     }
 
+    const caseCriteriaSet = await this.caseCriteria.listCriteria();
+
     return assignments.map((assignment) => {
       const evaluation = evaluationMap.get(assignment.evaluationId);
       const currentForm = evaluation?.forms.find((item) => item.slotId === assignment.slotId) ?? null;
@@ -429,6 +433,8 @@ export class EvaluationWorkflowService {
         candidate: candidate ?? undefined,
         caseFolder: caseMap.get(assignment.caseFolderId) ?? undefined,
         fitQuestion: questionMap.get(assignment.fitQuestionId) ?? undefined,
+        caseCriteria: caseCriteriaSet.criteria,
+        caseCriteriaVersion: caseCriteriaSet.version,
         form
       } satisfies InterviewerAssignmentView;
     });

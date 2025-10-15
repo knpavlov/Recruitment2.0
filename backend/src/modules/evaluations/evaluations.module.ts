@@ -5,6 +5,7 @@ import { accountsService } from '../accounts/accounts.module.js';
 import { candidatesService } from '../candidates/candidates.module.js';
 import { casesService } from '../cases/cases.module.js';
 import { questionsService } from '../questions/questions.module.js';
+import { caseCriteriaService } from '../caseCriteria/caseCriteria.module.js';
 
 const repository = new EvaluationsRepository();
 export const evaluationsService = new EvaluationsService(repository);
@@ -13,5 +14,6 @@ export const evaluationWorkflowService = new EvaluationWorkflowService(
   accountsService,
   candidatesService,
   casesService,
-  questionsService
+  questionsService,
+  caseCriteriaService
 );

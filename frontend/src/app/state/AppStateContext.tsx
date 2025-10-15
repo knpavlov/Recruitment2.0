@@ -4,11 +4,13 @@ import { CandidateProfile } from '../../shared/types/candidate';
 import { EvaluationConfig } from '../../shared/types/evaluation';
 import { AccountRecord, AccountRole } from '../../shared/types/account';
 import { FitQuestion } from '../../shared/types/fitQuestion';
+import { CaseCriterion, CaseCriteriaSet } from '../../shared/types/caseCriteria';
 import { DomainResult } from '../../shared/types/results';
 import { casesApi } from '../../modules/cases/services/casesApi';
 import { candidatesApi } from '../../modules/candidates/services/candidatesApi';
 import { accountsApi } from '../../modules/accounts/services/accountsApi';
 import { fitQuestionsApi } from '../../modules/questions/services/fitQuestionsApi';
+import { caseCriteriaApi } from '../../modules/caseCriteria/services/caseCriteriaApi';
 import { evaluationsApi } from '../../modules/evaluation/services/evaluationsApi';
 import { ApiError } from '../../shared/api/httpClient';
 import { useAuth } from '../../modules/auth/AuthContext';
@@ -37,6 +39,15 @@ interface AppStateContextValue {
       expectedVersion: number | null
     ) => Promise<DomainResult<FitQuestion>>;
     removeQuestion: (id: string) => Promise<DomainResult<string>>;
+  };
+  caseCriteria: {
+    criteria: CaseCriterion[];
+    version: number;
+    updatedAt: string | null;
+    saveCriteria: (
+      criteria: CaseCriterion[],
+      expectedVersion: number
+    ) => Promise<DomainResult<CaseCriteriaSet>>;
   };
   candidates: {
     list: CandidateProfile[];
@@ -70,6 +81,11 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [folders, setFolders] = useState<CaseFolder[]>([]);
   const [candidates, setCandidates] = useState<CandidateProfile[]>([]);
   const [fitQuestions, setFitQuestions] = useState<FitQuestion[]>([]);
+  const [caseCriteriaSet, setCaseCriteriaSet] = useState<CaseCriteriaSet>({
+    version: 1,
+    updatedAt: '',
+    criteria: []
+  });
   const [evaluations, setEvaluations] = useState<EvaluationConfig[]>([]);
   const [accounts, setAccounts] = useState<AccountRecord[]>([]);
   const { session } = useAuth();
@@ -113,6 +129,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     if (!session) {
       setCandidates([]);
       setFitQuestions([]);
+      setCaseCriteriaSet({ version: 1, updatedAt: '', criteria: [] });
       setEvaluations([]);
     }
   }, [session]);
@@ -160,6 +177,21 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       }
     };
     void loadQuestions();
+  }, [session]);
+
+  useEffect(() => {
+    if (!session) {
+      return;
+    }
+    const loadCaseCriteria = async () => {
+      try {
+        const remote = await caseCriteriaApi.list();
+        setCaseCriteriaSet(remote);
+      } catch (error) {
+        console.error('Failed to load case criteria:', error);
+      }
+    };
+    void loadCaseCriteria();
   }, [session]);
 
   const sortQuestionsByUpdated = (items: FitQuestion[]) =>
@@ -355,6 +387,29 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
             return { ok: false, error: 'not-found' };
           }
           console.error('Failed to delete fit question:', error);
+          return { ok: false, error: 'unknown' };
+        }
+      }
+    },
+    caseCriteria: {
+      criteria: caseCriteriaSet.criteria,
+      version: caseCriteriaSet.version,
+      updatedAt: caseCriteriaSet.updatedAt || null,
+      saveCriteria: async (criteria, expectedVersion) => {
+        try {
+          const result = await caseCriteriaApi.save(criteria, expectedVersion);
+          setCaseCriteriaSet(result);
+          return { ok: true, data: result };
+        } catch (error) {
+          if (error instanceof ApiError) {
+            if (error.code === 'version-conflict') {
+              return { ok: false, error: 'version-conflict' };
+            }
+            if (error.code === 'invalid-input') {
+              return { ok: false, error: 'invalid-input' };
+            }
+          }
+          console.error('Failed to save case criteria:', error);
           return { ok: false, error: 'unknown' };
         }
       }
@@ -581,7 +636,15 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
         }
       }
     }
-  }), [folders, fitQuestions, candidates, evaluations, accounts, syncFolders]);
+  }), [
+    folders,
+    fitQuestions,
+    caseCriteriaSet,
+    candidates,
+    evaluations,
+    accounts,
+    syncFolders
+  ]);
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;
 };
@@ -596,6 +659,7 @@ export const useAppState = () => {
 
 export const useCasesState = () => useAppState().cases;
 export const useFitQuestionsState = () => useAppState().fitQuestions;
+export const useCaseCriteriaState = () => useAppState().caseCriteria;
 export const useCandidatesState = () => useAppState().candidates;
 export const useEvaluationsState = () => useAppState().evaluations;
 export const useAccountsState = () => useAppState().accounts;

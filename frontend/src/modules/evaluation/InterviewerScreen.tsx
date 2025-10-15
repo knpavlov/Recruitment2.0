@@ -413,8 +413,21 @@ export const InterviewerScreen = () => {
       : 'Candidate not assigned';
     const fitQuestion = selectedAssignment.fitQuestion;
     const fitCriteria: CriterionDefinition[] = fitQuestion?.criteria ?? [];
-    const caseCriteriaRaw: CriterionDefinition[] = selectedAssignment.caseFolder?.evaluationCriteria ?? [];
-    const caseCriteria = sortCaseCriteria(caseCriteriaRaw);
+    const mergedCaseCriteria: CriterionDefinition[] = [
+      ...(selectedAssignment.caseCriteria ?? []),
+      ...(selectedAssignment.caseFolder?.evaluationCriteria ?? [])
+    ].map((criterion) => ({
+      id: criterion.id,
+      title: criterion.title,
+      ratings: criterion.ratings
+    }));
+    const caseCriteriaMap = new Map<string, CriterionDefinition>();
+    mergedCaseCriteria.forEach((criterion) => {
+      if (!caseCriteriaMap.has(criterion.id)) {
+        caseCriteriaMap.set(criterion.id, criterion);
+      }
+    });
+    const caseCriteria = sortCaseCriteria(Array.from(caseCriteriaMap.values()));
     const resumeLink = candidate?.resume ? (
       <a className={styles.fileLink} href={candidate.resume.dataUrl} download={candidate.resume.fileName}>
         Download resume ({candidate.resume.fileName})

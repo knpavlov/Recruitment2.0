@@ -83,5 +83,7 @@ export interface InterviewerAssignmentView {
   candidate?: import('./candidate').CandidateProfile;
   caseFolder?: import('./caseLibrary').CaseFolder;
   fitQuestion?: import('./fitQuestion').FitQuestion;
+  caseCriteria?: import('./caseCriteria').CaseCriterion[];
+  caseCriteriaVersion?: number;
   form: InterviewStatusRecord | null;
 }
