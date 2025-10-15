@@ -297,13 +297,13 @@ export class EvaluationWorkflowService {
     if (!trimmed) {
       throw new Error('INVALID_INPUT');
     }
-    await this.sendInvitations(trimmed, { scope: 'all', portalBaseUrl: options?.portalBaseUrl });
+    await this.sendInvitations(trimmed, { portalBaseUrl: options?.portalBaseUrl });
     return { id: trimmed };
   }
 
   async sendInvitations(
     id: string,
-    options: { scope: 'all' | 'updated'; portalBaseUrl?: string }
+    options?: { slotIds?: string[]; portalBaseUrl?: string }
   ): Promise<EvaluationRecord> {
     const trimmed = id.trim();
     if (!trimmed) {
@@ -312,66 +312,51 @@ export class EvaluationWorkflowService {
 
     const evaluation = await this.loadEvaluationWithState(trimmed);
     const assignments = this.buildAssignments(evaluation);
-    const existingAssignments = await this.evaluations.listAssignmentsForEvaluation(trimmed);
+    await this.ensureAccounts(assignments);
 
-    const existingBySlot = new Map(existingAssignments.map((item) => [item.slotId, item]));
-    const newSlotIds = new Set(assignments.map((assignment) => assignment.slotId));
-    const changedSlotIds = new Set<string>();
+    const normalizedSlotSet = Array.isArray(options?.slotIds)
+      ? new Set(
+          options.slotIds
+            .map((value) => (typeof value === 'string' ? value.trim() : ''))
+            .filter((value) => value.length > 0)
+        )
+      : null;
 
-    for (const assignment of assignments) {
-      const existing = existingBySlot.get(assignment.slotId);
-      if (!existing) {
-        changedSlotIds.add(assignment.slotId);
-        continue;
-      }
-      const sameEmail = normalizeEmail(existing.interviewerEmail) === assignment.interviewerEmail;
-      const sameName = (existing.interviewerName ?? '').trim() === assignment.interviewerName.trim();
-      const sameCase = (existing.caseFolderId ?? '') === assignment.caseFolderId;
-      const sameQuestion = (existing.fitQuestionId ?? '') === assignment.fitQuestionId;
-      if (!sameEmail || !sameName || !sameCase || !sameQuestion) {
-        changedSlotIds.add(assignment.slotId);
-      }
-    }
+    const availableSlotIds = new Set(assignments.map((assignment) => assignment.slotId));
+    const targetSlotIds = normalizedSlotSet
+      ? new Set(Array.from(normalizedSlotSet).filter((slotId) => availableSlotIds.has(slotId)))
+      : null;
 
-    const removedSlots = existingAssignments.filter((item) => !newSlotIds.has(item.slotId));
-    const structuralChange = removedSlots.length > 0;
+    const assignmentsToDeliver = targetSlotIds
+      ? assignments.filter((assignment) => targetSlotIds.has(assignment.slotId))
+      : assignments;
 
-    const scope: 'all' | 'updated' = evaluation.processStatus === 'draft' ? 'all' : options.scope;
+    const context = await this.loadContext(assignments, evaluation);
+    this.ensureContextResources(assignments, context);
 
-    if (scope === 'updated' && changedSlotIds.size === 0 && !structuralChange) {
-      return evaluation;
-    }
+    let deliveryError: Error | null = null;
+    let refreshSlotIds: string[] = [];
 
-    const refreshSlotIds =
-      scope === 'all'
-        ? assignments.map((assignment) => assignment.slotId)
-        : Array.from(changedSlotIds);
-
-    const assignmentsToSend =
-      scope === 'all'
-        ? assignments
-        : assignments.filter((assignment) => changedSlotIds.has(assignment.slotId));
-
-    if (assignmentsToSend.length > 0) {
-      await this.ensureAccounts(assignmentsToSend);
-      const context = await this.loadContext(assignmentsToSend, evaluation);
-      this.ensureContextResources(assignmentsToSend, context);
-      const portalBaseUrl = resolvePortalBaseUrl(options.portalBaseUrl);
-
+    if (assignmentsToDeliver.length > 0) {
       try {
-        await this.deliverInvitations(assignmentsToSend, evaluation, portalBaseUrl, context);
+        const portalBaseUrl = resolvePortalBaseUrl(options?.portalBaseUrl);
+        await this.deliverInvitations(assignmentsToDeliver, evaluation, portalBaseUrl, context);
+        refreshSlotIds = assignmentsToDeliver.map((assignment) => assignment.slotId);
       } catch (error) {
         if (error instanceof Error && error.message === MAILER_NOT_CONFIGURED) {
-          throw new Error('MAILER_UNAVAILABLE');
+          deliveryError = new Error('MAILER_UNAVAILABLE');
+        } else if (error instanceof Error) {
+          deliveryError = error;
+        } else {
+          deliveryError = new Error('UNKNOWN_DELIVERY_ERROR');
         }
-        throw error;
       }
     }
 
     try {
       await this.evaluations.storeAssignments(trimmed, assignments, {
         status: 'in-progress',
-        refreshSlotIds,
+        refreshSlotIds: deliveryError ? [] : refreshSlotIds,
         updateStartedAt: evaluation.processStatus === 'draft',
         roundNumber: evaluation.roundNumber ?? 1
       });
@@ -380,6 +365,10 @@ export class EvaluationWorkflowService {
         throw new Error('INVALID_ASSIGNMENT_RESOURCES');
       }
       throw error;
+    }
+
+    if (deliveryError) {
+      throw deliveryError;
     }
 
     return this.loadEvaluationWithState(trimmed);

@@ -392,13 +392,20 @@ export const evaluationsApi = {
       method: 'POST',
       body: { portalBaseUrl: computePortalBaseUrl() }
     }),
-  sendInvitations: async (id: string, scope: 'all' | 'updated') =>
-    ensureEvaluation(
+  sendInvitations: async (id: string, slotIds?: string[]) => {
+    const payload: Record<string, unknown> = {
+      portalBaseUrl: computePortalBaseUrl()
+    };
+    if (Array.isArray(slotIds) && slotIds.length > 0) {
+      payload.slotIds = slotIds;
+    }
+    return ensureEvaluation(
       await apiRequest<unknown>(`/evaluations/${id}/invitations`, {
         method: 'POST',
-        body: { scope, portalBaseUrl: computePortalBaseUrl() }
+        body: payload
       })
-    ),
+    );
+  },
   advance: async (id: string) =>
     ensureEvaluation(
       await apiRequest<unknown>(`/evaluations/${id}/advance`, {
