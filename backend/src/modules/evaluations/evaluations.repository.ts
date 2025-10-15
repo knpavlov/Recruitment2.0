@@ -421,20 +421,42 @@ export class EvaluationsRepository {
         throw new Error('NOT_FOUND');
       }
 
-      const slotIds = assignments.map((assignment) => assignment.slotId);
       const normalizedRound = Number.isFinite(options.roundNumber)
         ? Math.max(1, Math.trunc(options.roundNumber))
         : 1;
 
-      await client.query(
-        'DELETE FROM evaluation_assignments WHERE evaluation_id = $1 AND round_number = $3 AND NOT (slot_id = ANY($2::text[]));',
-        [evaluationId, slotIds, normalizedRound]
+      const slotIdSet = new Set(assignments.map((assignment) => assignment.slotId));
+
+      const existingSlotsResult = await client.query(
+        `SELECT slot_id
+           FROM evaluation_assignments
+          WHERE evaluation_id = $1 AND round_number = $2;`,
+        [evaluationId, normalizedRound]
       );
 
-      const refreshIds = Array.from(new Set(options.refreshSlotIds));
+      const existingSlotRows = existingSlotsResult.rows as Array<{ slot_id: string }>;
+
+      for (const row of existingSlotRows) {
+        const existingSlotId = row.slot_id;
+        if (!slotIdSet.has(existingSlotId)) {
+          await client.query(
+            `DELETE FROM evaluation_assignments
+              WHERE evaluation_id = $1 AND slot_id = $2 AND round_number = $3;`,
+            [evaluationId, existingSlotId, normalizedRound]
+          );
+        }
+      }
+
+      const refreshIdSet = new Set(
+        (options.refreshSlotIds ?? [])
+          .filter((id): id is string => typeof id === 'string')
+          .map((id) => id.trim())
+          .filter((id) => id.length > 0)
+      );
 
       for (const assignment of assignments) {
         const assignmentId = randomUUID();
+        const shouldRefresh = refreshIdSet.has(assignment.slotId);
         await client.query(
           `INSERT INTO evaluation_assignments (
              id,
@@ -456,10 +478,9 @@ export class EvaluationsRepository {
              fit_question_id = EXCLUDED.fit_question_id,
              round_number = EXCLUDED.round_number,
              invitation_sent_at = CASE
-               WHEN EXCLUDED.slot_id = ANY($9::text[])
-                 THEN NOW()
-              ELSE evaluation_assignments.invitation_sent_at
-            END;`,
+               WHEN $9::boolean THEN NOW()
+               ELSE evaluation_assignments.invitation_sent_at
+             END;`,
           [
             assignmentId,
             evaluationId,
@@ -469,7 +490,7 @@ export class EvaluationsRepository {
             assignment.caseFolderId,
             assignment.fitQuestionId,
             normalizedRound,
-            refreshIds
+            shouldRefresh
           ]
         );
       }
