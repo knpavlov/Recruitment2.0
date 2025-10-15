@@ -228,7 +228,7 @@ interface AssignmentRow extends Record<string, unknown> {
   case_folder_id: string;
   fit_question_id: string;
   round_number: number;
-  invitation_sent_at: Date;
+  invitation_sent_at: Date | null;
   created_at: Date;
 }
 
@@ -236,7 +236,7 @@ interface ExistingAssignmentRow extends Record<string, unknown> {
   id: string;
   slot_id: string;
   round_number: number | null;
-  invitation_sent_at: Date;
+  invitation_sent_at: Date | null;
   created_at: Date;
 }
 
@@ -249,7 +249,7 @@ const mapRowToAssignment = (row: AssignmentRow): InterviewAssignmentRecord => ({
   caseFolderId: row.case_folder_id,
   fitQuestionId: row.fit_question_id,
   roundNumber: Number(row.round_number ?? 1) || 1,
-  invitationSentAt: row.invitation_sent_at.toISOString(),
+  invitationSentAt: row.invitation_sent_at ? row.invitation_sent_at.toISOString() : null,
   createdAt: row.created_at.toISOString()
 });
 
@@ -410,7 +410,6 @@ export class EvaluationsRepository {
     assignments: InterviewAssignmentModel[],
     options: {
       status: EvaluationRecord['processStatus'];
-      refreshSlotIds: string[];
       updateStartedAt: boolean;
       roundNumber: number;
     }
@@ -482,18 +481,10 @@ export class EvaluationsRepository {
         );
       }
 
-      const refreshIdSet = new Set(
-        (options.refreshSlotIds ?? [])
-          .filter((id): id is string => typeof id === 'string')
-          .map((id) => id.trim())
-          .filter((id) => id.length > 0)
-      );
-
       for (const assignment of assignments) {
         const existing = existingBySlot.get(assignment.slotId);
         const isSameRound = existing?.roundNumber === normalizedRound;
         const assignmentId = isSameRound && existing?.id ? existing.id : randomUUID();
-        const shouldRefresh = refreshIdSet.has(assignment.slotId) || !existing || !isSameRound;
         const previousInvitation = isSameRound ? existing?.invitationSentAt ?? null : null;
         const previousCreatedAt = isSameRound ? existing?.createdAt ?? null : null;
         await client.query(
@@ -517,11 +508,8 @@ export class EvaluationsRepository {
              $6,
              $7,
              $8,
-             CASE
-               WHEN $9::boolean THEN NOW()
-               ELSE COALESCE($10::timestamptz, NOW())
-             END,
-             COALESCE($11::timestamptz, NOW())
+             $9,
+             $10
            )
            ON CONFLICT (evaluation_id, slot_id) DO UPDATE
              SET interviewer_email = EXCLUDED.interviewer_email,
@@ -529,10 +517,11 @@ export class EvaluationsRepository {
                  case_folder_id = EXCLUDED.case_folder_id,
                  fit_question_id = EXCLUDED.fit_question_id,
                  round_number = EXCLUDED.round_number,
-                 invitation_sent_at = CASE
-                   WHEN $9::boolean THEN NOW()
-                   ELSE COALESCE($10::timestamptz, evaluation_assignments.invitation_sent_at)
-                 END,
+                 invitation_sent_at = COALESCE(
+                   evaluation_assignments.invitation_sent_at,
+                   EXCLUDED.invitation_sent_at
+                 ),
+                 created_at = EXCLUDED.created_at,
                  id = EXCLUDED.id;`,
           [
             assignmentId,
@@ -543,9 +532,8 @@ export class EvaluationsRepository {
             assignment.caseFolderId,
             assignment.fitQuestionId,
             normalizedRound,
-            shouldRefresh,
             previousInvitation,
-            previousCreatedAt
+            previousCreatedAt ?? new Date()
           ]
         );
       }
@@ -569,6 +557,56 @@ export class EvaluationsRepository {
     } finally {
       client.release();
     }
+  }
+
+  async markInvitationsSent(
+    evaluationId: string,
+    slotIds: string[],
+    roundNumber: number
+  ): Promise<void> {
+    const normalizedIds = Array.from(
+      new Set(
+        slotIds
+          .map((id) => (typeof id === 'string' ? id.trim() : ''))
+          .filter((id): id is string => id.length > 0)
+      )
+    );
+    if (normalizedIds.length === 0) {
+      return;
+    }
+    await postgresPool.query(
+      `UPDATE evaluation_assignments
+          SET invitation_sent_at = NOW()
+        WHERE evaluation_id = $1
+          AND round_number = $3
+          AND slot_id = ANY($2::text[]);`,
+      [evaluationId, normalizedIds, roundNumber]
+    );
+  }
+
+  async markInvitationsPending(
+    evaluationId: string,
+    slotIds: string[],
+    roundNumber: number
+  ): Promise<void> {
+    const normalizedIds = Array.from(
+      new Set(
+        slotIds
+          .map((id) => (typeof id === 'string' ? id.trim() : ''))
+          .filter((id): id is string => id.length > 0)
+      )
+    );
+    if (normalizedIds.length === 0) {
+      return;
+    }
+    await postgresPool.query(
+      `UPDATE evaluation_assignments
+          SET invitation_sent_at = NULL
+        WHERE evaluation_id = $1
+          AND round_number = $3
+          AND slot_id = ANY($2::text[]);`,
+      [evaluationId, normalizedIds, roundNumber]
+    );
   }
 
   async listAssignmentsByEmail(email: string): Promise<InterviewAssignmentRecord[]> {

@@ -40,6 +40,19 @@ const handleError = (error: unknown, res: Response) => {
         .status(503)
         .json({ code: 'mailer-unavailable', message: 'Email service is not configured. Cannot notify interviewers.' });
       return;
+    case 'INVALID_SELECTION':
+      res
+        .status(400)
+        .json({ code: 'invalid-selection', message: 'Select at least one interviewer before resending invites.' });
+      return;
+    case 'INVITATION_DELIVERY_FAILED':
+      res
+        .status(502)
+        .json({
+          code: 'invitation-delivery-failed',
+          message: 'Some invitations could not be delivered. Check the mail log and try again.'
+        });
+      return;
     case 'INVALID_PORTAL_URL':
       res
         .status(503)
@@ -86,13 +99,15 @@ router.post('/:id/start', async (req, res) => {
 
 router.post('/:id/invitations', async (req, res) => {
   try {
-    const body = (req.body ?? {}) as { scope?: unknown; portalBaseUrl?: unknown };
-    const scope = body.scope === 'updated' ? 'updated' : 'all';
+    const body = (req.body ?? {}) as { slotIds?: unknown; portalBaseUrl?: unknown };
+    const slotIds = Array.isArray(body.slotIds)
+      ? body.slotIds.filter((value): value is string => typeof value === 'string')
+      : undefined;
     const portalBaseUrl = typeof body.portalBaseUrl === 'string' ? body.portalBaseUrl.trim() : undefined;
     const requestOrigin = req.get('origin');
     const resolvedBase = portalBaseUrl && portalBaseUrl.length > 0 ? portalBaseUrl : requestOrigin;
     const evaluation = await evaluationWorkflowService.sendInvitations(req.params.id, {
-      scope,
+      slotIds,
       portalBaseUrl: resolvedBase
     });
     res.json(evaluation);
