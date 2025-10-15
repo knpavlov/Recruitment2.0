@@ -160,19 +160,36 @@ export class EvaluationWorkflowService {
   }
 
   private async loadContext(assignments: InterviewAssignmentModel[], evaluation: EvaluationRecord) {
-    const candidate = evaluation.candidateId ? await this.candidates.getCandidate(evaluation.candidateId) : null;
+    let candidate: Awaited<ReturnType<CandidatesService['getCandidate']>> | null = null;
+    if (evaluation.candidateId) {
+      try {
+        candidate = await this.candidates.getCandidate(evaluation.candidateId);
+      } catch (error) {
+        console.warn('Не удалось загрузить кандидата для оценки', evaluation.candidateId, error);
+      }
+    }
 
     const uniqueCaseIds = Array.from(new Set(assignments.map((item) => item.caseFolderId)));
     const uniqueQuestionIds = Array.from(new Set(assignments.map((item) => item.fitQuestionId)));
 
     const caseMap = new Map<string, Awaited<ReturnType<CasesService['getFolder']>> | null>();
     for (const id of uniqueCaseIds) {
-      caseMap.set(id, await this.cases.getFolder(id));
+      try {
+        caseMap.set(id, await this.cases.getFolder(id));
+      } catch (error) {
+        console.warn('Не удалось загрузить кейс для назначения', id, error);
+        caseMap.set(id, null);
+      }
     }
 
     const questionMap = new Map<string, Awaited<ReturnType<QuestionsService['getQuestion']>> | null>();
     for (const id of uniqueQuestionIds) {
-      questionMap.set(id, await this.questions.getQuestion(id));
+      try {
+        questionMap.set(id, await this.questions.getQuestion(id));
+      } catch (error) {
+        console.warn('Не удалось загрузить fit-вопрос для назначения', id, error);
+        questionMap.set(id, null);
+      }
     }
 
     return { candidate, caseMap, questionMap };
