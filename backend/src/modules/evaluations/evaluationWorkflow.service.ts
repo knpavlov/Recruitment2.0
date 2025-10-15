@@ -14,6 +14,7 @@ import type { AccountsService } from '../accounts/accounts.service.js';
 import type { CandidatesService } from '../candidates/candidates.service.js';
 import type { CasesService } from '../cases/cases.service.js';
 import type { QuestionsService } from '../questions/questions.service.js';
+import { isUuid } from '../../shared/utils/uuid.js';
 
 const normalizeEmail = (value: string): string => value.trim().toLowerCase();
 
@@ -139,7 +140,9 @@ export class EvaluationWorkflowService {
       const email = slot.interviewerEmail?.trim().toLowerCase() ?? '';
       const caseId = slot.caseFolderId?.trim() ?? '';
       const questionId = slot.fitQuestionId?.trim() ?? '';
-      if (!email || !caseId || !questionId) {
+      const caseIsValid = isUuid(caseId);
+      const questionIsValid = isUuid(questionId);
+      if (!email || !caseId || !questionId || !caseIsValid || !questionIsValid) {
         throw new Error('MISSING_ASSIGNMENT_DATA');
       }
       assignments.push({
@@ -166,13 +169,28 @@ export class EvaluationWorkflowService {
     const uniqueQuestionIds = Array.from(new Set(assignments.map((item) => item.fitQuestionId)));
 
     const caseMap = new Map<string, Awaited<ReturnType<CasesService['getFolder']>> | null>();
+    let hasMissingReferences = false;
     for (const id of uniqueCaseIds) {
-      caseMap.set(id, await this.cases.getFolder(id));
+      try {
+        caseMap.set(id, await this.cases.getFolder(id));
+      } catch (error) {
+        console.warn('Failed to load case folder', id, error);
+        hasMissingReferences = true;
+      }
     }
 
     const questionMap = new Map<string, Awaited<ReturnType<QuestionsService['getQuestion']>> | null>();
     for (const id of uniqueQuestionIds) {
-      questionMap.set(id, await this.questions.getQuestion(id));
+      try {
+        questionMap.set(id, await this.questions.getQuestion(id));
+      } catch (error) {
+        console.warn('Failed to load fit question', id, error);
+        hasMissingReferences = true;
+      }
+    }
+
+    if (hasMissingReferences) {
+      throw new Error('MISSING_ASSIGNMENT_DATA');
     }
 
     return { candidate, caseMap, questionMap };

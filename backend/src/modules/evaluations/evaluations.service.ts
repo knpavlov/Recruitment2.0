@@ -1,6 +1,7 @@
 import { EvaluationsRepository } from './evaluations.repository.js';
 import { EvaluationRecord, EvaluationRoundSnapshot, EvaluationWriteModel } from './evaluations.types.js';
 import { computeInvitationState } from './evaluationAssignments.utils.js';
+import { isUuid } from '../../shared/utils/uuid.js';
 
 const readOptionalString = (value: unknown): string | undefined => {
   if (typeof value !== 'string') {
@@ -8,6 +9,14 @@ const readOptionalString = (value: unknown): string | undefined => {
   }
   const trimmed = value.trim();
   return trimmed ? trimmed : undefined;
+};
+
+const readOptionalUuid = (value: unknown): string | undefined => {
+  const id = readOptionalString(value);
+  if (!id) {
+    return undefined;
+  }
+  return isUuid(id) ? id : undefined;
 };
 
 const readOptionalPositiveInteger = (value: unknown): number | undefined => {
@@ -64,8 +73,8 @@ const sanitizeSlots = (value: unknown): EvaluationWriteModel['interviews'] => {
     }
     const interviewerName = readOptionalString(payload.interviewerName) ?? 'Interviewer';
     const interviewerEmail = readOptionalString(payload.interviewerEmail) ?? '';
-    const caseFolderId = readOptionalString(payload.caseFolderId);
-    const fitQuestionId = readOptionalString(payload.fitQuestionId);
+    const caseFolderId = readOptionalUuid(payload.caseFolderId);
+    const fitQuestionId = readOptionalUuid(payload.fitQuestionId);
 
     return {
       id,
@@ -176,7 +185,7 @@ const sanitizeRoundHistory = (value: unknown): EvaluationRoundSnapshot[] => {
       interviewCount: interviews.length,
       interviews,
       forms,
-      fitQuestionId: readOptionalString(payload.fitQuestionId),
+      fitQuestionId: readOptionalUuid(payload.fitQuestionId),
       processStatus: readProcessStatus(payload.processStatus),
       processStartedAt: readOptionalIsoDate(payload.processStartedAt),
       completedAt: readOptionalIsoDate(payload.completedAt),
@@ -226,11 +235,11 @@ const buildWriteModel = (payload: unknown): EvaluationWriteModel => {
 
   return {
     id,
-    candidateId: readOptionalString(source.candidateId),
+    candidateId: readOptionalUuid(source.candidateId),
     roundNumber: readOptionalPositiveInteger(source.roundNumber),
     interviewCount: interviews.length,
     interviews,
-    fitQuestionId: readOptionalString(source.fitQuestionId),
+    fitQuestionId: readOptionalUuid(source.fitQuestionId),
     forms,
     processStatus: readProcessStatus(source.processStatus),
     processStartedAt,
