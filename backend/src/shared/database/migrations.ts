@@ -283,6 +283,63 @@ const createTables = async () => {
       ADD COLUMN IF NOT EXISTS round_number INTEGER NOT NULL DEFAULT 1;
   `);
 
+  // Удаляем возможные дубли записей по слоту, оставляя самую свежую отправку
+  await postgresPool.query(`
+    WITH ranked AS (
+      SELECT
+        id,
+        ROW_NUMBER() OVER (
+          PARTITION BY evaluation_id, slot_id
+          ORDER BY invitation_sent_at DESC, created_at DESC, id DESC
+        ) AS row_number
+      FROM evaluation_assignments
+    )
+    DELETE FROM evaluation_assignments ea
+      USING ranked
+     WHERE ea.id = ranked.id
+       AND ranked.row_number > 1;
+  `);
+
+  // Гарантируем наличие уникального ограничения для пары (evaluation_id, slot_id)
+  await postgresPool.query(`
+    DO $$
+    DECLARE
+      evaluation_id_att SMALLINT;
+      slot_id_att SMALLINT;
+    BEGIN
+      SELECT attnum
+        INTO evaluation_id_att
+        FROM pg_attribute
+       WHERE attrelid = 'evaluation_assignments'::regclass
+         AND attname = 'evaluation_id'
+         AND NOT attisdropped;
+
+      SELECT attnum
+        INTO slot_id_att
+        FROM pg_attribute
+       WHERE attrelid = 'evaluation_assignments'::regclass
+         AND attname = 'slot_id'
+         AND NOT attisdropped;
+
+      IF evaluation_id_att IS NULL OR slot_id_att IS NULL THEN
+        RETURN;
+      END IF;
+
+      IF NOT EXISTS (
+        SELECT 1
+          FROM pg_constraint
+         WHERE conrelid = 'evaluation_assignments'::regclass
+           AND contype IN ('u', 'p')
+           AND conkey = ARRAY[evaluation_id_att, slot_id_att]::smallint[]
+      ) THEN
+        EXECUTE 'ALTER TABLE evaluation_assignments
+                  ADD CONSTRAINT evaluation_assignments_evaluation_slot_unique
+                  UNIQUE (evaluation_id, slot_id)';
+      END IF;
+    END
+    $$;
+  `);
+
   await postgresPool.query(`
     CREATE TABLE IF NOT EXISTS questions (
       id UUID PRIMARY KEY,
