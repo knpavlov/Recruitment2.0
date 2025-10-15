@@ -421,20 +421,50 @@ export class EvaluationsRepository {
         throw new Error('NOT_FOUND');
       }
 
-      const slotIds = assignments.map((assignment) => assignment.slotId);
       const normalizedRound = Number.isFinite(options.roundNumber)
         ? Math.max(1, Math.trunc(options.roundNumber))
         : 1;
 
-      await client.query(
-        'DELETE FROM evaluation_assignments WHERE evaluation_id = $1 AND round_number = $3 AND NOT (slot_id = ANY($2::text[]));',
-        [evaluationId, slotIds, normalizedRound]
+      const existingAssignmentsSnapshot = await client.query(
+        `SELECT id,
+                slot_id,
+                invitation_sent_at,
+                created_at
+           FROM evaluation_assignments
+          WHERE evaluation_id = $1 AND round_number = $2;`,
+        [evaluationId, normalizedRound]
       );
 
-      const refreshIds = Array.from(new Set(options.refreshSlotIds));
+      // Сохраняем текущие записи, чтобы можно было переиспользовать идентификаторы и временные метки
+      type AssignmentSnapshotRow = {
+        id: string;
+        slot_id: string;
+        invitation_sent_at: Date;
+        created_at: Date;
+      };
+
+      const previousAssignments = new Map<string, AssignmentSnapshotRow>(
+        existingAssignmentsSnapshot.rows.map((row: AssignmentSnapshotRow) => [row.slot_id, row])
+      );
+
+      await client.query(
+        'DELETE FROM evaluation_assignments WHERE evaluation_id = $1 AND round_number = $2;',
+        [evaluationId, normalizedRound]
+      );
+
+      const refreshIds = new Set(options.refreshSlotIds);
+      const nowResult = await client.query('SELECT NOW() AS current;');
+      const currentTimestamp = (nowResult.rows[0]?.current as Date) ?? new Date();
 
       for (const assignment of assignments) {
-        const assignmentId = randomUUID();
+        const previous = previousAssignments.get(assignment.slotId);
+        const shouldRefresh = refreshIds.has(assignment.slotId) || !previous;
+        const invitationSentAt = shouldRefresh
+          ? currentTimestamp
+          : previous.invitation_sent_at;
+        const createdAt = previous?.created_at ?? currentTimestamp;
+        const assignmentId = previous?.id ?? randomUUID();
+
         await client.query(
           `INSERT INTO evaluation_assignments (
              id,
@@ -447,19 +477,7 @@ export class EvaluationsRepository {
              round_number,
              invitation_sent_at,
              created_at
-           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
-           ON CONFLICT (evaluation_id, slot_id)
-           DO UPDATE SET
-             interviewer_email = EXCLUDED.interviewer_email,
-             interviewer_name = EXCLUDED.interviewer_name,
-             case_folder_id = EXCLUDED.case_folder_id,
-             fit_question_id = EXCLUDED.fit_question_id,
-             round_number = EXCLUDED.round_number,
-             invitation_sent_at = CASE
-               WHEN EXCLUDED.slot_id = ANY($9::text[])
-                 THEN NOW()
-              ELSE evaluation_assignments.invitation_sent_at
-            END;`,
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);`,
           [
             assignmentId,
             evaluationId,
@@ -469,7 +487,8 @@ export class EvaluationsRepository {
             assignment.caseFolderId,
             assignment.fitQuestionId,
             normalizedRound,
-            refreshIds
+            invitationSentAt,
+            createdAt
           ]
         );
       }
