@@ -458,8 +458,8 @@ export class EvaluationsRepository {
              invitation_sent_at = CASE
                WHEN EXCLUDED.slot_id = ANY($9::text[])
                  THEN NOW()
-              ELSE evaluation_assignments.invitation_sent_at
-            END;`,
+               ELSE COALESCE(evaluation_assignments.invitation_sent_at, NOW())
+             END;`,
           [
             assignmentId,
             evaluationId,
