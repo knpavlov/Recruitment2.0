@@ -64,8 +64,14 @@ export const EvaluationScreen = () => {
   }, [candidates]);
 
   const handleSendInvites = useCallback(
-    async (evaluation: EvaluationConfig, scope: 'all' | 'updated') => {
-      const result = await sendInvitations(evaluation.id, scope);
+    async (evaluation: EvaluationConfig, slotIds?: string[]) => {
+      const sanitizedSelection = Array.isArray(slotIds)
+        ? slotIds
+            .map((value) => value.trim())
+            .filter((value) => value.length > 0)
+        : undefined;
+      const effectiveSelection = sanitizedSelection && sanitizedSelection.length > 0 ? sanitizedSelection : undefined;
+      const result = await sendInvitations(evaluation.id, effectiveSelection);
       if (!result.ok) {
         if (result.error === 'missing-assignment-data') {
           setBanner({
@@ -99,6 +105,17 @@ export const EvaluationScreen = () => {
           });
           return;
         }
+        if (result.error === 'invalid-selection') {
+          setBanner({ type: 'error', text: 'Choose at least one interviewer before resending invites.' });
+          return;
+        }
+        if (result.error === 'invitation-delivery-failed') {
+          setBanner({
+            type: 'error',
+            text: 'Some invitations could not be delivered. Check the email service configuration and try again.'
+          });
+          return;
+        }
         if (result.error === 'not-found') {
           setBanner({ type: 'error', text: 'Evaluation not found. Refresh the page.' });
           return;
@@ -106,11 +123,31 @@ export const EvaluationScreen = () => {
         setBanner({ type: 'error', text: 'Failed to send invitations.' });
         return;
       }
-      const message =
-        scope === 'all'
-          ? 'Invitations sent to interviewers.'
-          : 'Updated invitations sent to selected interviewers.';
-      setBanner({ type: 'info', text: message });
+      const updatedEvaluation = result.data.evaluation;
+      const delivery = result.data.deliveryReport;
+      if (delivery.failed.length > 0) {
+        const failedLabels = delivery.failed.map((failure) => {
+          const slot = updatedEvaluation.invitationState.slots.find((state) => state.slotId === failure.slotId);
+          const label = slot
+            ? `${slot.interviewerName.trim() || 'Interviewer'} — ${slot.interviewerEmail || slot.slotId}`
+            : failure.slotId;
+          const reason = failure.errorMessage?.trim() || 'Delivery failed.';
+          return `${label}: ${reason}`;
+        });
+        setBanner({
+          type: 'error',
+          text: `Some invitations were not delivered. ${failedLabels.join(' | ')}`
+        });
+        return;
+      }
+      if (delivery.sent.length > 0) {
+        const message = effectiveSelection && effectiveSelection.length > 0
+          ? 'Invitations sent to the selected interviewers.'
+          : 'Invitations sent to every interviewer.';
+        setBanner({ type: 'info', text: message });
+        return;
+      }
+      setBanner({ type: 'info', text: 'Assignments updated without sending new invitations.' });
     },
     [sendInvitations]
   );
@@ -247,12 +284,21 @@ export const EvaluationScreen = () => {
         invitesTooltip = 'Complete all interviewer, case and fit question assignments before sending invites.';
       }
 
-      const invitesMenuAvailable =
-        evaluation.invitationState.hasInvitations && evaluation.invitationState.hasPendingChanges && !isHistoricalView;
       const invitesButtonLabel = evaluation.invitationState.hasInvitations ? 'Send Invites Again' : 'Send Invites';
+      const hasInvitations = evaluation.invitationState.hasInvitations && !isHistoricalView;
+      if (!invitesDisabled && hasInvitations && evaluation.invitationState.hasPendingChanges) {
+        invitesTooltip = 'Select interviewers to resend updated invites.';
+      }
       if (!invitesDisabled && evaluation.invitationState.hasInvitations && !evaluation.invitationState.hasPendingChanges) {
         invitesTooltip = 'Invitations were already sent. Use this action to resend the same details.';
       }
+
+      const invitees = evaluation.interviews.map((slot) => {
+        const name = slot.interviewerName.trim() || 'Interviewer';
+        const email = slot.interviewerEmail.trim();
+        const label = email ? `${name} — ${email}` : name;
+        return { slotId: slot.id, label };
+      });
 
       const decisionDisabled = isHistoricalView || !allFormsSubmitted;
       let decisionTooltip: string | undefined;
@@ -290,12 +336,8 @@ export const EvaluationScreen = () => {
         setRoundSelections((prev) => ({ ...prev, [evaluation.id]: round }));
       };
 
-      const sendAll = () => {
-        void handleSendInvites(evaluation, 'all');
-      };
-
-      const sendUpdated = () => {
-        void handleSendInvites(evaluation, 'updated');
+      const sendInvites = (slotIds?: string[]) => {
+        void handleSendInvites(evaluation, slotIds);
       };
 
       const decide = (option: DecisionOption) => {
@@ -334,9 +376,9 @@ export const EvaluationScreen = () => {
         invitesButtonLabel,
         invitesDisabled,
         invitesTooltip,
-        invitesMenuAvailable,
-        onSendInvitesAll: sendAll,
-        onSendInvitesUpdated: sendUpdated,
+        hasInvitations,
+        invitees,
+        onSendInvites: sendInvites,
         onEdit: () => {
           setModalEvaluation(evaluation);
           setIsModalOpen(true);
