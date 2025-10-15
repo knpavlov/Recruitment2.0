@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { postgresPool } from '../../shared/database/postgres.client.js';
 import {
   EvaluationRecord,
@@ -215,7 +215,7 @@ const mapRowToRecord = (row: EvaluationRow): EvaluationRecord => {
     processStatus: (row.process_status as EvaluationRecord['processStatus']) ?? 'draft',
     processStartedAt: row.process_started_at ? row.process_started_at.toISOString() : undefined,
     roundHistory: mapRoundHistory(row.round_history),
-    invitationState: { hasInvitations: false, hasPendingChanges: false }
+    invitationState: { hasInvitations: false, hasPendingChanges: false, slots: [] }
   } satisfies EvaluationRecord;
 };
 
@@ -228,7 +228,12 @@ interface AssignmentRow extends Record<string, unknown> {
   case_folder_id: string;
   fit_question_id: string;
   round_number: number;
-  invitation_sent_at: Date;
+  invitation_sent_at: Date | null;
+  details_checksum: string | null;
+  last_sent_checksum: string | null;
+  last_delivery_error_code: string | null;
+  last_delivery_error: string | null;
+  last_delivery_attempt_at: Date | null;
   created_at: Date;
 }
 
@@ -236,7 +241,12 @@ interface ExistingAssignmentRow extends Record<string, unknown> {
   id: string;
   slot_id: string;
   round_number: number | null;
-  invitation_sent_at: Date;
+  invitation_sent_at: Date | null;
+  details_checksum: string | null;
+  last_sent_checksum: string | null;
+  last_delivery_error_code: string | null;
+  last_delivery_error: string | null;
+  last_delivery_attempt_at: Date | null;
   created_at: Date;
 }
 
@@ -249,7 +259,12 @@ const mapRowToAssignment = (row: AssignmentRow): InterviewAssignmentRecord => ({
   caseFolderId: row.case_folder_id,
   fitQuestionId: row.fit_question_id,
   roundNumber: Number(row.round_number ?? 1) || 1,
-  invitationSentAt: row.invitation_sent_at.toISOString(),
+  invitationSentAt: row.invitation_sent_at ? row.invitation_sent_at.toISOString() : null,
+  detailsChecksum: row.details_checksum ?? '',
+  lastSentChecksum: row.last_sent_checksum,
+  lastDeliveryErrorCode: row.last_delivery_error_code,
+  lastDeliveryError: row.last_delivery_error,
+  lastDeliveryAttemptAt: row.last_delivery_attempt_at ? row.last_delivery_attempt_at.toISOString() : null,
   createdAt: row.created_at.toISOString()
 });
 
@@ -410,9 +425,9 @@ export class EvaluationsRepository {
     assignments: InterviewAssignmentModel[],
     options: {
       status: EvaluationRecord['processStatus'];
-      refreshSlotIds: string[];
       updateStartedAt: boolean;
       roundNumber: number;
+      touchEvaluation?: boolean;
     }
   ): Promise<void> {
     const client = await (postgresPool as unknown as { connect: () => Promise<any> }).connect();
@@ -434,7 +449,16 @@ export class EvaluationsRepository {
         : 1;
 
       const existingAssignmentsResult = await client.query(
-        `SELECT id, slot_id, round_number, invitation_sent_at, created_at
+        `SELECT id,
+                slot_id,
+                round_number,
+                invitation_sent_at,
+                details_checksum,
+                last_sent_checksum,
+                last_delivery_error_code,
+                last_delivery_error,
+                last_delivery_attempt_at,
+                created_at
            FROM evaluation_assignments
           WHERE evaluation_id = $1;`,
         [evaluationId]
@@ -455,7 +479,12 @@ export class EvaluationsRepository {
             id: row.id,
             roundNumber: normalizeRowRound(row.round_number),
             invitationSentAt: row.invitation_sent_at,
-            createdAt: row.created_at
+            createdAt: row.created_at,
+            detailsChecksum: row.details_checksum ?? '',
+            lastSentChecksum: row.last_sent_checksum ?? null,
+            lastDeliveryErrorCode: row.last_delivery_error_code ?? null,
+            lastDeliveryError: row.last_delivery_error ?? null,
+            lastDeliveryAttemptAt: row.last_delivery_attempt_at ?? null
           }
         ])
       );
@@ -482,20 +511,30 @@ export class EvaluationsRepository {
         );
       }
 
-      const refreshIdSet = new Set(
-        (options.refreshSlotIds ?? [])
-          .filter((id): id is string => typeof id === 'string')
-          .map((id) => id.trim())
-          .filter((id) => id.length > 0)
-      );
+      const computeChecksum = (payload: InterviewAssignmentModel): string => {
+        const hash = createHash('sha256');
+        hash.update(payload.interviewerEmail);
+        hash.update('|');
+        hash.update(payload.interviewerName.trim());
+        hash.update('|');
+        hash.update(payload.caseFolderId);
+        hash.update('|');
+        hash.update(payload.fitQuestionId);
+        return hash.digest('hex');
+      };
 
       for (const assignment of assignments) {
+        const detailsChecksum = computeChecksum(assignment);
         const existing = existingBySlot.get(assignment.slotId);
         const isSameRound = existing?.roundNumber === normalizedRound;
         const assignmentId = isSameRound && existing?.id ? existing.id : randomUUID();
-        const shouldRefresh = refreshIdSet.has(assignment.slotId) || !existing || !isSameRound;
         const previousInvitation = isSameRound ? existing?.invitationSentAt ?? null : null;
         const previousCreatedAt = isSameRound ? existing?.createdAt ?? null : null;
+        const previousLastSentChecksum = isSameRound ? existing?.lastSentChecksum ?? null : null;
+        const hasDetailsChanged = !isSameRound || (existing?.detailsChecksum ?? '') !== detailsChecksum;
+        const preservedErrorCode = isSameRound && !hasDetailsChanged ? existing?.lastDeliveryErrorCode ?? null : null;
+        const preservedError = isSameRound && !hasDetailsChanged ? existing?.lastDeliveryError ?? null : null;
+        const preservedErrorAt = isSameRound && !hasDetailsChanged ? existing?.lastDeliveryAttemptAt ?? null : null;
         await client.query(
           `INSERT INTO evaluation_assignments (
              id,
@@ -505,9 +544,14 @@ export class EvaluationsRepository {
              interviewer_name,
              case_folder_id,
              fit_question_id,
-             round_number,
-             invitation_sent_at,
-             created_at
+              round_number,
+              invitation_sent_at,
+             created_at,
+             details_checksum,
+             last_sent_checksum,
+             last_delivery_error_code,
+             last_delivery_error,
+             last_delivery_attempt_at
            ) VALUES (
              $1,
              $2,
@@ -517,11 +561,13 @@ export class EvaluationsRepository {
              $6,
              $7,
              $8,
-             CASE
-               WHEN $9::boolean THEN NOW()
-               ELSE COALESCE($10::timestamptz, NOW())
-             END,
-             COALESCE($11::timestamptz, NOW())
+             $9,
+             $10,
+             $11,
+             $12,
+             $13,
+             $14,
+             $15
            )
            ON CONFLICT (evaluation_id, slot_id) DO UPDATE
              SET interviewer_email = EXCLUDED.interviewer_email,
@@ -529,10 +575,16 @@ export class EvaluationsRepository {
                  case_folder_id = EXCLUDED.case_folder_id,
                  fit_question_id = EXCLUDED.fit_question_id,
                  round_number = EXCLUDED.round_number,
-                 invitation_sent_at = CASE
-                   WHEN $9::boolean THEN NOW()
-                   ELSE COALESCE($10::timestamptz, evaluation_assignments.invitation_sent_at)
-                 END,
+                 invitation_sent_at = COALESCE(
+                   evaluation_assignments.invitation_sent_at,
+                   EXCLUDED.invitation_sent_at
+                 ),
+                 created_at = EXCLUDED.created_at,
+                 details_checksum = EXCLUDED.details_checksum,
+                 last_sent_checksum = EXCLUDED.last_sent_checksum,
+                 last_delivery_error_code = EXCLUDED.last_delivery_error_code,
+                 last_delivery_error = EXCLUDED.last_delivery_error,
+                 last_delivery_attempt_at = EXCLUDED.last_delivery_attempt_at,
                  id = EXCLUDED.id;`,
           [
             assignmentId,
@@ -543,24 +595,30 @@ export class EvaluationsRepository {
             assignment.caseFolderId,
             assignment.fitQuestionId,
             normalizedRound,
-            shouldRefresh,
             previousInvitation,
-            previousCreatedAt
+            previousCreatedAt ?? new Date(),
+            detailsChecksum,
+            previousLastSentChecksum,
+            preservedErrorCode,
+            preservedError,
+            preservedErrorAt
           ]
         );
       }
 
-      await client.query(
-        `UPDATE evaluations
-            SET process_status = $2,
-                process_started_at = CASE
-                  WHEN $3::boolean IS TRUE THEN COALESCE(process_started_at, NOW())
-                  ELSE process_started_at
-                END,
-                updated_at = NOW()
-          WHERE id = $1;`,
-        [evaluationId, options.status, options.updateStartedAt]
-      );
+      if (options.touchEvaluation !== false) {
+        await client.query(
+          `UPDATE evaluations
+              SET process_status = $2,
+                  process_started_at = CASE
+                    WHEN $3::boolean IS TRUE THEN COALESCE(process_started_at, NOW())
+                    ELSE process_started_at
+                  END,
+                  updated_at = NOW()
+            WHERE id = $1;`,
+          [evaluationId, options.status, options.updateStartedAt]
+        );
+      }
 
       await client.query('COMMIT');
     } catch (error) {
@@ -569,6 +627,88 @@ export class EvaluationsRepository {
     } finally {
       client.release();
     }
+  }
+
+  async markInvitationsSent(
+    evaluationId: string,
+    slotIds: string[],
+    roundNumber: number
+  ): Promise<void> {
+    const normalizedIds = Array.from(
+      new Set(
+        slotIds
+          .map((id) => (typeof id === 'string' ? id.trim() : ''))
+          .filter((id): id is string => id.length > 0)
+      )
+    );
+    if (normalizedIds.length === 0) {
+      return;
+    }
+    await postgresPool.query(
+      `UPDATE evaluation_assignments
+          SET invitation_sent_at = NOW(),
+              last_sent_checksum = details_checksum,
+              last_delivery_error_code = NULL,
+              last_delivery_error = NULL,
+              last_delivery_attempt_at = NOW()
+        WHERE evaluation_id = $1
+          AND round_number = $3
+          AND slot_id = ANY($2::text[]);`,
+      [evaluationId, normalizedIds, roundNumber]
+    );
+  }
+
+  async markInvitationsFailed(
+    evaluationId: string,
+    failures: Array<{ slotId: string; errorCode?: string; errorMessage?: string }>,
+    roundNumber: number
+  ): Promise<void> {
+    if (failures.length === 0) {
+      return;
+    }
+    for (const failure of failures) {
+      const slotId = typeof failure.slotId === 'string' ? failure.slotId.trim() : '';
+      if (!slotId) {
+        continue;
+      }
+      const errorCode = failure.errorCode?.toString().slice(0, 120) ?? null;
+      const errorMessage = failure.errorMessage?.toString().slice(0, 500) ?? null;
+      await postgresPool.query(
+        `UPDATE evaluation_assignments
+            SET last_delivery_error_code = $4,
+                last_delivery_error = $5,
+                last_delivery_attempt_at = NOW()
+          WHERE evaluation_id = $1
+            AND round_number = $2
+            AND slot_id = $3;`,
+        [evaluationId, roundNumber, slotId, errorCode, errorMessage]
+      );
+    }
+  }
+
+  async markInvitationsPending(
+    evaluationId: string,
+    slotIds: string[],
+    roundNumber: number
+  ): Promise<void> {
+    const normalizedIds = Array.from(
+      new Set(
+        slotIds
+          .map((id) => (typeof id === 'string' ? id.trim() : ''))
+          .filter((id): id is string => id.length > 0)
+      )
+    );
+    if (normalizedIds.length === 0) {
+      return;
+    }
+    await postgresPool.query(
+      `UPDATE evaluation_assignments
+          SET invitation_sent_at = NULL
+        WHERE evaluation_id = $1
+          AND round_number = $3
+          AND slot_id = ANY($2::text[]);`,
+      [evaluationId, normalizedIds, roundNumber]
+    );
   }
 
   async listAssignmentsByEmail(email: string): Promise<InterviewAssignmentRecord[]> {
@@ -582,6 +722,11 @@ export class EvaluationsRepository {
               fit_question_id,
               round_number,
               invitation_sent_at,
+              details_checksum,
+              last_sent_checksum,
+              last_delivery_error_code,
+              last_delivery_error,
+              last_delivery_attempt_at,
               created_at
          FROM evaluation_assignments
         WHERE lower(interviewer_email) = lower($1)
@@ -602,6 +747,11 @@ export class EvaluationsRepository {
               fit_question_id,
               round_number,
               invitation_sent_at,
+              details_checksum,
+              last_sent_checksum,
+              last_delivery_error_code,
+              last_delivery_error,
+              last_delivery_attempt_at,
               created_at
          FROM evaluation_assignments
         WHERE evaluation_id = $1
@@ -625,6 +775,11 @@ export class EvaluationsRepository {
               fit_question_id,
               round_number,
               invitation_sent_at,
+              details_checksum,
+              last_sent_checksum,
+              last_delivery_error_code,
+              last_delivery_error,
+              last_delivery_attempt_at,
               created_at
          FROM evaluation_assignments
         WHERE evaluation_id = $1 AND slot_id = $2
