@@ -1,10 +1,48 @@
 import {
   EvaluationInvitationState,
   EvaluationRecord,
-  InterviewAssignmentRecord
+  InterviewAssignmentRecord,
+  InvitationSlotState,
+  InvitationSlotStatus
 } from './evaluations.types.js';
 
-const normalize = (value: string | undefined) => (value ?? '').trim().toLowerCase();
+const resolveStatus = (
+  assignment: InterviewAssignmentRecord,
+  slot: EvaluationRecord['interviews'][number]
+): InvitationSlotState => {
+  const sentAt = assignment.invitationSentAt ?? null;
+  const attemptAt = assignment.lastDeliveryAttemptAt ?? null;
+  const sentChecksum = assignment.lastSentChecksum ?? null;
+  const detailsChecksum = assignment.detailsChecksum;
+  const hasPendingDetails = !sentChecksum || sentChecksum !== detailsChecksum;
+  const lastSuccessTime = sentAt ? new Date(sentAt).getTime() : null;
+  const lastAttemptTime = attemptAt ? new Date(attemptAt).getTime() : null;
+  const errorActive =
+    typeof assignment.lastDeliveryError === 'string' && assignment.lastDeliveryError.trim().length > 0 &&
+    (!lastSuccessTime || (lastAttemptTime ?? Number.NaN) >= (lastSuccessTime ?? Number.NEGATIVE_INFINITY));
+
+  let status: InvitationSlotStatus;
+  if (errorActive) {
+    status = 'failed';
+  } else if (!sentAt) {
+    status = 'pending';
+  } else if (hasPendingDetails) {
+    status = 'stale';
+  } else {
+    status = 'delivered';
+  }
+
+  return {
+    slotId: assignment.slotId,
+    interviewerName: slot.interviewerName,
+    interviewerEmail: slot.interviewerEmail,
+    status,
+    invitationSentAt: sentAt,
+    lastDeliveryAttemptAt: attemptAt,
+    lastDeliveryErrorCode: assignment.lastDeliveryErrorCode ?? null,
+    lastDeliveryError: assignment.lastDeliveryError ?? null
+  } satisfies InvitationSlotState;
+};
 
 export const computeInvitationState = (
   evaluation: EvaluationRecord,
@@ -16,56 +54,36 @@ export const computeInvitationState = (
   );
   const slotMap = new Map(evaluation.interviews.map((slot) => [slot.id, slot]));
   const matchingAssignments = currentAssignments.filter((assignment) => slotMap.has(assignment.slotId));
-  const hasInvitations = matchingAssignments.length > 0;
+  const slotStates: InvitationSlotState[] = [];
 
-  let hasPendingChanges = false;
-
-  if (!hasInvitations) {
-    hasPendingChanges = true;
-  }
-
-  if (!hasPendingChanges) {
-    for (const [slotId, slot] of slotMap.entries()) {
-      const assignment = matchingAssignments.find((item) => item.slotId === slotId);
-      if (!assignment) {
-        hasPendingChanges = true;
-        break;
-      }
-      if (normalize(slot.interviewerEmail) !== normalize(assignment.interviewerEmail)) {
-        hasPendingChanges = true;
-        break;
-      }
-      const slotCase = slot.caseFolderId ?? '';
-      const assignmentCase = assignment.caseFolderId ?? '';
-      if (slotCase !== assignmentCase) {
-        hasPendingChanges = true;
-        break;
-      }
-      const slotFit = slot.fitQuestionId ?? '';
-      const assignmentFit = assignment.fitQuestionId ?? '';
-      if (slotFit !== assignmentFit) {
-        hasPendingChanges = true;
-        break;
-      }
-      const slotName = (slot.interviewerName ?? '').trim();
-      const assignmentName = (assignment.interviewerName ?? '').trim();
-      if (slotName !== assignmentName) {
-        hasPendingChanges = true;
-        break;
-      }
+  for (const slot of evaluation.interviews) {
+    const assignment = matchingAssignments.find((item) => item.slotId === slot.id);
+    if (!assignment) {
+      slotStates.push({
+        slotId: slot.id,
+        interviewerName: slot.interviewerName,
+        interviewerEmail: slot.interviewerEmail,
+        status: 'unassigned',
+        invitationSentAt: null,
+        lastDeliveryAttemptAt: null,
+        lastDeliveryErrorCode: null,
+        lastDeliveryError: null
+      });
+      continue;
     }
+    slotStates.push(resolveStatus(assignment, slot));
   }
 
-  if (!hasPendingChanges) {
-    const currentSlotIds = new Set(slotMap.keys());
-    if (currentAssignments.some((assignment) => !currentSlotIds.has(assignment.slotId))) {
-      hasPendingChanges = true;
-    }
-  }
+  const sentAssignments = matchingAssignments.filter((assignment) => assignment.invitationSentAt);
+  const hasInvitations = sentAssignments.length > 0;
 
-  const lastSentAt = matchingAssignments.length
-    ? matchingAssignments
-        .map((item) => new Date(item.invitationSentAt).getTime())
+  const extraAssignments = currentAssignments.filter((assignment) => !slotMap.has(assignment.slotId));
+
+  const hasPendingChanges = slotStates.some((state) => state.status !== 'delivered') || extraAssignments.length > 0;
+
+  const lastSentAt = sentAssignments.length
+    ? sentAssignments
+        .map((item) => (item.invitationSentAt ? new Date(item.invitationSentAt).getTime() : Number.NaN))
         .filter((value) => Number.isFinite(value))
         .sort((a, b) => b - a)[0]
     : undefined;
@@ -73,6 +91,7 @@ export const computeInvitationState = (
   return {
     hasInvitations,
     hasPendingChanges,
-    lastSentAt: lastSentAt ? new Date(lastSentAt).toISOString() : undefined
+    lastSentAt: lastSentAt ? new Date(lastSentAt).toISOString() : undefined,
+    slots: slotStates
   };
 };

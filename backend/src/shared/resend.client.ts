@@ -16,7 +16,9 @@ export class ResendError extends Error {
   constructor(
     message: string,
     public readonly status: number,
-    public readonly code?: string
+    public readonly code?: string,
+    // Дополнительная информация о паузе перед повтором запроса
+    public readonly retryAfterMs?: number
   ) {
     super(message);
     this.name = 'ResendError';
@@ -54,6 +56,21 @@ export const sendWithResend = async ({ apiKey, from, to, subject, text }: Resend
         ? details.message
         : response.statusText;
 
-    throw new ResendError(message, response.status, code);
+    const retryAfterHeader = response.headers.get('retry-after');
+    let retryAfterMs: number | undefined;
+    if (retryAfterHeader) {
+      const numericDelay = Number(retryAfterHeader);
+      if (Number.isFinite(numericDelay) && numericDelay >= 0) {
+        retryAfterMs = numericDelay * 1000;
+      } else {
+        const retryDate = new Date(retryAfterHeader);
+        const delayMs = retryDate.getTime() - Date.now();
+        if (!Number.isNaN(delayMs) && delayMs > 0) {
+          retryAfterMs = delayMs;
+        }
+      }
+    }
+
+    throw new ResendError(message, response.status, code, retryAfterMs);
   }
 };

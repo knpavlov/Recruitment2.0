@@ -6,7 +6,10 @@ import {
   InterviewStatusRecord,
   EvaluationCriterionScore,
   EvaluationRoundSnapshot,
-  EvaluationInvitationState
+  EvaluationInvitationState,
+  InvitationSlotState,
+  InvitationDeliveryReport,
+  InvitationDeliveryFailure
 } from '../../../shared/types/evaluation';
 
 const normalizeString = (value: unknown): string | undefined => {
@@ -100,16 +103,47 @@ const normalizeRoundHistory = (value: unknown): EvaluationRoundSnapshot[] => {
   return rounds.sort((a, b) => a.roundNumber - b.roundNumber);
 };
 
+const normalizeInvitationSlot = (value: unknown): InvitationSlotState | null => {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const payload = value as Record<string, unknown>;
+  const slotId = normalizeString(payload.slotId)?.trim();
+  if (!slotId) {
+    return null;
+  }
+  const status = normalizeString(payload.status);
+  const allowedStatuses: InvitationSlotState['status'][] = ['pending', 'delivered', 'stale', 'failed', 'unassigned'];
+  const resolvedStatus = allowedStatuses.includes(status as InvitationSlotState['status'])
+    ? (status as InvitationSlotState['status'])
+    : 'pending';
+  return {
+    slotId,
+    interviewerName: normalizeString(payload.interviewerName) ?? 'Interviewer',
+    interviewerEmail: normalizeString(payload.interviewerEmail) ?? '',
+    status: resolvedStatus,
+    invitationSentAt: normalizeIsoString(payload.invitationSentAt) ?? null,
+    lastDeliveryAttemptAt: normalizeIsoString(payload.lastDeliveryAttemptAt) ?? null,
+    lastDeliveryErrorCode: normalizeString(payload.lastDeliveryErrorCode)?.trim() || null,
+    lastDeliveryError: normalizeString(payload.lastDeliveryError)?.trim() || null
+  };
+};
+
 const normalizeInvitationState = (value: unknown): EvaluationInvitationState => {
   if (!value || typeof value !== 'object') {
-    return { hasInvitations: false, hasPendingChanges: true };
+    return { hasInvitations: false, hasPendingChanges: true, slots: [] };
   }
   const payload = value as Record<string, unknown>;
   const hasInvitations = typeof payload.hasInvitations === 'boolean' ? payload.hasInvitations : false;
   const hasPendingChanges =
     typeof payload.hasPendingChanges === 'boolean' ? payload.hasPendingChanges : !hasInvitations;
   const lastSentAt = normalizeIsoString(payload.lastSentAt) ?? undefined;
-  return { hasInvitations, hasPendingChanges, lastSentAt };
+  const slots = Array.isArray(payload.slots)
+    ? payload.slots
+        .map((slot) => normalizeInvitationSlot(slot))
+        .filter((slot): slot is InvitationSlotState => Boolean(slot))
+    : [];
+  return { hasInvitations, hasPendingChanges, lastSentAt, slots };
 };
 
 const normalizeSlot = (value: unknown): InterviewSlot | null => {
@@ -302,6 +336,57 @@ const ensureEvaluationList = (value: unknown): EvaluationConfig[] => {
     .filter((evaluation): evaluation is EvaluationConfig => Boolean(evaluation));
 };
 
+const ensureSendInvitationsResult = (
+  value: unknown
+): { evaluation: EvaluationConfig; deliveryReport: InvitationDeliveryReport } => {
+  if (!value || typeof value !== 'object') {
+    throw new Error('Failed to parse send invitations result.');
+  }
+  const payload = value as { evaluation?: unknown; deliveryReport?: unknown };
+  const evaluation = ensureEvaluation(payload.evaluation);
+  const deliveryReport = normalizeDeliveryReport(payload.deliveryReport);
+  return { evaluation, deliveryReport };
+};
+
+const normalizeDeliveryFailure = (value: unknown): InvitationDeliveryFailure | null => {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const payload = value as Record<string, unknown>;
+  const slotId = normalizeString(payload.slotId)?.trim();
+  if (!slotId) {
+    return null;
+  }
+  return {
+    slotId,
+    errorCode: normalizeString(payload.errorCode)?.trim() || undefined,
+    errorMessage: normalizeString(payload.errorMessage)?.trim() || undefined
+  };
+};
+
+const normalizeDeliveryReport = (value: unknown): InvitationDeliveryReport => {
+  if (!value || typeof value !== 'object') {
+    return { sent: [], failed: [], skipped: [] };
+  }
+  const payload = value as Record<string, unknown>;
+  const sent = Array.isArray(payload.sent)
+    ? payload.sent
+        .map((item) => normalizeString(item)?.trim())
+        .filter((item): item is string => Boolean(item))
+    : [];
+  const skipped = Array.isArray(payload.skipped)
+    ? payload.skipped
+        .map((item) => normalizeString(item)?.trim())
+        .filter((item): item is string => Boolean(item))
+    : [];
+  const failed = Array.isArray(payload.failed)
+    ? payload.failed
+        .map((item) => normalizeDeliveryFailure(item))
+        .filter((item): item is InvitationDeliveryFailure => Boolean(item))
+    : [];
+  return { sent, failed, skipped };
+};
+
 const serializeRoundHistory = (history: EvaluationRoundSnapshot[]) =>
   history.map((round) => ({
     ...round,
@@ -392,13 +477,18 @@ export const evaluationsApi = {
       method: 'POST',
       body: { portalBaseUrl: computePortalBaseUrl() }
     }),
-  sendInvitations: async (id: string, scope: 'all' | 'updated') =>
-    ensureEvaluation(
+  sendInvitations: async (id: string, slotIds?: string[]) => {
+    const payload: Record<string, unknown> = { portalBaseUrl: computePortalBaseUrl() };
+    if (Array.isArray(slotIds) && slotIds.length > 0) {
+      payload.slotIds = slotIds;
+    }
+    return ensureSendInvitationsResult(
       await apiRequest<unknown>(`/evaluations/${id}/invitations`, {
         method: 'POST',
-        body: { scope, portalBaseUrl: computePortalBaseUrl() }
+        body: payload
       })
-    ),
+    );
+  },
   advance: async (id: string) =>
     ensureEvaluation(
       await apiRequest<unknown>(`/evaluations/${id}/advance`, {
