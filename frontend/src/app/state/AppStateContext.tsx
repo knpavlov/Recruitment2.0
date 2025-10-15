@@ -10,8 +10,10 @@ import { candidatesApi } from '../../modules/candidates/services/candidatesApi';
 import { accountsApi } from '../../modules/accounts/services/accountsApi';
 import { fitQuestionsApi } from '../../modules/questions/services/fitQuestionsApi';
 import { evaluationsApi } from '../../modules/evaluation/services/evaluationsApi';
+import { caseCriteriaApi } from '../../modules/case-criteria/services/caseCriteriaApi';
 import { ApiError } from '../../shared/api/httpClient';
 import { useAuth } from '../../modules/auth/AuthContext';
+import { CaseCriterion, CaseCriterionDraft, CaseCriteriaSet } from '../../shared/types/caseCriteria';
 
 interface AppStateContextValue {
   cases: {
@@ -62,6 +64,15 @@ interface AppStateContextValue {
     activateAccount: (id: string) => Promise<DomainResult<AccountRecord>>;
     removeAccount: (id: string) => Promise<DomainResult<string>>;
   };
+  caseCriteria: {
+    list: CaseCriterion[];
+    version: number | null;
+    reload: () => Promise<void>;
+    saveSet: (
+      drafts: CaseCriterionDraft[],
+      expectedVersion: number | null
+    ) => Promise<DomainResult<CaseCriteriaSet>>;
+  };
 }
 
 const AppStateContext = createContext<AppStateContextValue | null>(null);
@@ -72,6 +83,8 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [fitQuestions, setFitQuestions] = useState<FitQuestion[]>([]);
   const [evaluations, setEvaluations] = useState<EvaluationConfig[]>([]);
   const [accounts, setAccounts] = useState<AccountRecord[]>([]);
+  const [caseCriteria, setCaseCriteria] = useState<CaseCriterion[]>([]);
+  const [caseCriteriaVersion, setCaseCriteriaVersion] = useState<number | null>(null);
   const { session } = useAuth();
 
   const syncFolders = useCallback(async (): Promise<CaseFolder[] | null> => {
@@ -114,8 +127,37 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       setCandidates([]);
       setFitQuestions([]);
       setEvaluations([]);
+      setCaseCriteria([]);
+      setCaseCriteriaVersion(null);
     }
   }, [session]);
+
+  useEffect(() => {
+    if (!session) {
+      return;
+    }
+    const loadCaseCriteria = async () => {
+      try {
+        const remote = await caseCriteriaApi.list();
+        setCaseCriteria(remote.items);
+        setCaseCriteriaVersion(remote.version);
+      } catch (error) {
+        console.error('Failed to load case criteria:', error);
+      }
+    };
+    void loadCaseCriteria();
+  }, [session]);
+
+  const reloadCaseCriteria = useCallback(async () => {
+    try {
+      const remote = await caseCriteriaApi.list();
+      setCaseCriteria(remote.items);
+      setCaseCriteriaVersion(remote.version);
+    } catch (error) {
+      console.error('Failed to reload case criteria:', error);
+      throw error;
+    }
+  }, []);
 
   useEffect(() => {
     if (!session) {
@@ -580,8 +622,44 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
           return { ok: false, error: 'unknown' };
         }
       }
+    },
+    caseCriteria: {
+      list: caseCriteria,
+      version: caseCriteriaVersion,
+      reload: async () => {
+        await reloadCaseCriteria();
+      },
+      saveSet: async (drafts, expectedVersion) => {
+        try {
+          const result = await caseCriteriaApi.save(drafts, expectedVersion);
+          setCaseCriteria(result.items);
+          setCaseCriteriaVersion(result.version);
+          return { ok: true, data: result };
+        } catch (error) {
+          if (error instanceof ApiError) {
+            if (error.code === 'version-conflict') {
+              return { ok: false, error: 'version-conflict' };
+            }
+            if (error.code === 'invalid-input') {
+              return { ok: false, error: 'invalid-input' };
+            }
+          }
+          console.error('Failed to save case criteria:', error);
+          return { ok: false, error: 'unknown' };
+        }
+      }
     }
-  }), [folders, fitQuestions, candidates, evaluations, accounts, syncFolders]);
+  }), [
+    folders,
+    fitQuestions,
+    candidates,
+    evaluations,
+    accounts,
+    syncFolders,
+    caseCriteria,
+    caseCriteriaVersion,
+    reloadCaseCriteria
+  ]);
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;
 };
@@ -599,3 +677,4 @@ export const useFitQuestionsState = () => useAppState().fitQuestions;
 export const useCandidatesState = () => useAppState().candidates;
 export const useEvaluationsState = () => useAppState().evaluations;
 export const useAccountsState = () => useAppState().accounts;
+export const useCaseCriteriaState = () => useAppState().caseCriteria;

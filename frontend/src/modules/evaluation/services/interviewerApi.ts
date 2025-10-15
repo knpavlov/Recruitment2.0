@@ -12,6 +12,7 @@ import {
 } from '../../../shared/types/candidate';
 import { CaseFileRecord, CaseFolder } from '../../../shared/types/caseLibrary';
 import { FitQuestion } from '../../../shared/types/fitQuestion';
+import { CaseCriterion } from '../../../shared/types/caseCriteria';
 
 const normalizeString = (value: unknown): string | undefined => {
   if (typeof value === 'string') {
@@ -233,6 +234,49 @@ const normalizeCaseFolder = (value: unknown): CaseFolder | undefined => {
   };
 };
 
+const normalizeCaseCriterionDefinition = (value: unknown): CaseCriterion | undefined => {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+  const payload = value as Partial<CaseCriterion> & { id?: unknown; title?: unknown; ratings?: unknown; position?: unknown };
+  const id = normalizeString(payload.id)?.trim();
+  const title = normalizeString(payload.title)?.trim();
+  if (!id || !title) {
+    return undefined;
+  }
+  const positionValue = typeof payload.position === 'number' ? payload.position : Number(payload.position ?? 0);
+  const createdAt = normalizeIso(payload.createdAt) ?? new Date().toISOString();
+  const updatedAt = normalizeIso(payload.updatedAt) ?? createdAt;
+
+  const ratingsSource =
+    payload.ratings && typeof payload.ratings === 'object' ? (payload.ratings as Record<string, unknown>) : {};
+  const ratings: CaseCriterion['ratings'] = {};
+  for (const score of [1, 2, 3, 4, 5] as const) {
+    const raw = normalizeString(ratingsSource[String(score)]);
+    if (raw) {
+      ratings[score] = raw.trim();
+    }
+  }
+
+  return {
+    id,
+    title,
+    ratings,
+    position: Number.isFinite(positionValue) ? Number(positionValue) : 0,
+    createdAt,
+    updatedAt
+  };
+};
+
+const ensureCaseCriteriaDefinitions = (value: unknown): CaseCriterion[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((entry) => normalizeCaseCriterionDefinition(entry))
+    .filter((criterion): criterion is CaseCriterion => Boolean(criterion));
+};
+
 const normalizeFitQuestion = (value: unknown): FitQuestion | undefined => {
   if (!value || typeof value !== 'object') {
     return undefined;
@@ -343,7 +387,8 @@ const normalizeAssignment = (value: unknown): InterviewerAssignmentView | null =
     candidate: normalizeCandidate(payload.candidate),
     caseFolder: normalizeCaseFolder(payload.caseFolder),
     fitQuestion: normalizeFitQuestion(payload.fitQuestion),
-    form: normalizeForm(payload.form)
+    form: normalizeForm(payload.form),
+    caseCriteria: ensureCaseCriteriaDefinitions(payload.caseCriteria)
   };
 };
 

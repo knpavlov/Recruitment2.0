@@ -1,0 +1,237 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 32px;
+}
+
+.subtitle {
+  margin: 8px 0 0 0;
+  color: #475569;
+}
+
+.versionBadge {
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.2);
+  color: #0f172a;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.infoBanner,
+.errorBanner {
+  padding: 16px 20px;
+  border-radius: 16px;
+  font-weight: 500;
+}
+
+.infoBanner {
+  background: rgba(134, 239, 172, 0.2);
+  color: #166534;
+}
+
+.errorBanner {
+  background: rgba(254, 202, 202, 0.3);
+  color: #b91c1c;
+}
+
+.editorCard {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 28px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.8);
+  box-shadow: 0 32px 64px rgba(15, 23, 42, 0.08);
+}
+
+.criteriaHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+}
+
+.criteriaHeader h2 {
+  margin: 0;
+}
+
+.mutedText {
+  margin: 8px 0 0 0;
+  color: #64748b;
+}
+
+.actionsRow {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.primaryButton {
+  padding: 12px 20px;
+  border-radius: 12px;
+  border: none;
+  background: linear-gradient(135deg, #34d399, #22d3ee);
+  color: white;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.primaryButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.primaryButton:not(:disabled):hover,
+.secondaryButton:hover,
+.removeCriterionButton:hover {
+  transform: translateY(-1px);
+}
+
+.secondaryButton {
+  padding: 12px 18px;
+  border-radius: 12px;
+  border: none;
+  background: rgba(148, 163, 184, 0.25);
+  color: #0f172a;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.secondaryButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.linkButton {
+  border: none;
+  background: transparent;
+  color: #2563eb;
+  cursor: pointer;
+  padding: 10px 12px;
+  border-radius: 10px;
+}
+
+.linkButton:disabled {
+  color: rgba(37, 99, 235, 0.4);
+  cursor: not-allowed;
+}
+
+.criteriaList {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.placeholder {
+  margin: 0;
+  padding: 24px;
+  border-radius: 18px;
+  background: rgba(226, 232, 240, 0.4);
+  color: #475569;
+}
+
+.criterionBlock {
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  padding: 24px;
+  background: white;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.criterionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.criterionHeader h3 {
+  margin: 0;
+}
+
+.removeCriterionButton {
+  border: none;
+  background: rgba(248, 113, 113, 0.2);
+  color: #b91c1c;
+  border-radius: 10px;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.removeCriterionButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+  color: #475569;
+}
+
+.fieldGroup input {
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  padding: 12px;
+  font-size: 14px;
+  background: #ffffff;
+}
+
+.fieldLabel {
+  font-weight: 600;
+}
+
+.ratingsTable {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ratingRow {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.ratingLabel {
+  font-weight: 600;
+  color: #475569;
+  padding-top: 12px;
+}
+
+.ratingRow textarea {
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  padding: 12px;
+  font-size: 14px;
+  min-height: 96px;
+  resize: vertical;
+  background: #ffffff;
+}
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+}

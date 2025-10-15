@@ -14,6 +14,7 @@ import type { AccountsService } from '../accounts/accounts.service.js';
 import type { CandidatesService } from '../candidates/candidates.service.js';
 import type { CasesService } from '../cases/cases.service.js';
 import type { QuestionsService } from '../questions/questions.service.js';
+import type { CaseCriteriaService } from '../caseCriteria/caseCriteria.service.js';
 
 const normalizeEmail = (value: string): string => value.trim().toLowerCase();
 
@@ -117,6 +118,7 @@ export class EvaluationWorkflowService {
     private readonly candidates: CandidatesService,
     private readonly cases: CasesService,
     private readonly questions: QuestionsService,
+    private readonly caseCriteria: CaseCriteriaService,
     private readonly mailer = new MailerService()
   ) {}
 
@@ -371,6 +373,7 @@ export class EvaluationWorkflowService {
     const candidateMap = new Map<string, Awaited<ReturnType<CandidatesService['getCandidate']>> | null>();
     const caseMap = new Map<string, Awaited<ReturnType<CasesService['getFolder']>> | null>();
     const questionMap = new Map<string, Awaited<ReturnType<QuestionsService['getQuestion']>> | null>();
+    const globalCriteria = await this.caseCriteria.listCriteria();
 
     for (const assignment of assignments) {
       const evaluation = evaluationMap.get(assignment.evaluationId);
@@ -429,7 +432,11 @@ export class EvaluationWorkflowService {
         candidate: candidate ?? undefined,
         caseFolder: caseMap.get(assignment.caseFolderId) ?? undefined,
         fitQuestion: questionMap.get(assignment.fitQuestionId) ?? undefined,
-        form
+        form,
+        caseCriteria: globalCriteria.items.map((criterion) => ({
+          ...criterion,
+          ratings: { ...criterion.ratings }
+        }))
       } satisfies InterviewerAssignmentView;
     });
   }
