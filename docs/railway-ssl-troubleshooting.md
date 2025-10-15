@@ -17,19 +17,11 @@ Railway выдаёт бесплатные TLS-сертификаты для по
 ## Как диагностировать проблему
 
 1. **Проверить сертификат с помощью CLI.**
-   - **macOS/Linux (bash/zsh):**
-     ```bash
-     openssl s_client -connect recruitment20-frontend-production.up.railway.app:443 \
-       -servername recruitment20-frontend-production.up.railway.app < /dev/null |
-       openssl x509 -noout -issuer -subject -dates
-     ```
-   - **Windows PowerShell:** оператор перенаправления `<` не поддерживается, поэтому используйте конвейер с `echo`.
-     ```powershell
-     echo '' | openssl s_client -connect recruitment20-frontend-production.up.railway.app:443 `
-       -servername recruitment20-frontend-production.up.railway.app |
-       openssl x509 -noout -issuer -subject -dates
-     ```
-     Если установлен только `cmd.exe`-вариант OpenSSL, выполните команду через `cmd /c "echo.| openssl ..."`.
+   ```bash
+   openssl s_client -connect recruitment20-frontend-production.up.railway.app:443 \
+     -servername recruitment20-frontend-production.up.railway.app < /dev/null |
+     openssl x509 -noout -issuer -subject -dates
+   ```
    - Если в поле `issuer` указан `Let's Encrypt`, сертификат корректен, а ошибка идёт со стороны браузера/кэша.
    - Если указан `Railway Proxy CA` или другое неизвестное имя, Railway ещё не выпустил доверенный сертификат.
    - Если вместо Railway/Let's Encrypt отображаются корпоративные прокси (`Cisco Umbrella Secondary SubCA`, `Zscaler Intermediate`, и т. д.), значит трафик перехватывается сетевым фильтром. Проверьте, установлен ли в систему корневой сертификат компании, либо подключитесь к другой сети/VPN.
