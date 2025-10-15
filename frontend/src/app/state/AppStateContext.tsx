@@ -1,7 +1,7 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { CaseFolder, CaseFileUploadDto } from '../../shared/types/caseLibrary';
 import { CandidateProfile } from '../../shared/types/candidate';
-import { EvaluationConfig } from '../../shared/types/evaluation';
+import { EvaluationConfig, InvitationDeliveryReport } from '../../shared/types/evaluation';
 import { AccountRecord, AccountRole } from '../../shared/types/account';
 import { FitQuestion } from '../../shared/types/fitQuestion';
 import { CaseCriterion } from '../../shared/types/caseCriteria';
@@ -63,7 +63,10 @@ interface AppStateContextValue {
       expectedVersion: number | null
     ) => Promise<DomainResult<EvaluationConfig>>;
     removeEvaluation: (id: string) => Promise<DomainResult<string>>;
-    sendInvitations: (id: string, scope: 'all' | 'updated') => Promise<DomainResult<EvaluationConfig>>;
+    sendInvitations: (
+      id: string,
+      slotIds?: string[]
+    ) => Promise<DomainResult<{ evaluation: EvaluationConfig; deliveryReport: InvitationDeliveryReport }>>;
     advanceRound: (id: string) => Promise<DomainResult<EvaluationConfig>>;
   };
   accounts: {
@@ -574,11 +577,11 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
           return { ok: false, error: 'unknown' };
         }
       },
-      sendInvitations: async (id, scope) => {
+      sendInvitations: async (id, slotIds) => {
         try {
-          const updated = await evaluationsApi.sendInvitations(id, scope);
-          setEvaluations((prev) => prev.map((item) => (item.id === id ? updated : item)));
-          return { ok: true, data: updated };
+          const result = await evaluationsApi.sendInvitations(id, slotIds);
+          setEvaluations((prev) => prev.map((item) => (item.id === id ? result.evaluation : item)));
+          return { ok: true, data: result };
         } catch (error) {
           if (error instanceof ApiError) {
             if (error.code === 'missing-assignment-data') {
@@ -595,6 +598,12 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
             }
             if (error.code === 'invalid-portal-url') {
               return { ok: false, error: 'invalid-portal-url' };
+            }
+            if (error.code === 'invalid-selection') {
+              return { ok: false, error: 'invalid-selection' };
+            }
+            if (error.code === 'invitation-delivery-failed') {
+              return { ok: false, error: 'invitation-delivery-failed' };
             }
             if (error.code === 'not-found') {
               return { ok: false, error: 'not-found' };

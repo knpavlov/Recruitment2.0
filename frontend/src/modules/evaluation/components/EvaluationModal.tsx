@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import styles from '../../../styles/EvaluationModal.module.css';
-import { EvaluationConfig, InterviewSlot, InterviewStatusRecord } from '../../../shared/types/evaluation';
+import {
+  EvaluationConfig,
+  InterviewSlot,
+  InterviewStatusRecord,
+  InvitationSlotStatus
+} from '../../../shared/types/evaluation';
 import { CandidateProfile } from '../../../shared/types/candidate';
 import { CaseFolder } from '../../../shared/types/caseLibrary';
 import { FitQuestion } from '../../../shared/types/fitQuestion';
@@ -31,6 +36,14 @@ const createStatusRecord = (slot: InterviewSlot): InterviewStatusRecord => ({
   submitted: false
 });
 
+const STATUS_LABELS: Record<InvitationSlotStatus, string> = {
+  pending: 'Not sent',
+  delivered: 'Delivered',
+  stale: 'Needs resend',
+  failed: 'Delivery failed',
+  unassigned: 'Incomplete'
+};
+
 const createDefaultConfig = (): EvaluationConfig => {
   const interviews = [createInterviewSlot()];
   return {
@@ -48,7 +61,8 @@ const createDefaultConfig = (): EvaluationConfig => {
     roundHistory: [],
     invitationState: {
       hasInvitations: false,
-      hasPendingChanges: true
+      hasPendingChanges: true,
+      slots: []
     }
   };
 };
@@ -104,6 +118,25 @@ export const EvaluationModal = ({
 
   const expectedVersion = initialConfig ? initialConfig.version : null;
 
+  const slotStatusMap = useMemo(() => {
+    const map = new Map<string, (typeof config.invitationState.slots)[number]>();
+    (config.invitationState.slots ?? []).forEach((state) => {
+      map.set(state.slotId, state);
+    });
+    return map;
+  }, [config.invitationState.slots]);
+
+  const formatDateTime = (value?: string | null) => {
+    if (!value) {
+      return '';
+    }
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return '';
+    }
+    return date.toLocaleString();
+  };
+
   const updateInterviews = (updater: (current: InterviewSlot[]) => InterviewSlot[]) => {
     setConfig((prev) => {
       const interviews = updater(prev.interviews);
@@ -119,7 +152,7 @@ export const EvaluationModal = ({
         interviewCount: interviews.length,
         forms,
         invitationState: {
-          ...(prev.invitationState ?? { hasInvitations: false, hasPendingChanges: true }),
+          ...(prev.invitationState ?? { hasInvitations: false, hasPendingChanges: true, slots: [] }),
           hasPendingChanges: true
         }
       };
@@ -247,13 +280,46 @@ export const EvaluationModal = ({
           </div>
 
           <div className={styles.interviewsList}>
-            {config.interviews.map((slot, index) => (
-              <div key={slot.id} className={styles.interviewBlock}>
-                <div className={styles.interviewHeader}>
-                  <h3>Interview {index + 1}</h3>
-                  <button
-                    type="button"
-                    className={styles.removeInterviewButton}
+            {config.interviews.map((slot, index) => {
+              const invitationSlot = slotStatusMap.get(slot.id);
+              const statusKey: InvitationSlotStatus = invitationSlot?.status ?? 'pending';
+              const badgeClass =
+                statusKey === 'delivered'
+                  ? styles.statusDelivered
+                  : statusKey === 'stale'
+                    ? styles.statusStale
+                    : statusKey === 'failed'
+                      ? styles.statusFailed
+                      : statusKey === 'unassigned'
+                        ? styles.statusUnassigned
+                        : styles.statusPending;
+              let note: string | null = null;
+              if (statusKey === 'delivered') {
+                note = invitationSlot?.invitationSentAt
+                  ? `Delivered on ${formatDateTime(invitationSlot.invitationSentAt)}`
+                  : 'Invitation delivered.';
+              } else if (statusKey === 'stale') {
+                note = invitationSlot?.invitationSentAt
+                  ? `Assignment changed after the invite sent on ${formatDateTime(invitationSlot.invitationSentAt)}.`
+                  : 'Assignment updated. Resend the invitation when ready.';
+              } else if (statusKey === 'failed') {
+                note = invitationSlot?.lastDeliveryAttemptAt
+                  ? `Last delivery attempt on ${formatDateTime(invitationSlot.lastDeliveryAttemptAt)}.`
+                  : 'Delivery attempt failed. Check the address and resend.';
+              } else if (statusKey === 'unassigned') {
+                note = 'Provide interviewer email, case, and fit question before sending an invite.';
+              } else {
+                note = 'Invitation has not been sent yet.';
+              }
+              const errorText = invitationSlot?.lastDeliveryError?.trim() || null;
+
+              return (
+                <div key={slot.id} className={styles.interviewBlock}>
+                  <div className={styles.interviewHeader}>
+                    <h3>Interview {index + 1}</h3>
+                    <button
+                      type="button"
+                      className={styles.removeInterviewButton}
                     onClick={() => handleRemoveInterview(slot.id)}
                     disabled={config.interviews.length <= 1}
                   >
@@ -302,8 +368,14 @@ export const EvaluationModal = ({
                     ))}
                   </select>
                 </label>
+                <div className={styles.statusSection}>
+                  <span className={`${styles.statusBadge} ${badgeClass}`}>{STATUS_LABELS[statusKey]}</span>
+                  {note && <span className={styles.statusNote}>{note}</span>}
+                  {errorText && <span className={styles.statusError}>{errorText}</span>}
+                </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
