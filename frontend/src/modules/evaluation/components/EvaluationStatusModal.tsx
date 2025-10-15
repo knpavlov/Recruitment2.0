@@ -3,6 +3,7 @@ import styles from '../../../styles/EvaluationStatusModal.module.css';
 import { EvaluationConfig, OfferRecommendationValue } from '../../../shared/types/evaluation';
 import { FitQuestion } from '../../../shared/types/fitQuestion';
 import { CaseFolder } from '../../../shared/types/caseLibrary';
+import { CaseCriterion } from '../../../shared/types/caseCriteria';
 
 interface EvaluationStatusModalProps {
   evaluation: EvaluationConfig;
@@ -10,6 +11,7 @@ interface EvaluationStatusModalProps {
   candidatePosition: string;
   roundLabel: string;
   fitQuestions: FitQuestion[];
+  caseCriteria: CaseCriterion[];
   caseFolders: CaseFolder[];
   onClose: () => void;
 }
@@ -67,7 +69,11 @@ interface InterviewerColumn {
   form?: EvaluationConfig['forms'][number];
 }
 
-const buildCriteriaTitleMap = (fitQuestions: FitQuestion[], caseFolders: CaseFolder[]) => {
+const buildCriteriaTitleMap = (
+  fitQuestions: FitQuestion[],
+  caseCriteria: CaseCriterion[],
+  caseFolders: CaseFolder[]
+) => {
   const fitMap = new Map<string, string>();
   for (const question of fitQuestions) {
     for (const criterion of question.criteria) {
@@ -76,6 +82,9 @@ const buildCriteriaTitleMap = (fitQuestions: FitQuestion[], caseFolders: CaseFol
   }
 
   const caseMap = new Map<string, string>();
+  for (const criterion of caseCriteria) {
+    caseMap.set(criterion.id, criterion.title);
+  }
   for (const folder of caseFolders) {
     for (const criterion of folder.evaluationCriteria) {
       caseMap.set(criterion.id, criterion.title);
@@ -248,6 +257,7 @@ export const EvaluationStatusModal = ({
   candidatePosition,
   roundLabel,
   fitQuestions,
+  caseCriteria,
   caseFolders,
   onClose
 }: EvaluationStatusModalProps) => {
@@ -255,7 +265,7 @@ export const EvaluationStatusModal = ({
   const avgFitScore = computeAverageScore(submittedForms.map((form) => form.fitScore));
   const avgCaseScore = computeAverageScore(submittedForms.map((form) => form.caseScore));
   const formsPlanned = evaluation.interviews.length || evaluation.interviewCount;
-  const { fitMap, caseMap } = buildCriteriaTitleMap(fitQuestions, caseFolders);
+  const { fitMap, caseMap } = buildCriteriaTitleMap(fitQuestions, caseCriteria, caseFolders);
   const interviewerColumns = buildInterviewerColumns(evaluation);
 
   const summarySections: SummaryTableSection[] = [];
