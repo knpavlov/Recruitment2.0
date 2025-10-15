@@ -12,6 +12,7 @@ import { LoginScreen } from './modules/auth/LoginScreen';
 import { FitQuestionsScreen } from './modules/questions/FitQuestionsScreen';
 import { InterviewerScreen } from './modules/evaluation/InterviewerScreen';
 import { useHasInterviewerAssignments } from './app/hooks/useHasInterviewerAssignments';
+import { CaseCriteriaScreen } from './modules/case-criteria/CaseCriteriaScreen';
 
 const AppContent = () => {
   const { session } = useAuth();
@@ -66,6 +67,8 @@ const AppContent = () => {
     switch (activePage) {
       case 'cases':
         return <CasesScreen />;
+      case 'case-criteria':
+        return <CaseCriteriaScreen />;
       case 'questions':
         return <FitQuestionsScreen />;
       case 'candidates':

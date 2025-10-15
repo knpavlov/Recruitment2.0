@@ -372,6 +372,7 @@ export const InterviewerScreen = () => {
                 <span className={`${styles.statusPill} ${submitted ? styles.statusPillCompleted : styles.statusPillAssigned}`}>
                   {statusLabel}
                 </span>
+                <span className={styles.roundBadge}>Round {assignment.roundNumber}</span>
                 <span className={styles.listItemMetaText}>Assigned {formatDateTime(assignment.invitationSentAt)}</span>
               </div>
             </li>
@@ -411,8 +412,14 @@ export const InterviewerScreen = () => {
       : 'Candidate not assigned';
     const fitQuestion = selectedAssignment.fitQuestion;
     const fitCriteria: CriterionDefinition[] = fitQuestion?.criteria ?? [];
-    const caseCriteriaRaw: CriterionDefinition[] = selectedAssignment.caseFolder?.evaluationCriteria ?? [];
-    const caseCriteria = sortCaseCriteria(caseCriteriaRaw);
+    const caseCriteriaSource = selectedAssignment.caseCriteria.length
+      ? selectedAssignment.caseCriteria.map((criterion) => ({
+          id: criterion.id,
+          title: criterion.title,
+          ratings: criterion.ratings
+        }))
+      : selectedAssignment.caseFolder?.evaluationCriteria ?? [];
+    const caseCriteria = sortCaseCriteria(caseCriteriaSource);
     const resumeLink = candidate?.resume ? (
       <a className={styles.fileLink} href={candidate.resume.dataUrl} download={candidate.resume.fileName}>
         Download resume ({candidate.resume.fileName})

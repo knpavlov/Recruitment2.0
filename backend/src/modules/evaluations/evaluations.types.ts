@@ -69,6 +69,7 @@ export interface EvaluationInvitationState {
 export interface InterviewAssignmentRecord extends InterviewAssignmentModel {
   id: string;
   evaluationId: string;
+  roundNumber: number;
   invitationSentAt: string;
   createdAt: string;
 }
@@ -111,8 +112,10 @@ export interface InterviewerAssignmentView {
   invitationSentAt: string;
   evaluationUpdatedAt: string;
   evaluationProcessStatus: EvaluationProcessStatus;
+  roundNumber: number;
   candidate?: CandidateRecord;
   caseFolder?: CaseFolder;
   fitQuestion?: FitQuestionRecord;
+  caseCriteria: import('../case-criteria/caseCriteria.types.js').CaseCriterionRecord[];
   form: InterviewStatusModel | null;
 }

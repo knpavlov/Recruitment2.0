@@ -100,6 +100,18 @@
   border-color: #bbf7d0;
 }
 
+.roundBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(129, 140, 248, 0.2);
+  color: #4338ca;
+  border: 1px solid rgba(99, 102, 241, 0.25);
+}
+
 .detailPanel {
   background: #ffffff;
   border-radius: 12px;

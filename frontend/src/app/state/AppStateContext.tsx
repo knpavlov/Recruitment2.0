@@ -12,6 +12,8 @@ import { fitQuestionsApi } from '../../modules/questions/services/fitQuestionsAp
 import { evaluationsApi } from '../../modules/evaluation/services/evaluationsApi';
 import { ApiError } from '../../shared/api/httpClient';
 import { useAuth } from '../../modules/auth/AuthContext';
+import { caseCriteriaApi } from '../../modules/case-criteria/services/caseCriteriaApi';
+import { CaseCriterion } from '../../shared/types/caseCriteria';
 
 interface AppStateContextValue {
   cases: {
@@ -29,6 +31,13 @@ interface AppStateContextValue {
       fileId: string,
       expectedVersion: number
     ) => Promise<DomainResult<CaseFolder>>;
+  };
+  caseCriteria: {
+    items: CaseCriterion[];
+    version: number;
+    saveAll: (
+      items: CaseCriterion[]
+    ) => Promise<DomainResult<{ items: CaseCriterion[]; version: number }>>;
   };
   fitQuestions: {
     list: FitQuestion[];
@@ -68,6 +77,8 @@ const AppStateContext = createContext<AppStateContextValue | null>(null);
 
 export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [folders, setFolders] = useState<CaseFolder[]>([]);
+  const [caseCriteria, setCaseCriteria] = useState<CaseCriterion[]>([]);
+  const [caseCriteriaVersion, setCaseCriteriaVersion] = useState<number>(1);
   const [candidates, setCandidates] = useState<CandidateProfile[]>([]);
   const [fitQuestions, setFitQuestions] = useState<FitQuestion[]>([]);
   const [evaluations, setEvaluations] = useState<EvaluationConfig[]>([]);
@@ -111,10 +122,28 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (!session) {
+      setCaseCriteria([]);
+      setCaseCriteriaVersion(1);
       setCandidates([]);
       setFitQuestions([]);
       setEvaluations([]);
     }
+  }, [session]);
+
+  useEffect(() => {
+    if (!session) {
+      return;
+    }
+    const loadCaseCriteria = async () => {
+      try {
+        const response = await caseCriteriaApi.list();
+        setCaseCriteria(response.items);
+        setCaseCriteriaVersion(response.version);
+      } catch (error) {
+        console.error('Failed to load case criteria:', error);
+      }
+    };
+    void loadCaseCriteria();
   }, [session]);
 
   useEffect(() => {
@@ -286,6 +315,29 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
             }
           }
           console.error('Failed to delete file from folder:', error);
+          return { ok: false, error: 'unknown' };
+        }
+      }
+    },
+    caseCriteria: {
+      items: caseCriteria,
+      version: caseCriteriaVersion,
+      saveAll: async (items) => {
+        try {
+          const response = await caseCriteriaApi.saveAll(items, caseCriteriaVersion);
+          setCaseCriteria(response.items);
+          setCaseCriteriaVersion(response.version);
+          return { ok: true, data: response };
+        } catch (error) {
+          if (error instanceof ApiError) {
+            if (error.code === 'version-conflict') {
+              return { ok: false, error: 'version-conflict' };
+            }
+            if (error.code === 'invalid-input') {
+              return { ok: false, error: 'invalid-input' };
+            }
+          }
+          console.error('Failed to save case criteria:', error);
           return { ok: false, error: 'unknown' };
         }
       }
@@ -581,7 +633,16 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
         }
       }
     }
-  }), [folders, fitQuestions, candidates, evaluations, accounts, syncFolders]);
+  }), [
+    folders,
+    caseCriteria,
+    caseCriteriaVersion,
+    fitQuestions,
+    candidates,
+    evaluations,
+    accounts,
+    syncFolders
+  ]);
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;
 };
@@ -595,6 +656,7 @@ export const useAppState = () => {
 };
 
 export const useCasesState = () => useAppState().cases;
+export const useCaseCriteriaState = () => useAppState().caseCriteria;
 export const useFitQuestionsState = () => useAppState().fitQuestions;
 export const useCandidatesState = () => useAppState().candidates;
 export const useEvaluationsState = () => useAppState().evaluations;

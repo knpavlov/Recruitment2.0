@@ -227,6 +227,7 @@ interface AssignmentRow extends Record<string, unknown> {
   interviewer_name: string;
   case_folder_id: string;
   fit_question_id: string;
+  round_number: number | null;
   invitation_sent_at: Date;
   created_at: Date;
 }
@@ -239,6 +240,7 @@ const mapRowToAssignment = (row: AssignmentRow): InterviewAssignmentRecord => ({
   interviewerName: row.interviewer_name,
   caseFolderId: row.case_folder_id,
   fitQuestionId: row.fit_question_id,
+  roundNumber: Number(row.round_number ?? 1),
   invitationSentAt: row.invitation_sent_at.toISOString(),
   createdAt: row.created_at.toISOString()
 });
@@ -397,6 +399,7 @@ export class EvaluationsRepository {
 
   async storeAssignments(
     evaluationId: string,
+    roundNumber: number,
     assignments: InterviewAssignmentModel[],
     options: {
       status: EvaluationRecord['processStatus'];
@@ -421,8 +424,8 @@ export class EvaluationsRepository {
       const slotIds = assignments.map((assignment) => assignment.slotId);
 
       await client.query(
-        'DELETE FROM evaluation_assignments WHERE evaluation_id = $1 AND NOT (slot_id = ANY($2::text[]));',
-        [evaluationId, slotIds]
+        'DELETE FROM evaluation_assignments WHERE evaluation_id = $1 AND round_number = $2 AND NOT (slot_id = ANY($3::text[]));',
+        [evaluationId, roundNumber, slotIds]
       );
 
       const refreshIds = Array.from(new Set(options.refreshSlotIds));
@@ -438,20 +441,21 @@ export class EvaluationsRepository {
              interviewer_name,
              case_folder_id,
              fit_question_id,
+             round_number,
              invitation_sent_at,
              created_at
-           ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
-           ON CONFLICT (evaluation_id, slot_id)
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+           ON CONFLICT (evaluation_id, round_number, slot_id)
            DO UPDATE SET
              interviewer_email = EXCLUDED.interviewer_email,
              interviewer_name = EXCLUDED.interviewer_name,
              case_folder_id = EXCLUDED.case_folder_id,
              fit_question_id = EXCLUDED.fit_question_id,
              invitation_sent_at = CASE
-               WHEN EXCLUDED.slot_id = ANY($8::text[])
+               WHEN EXCLUDED.slot_id = ANY($9::text[])
                  THEN NOW()
-               ELSE evaluation_assignments.invitation_sent_at
-             END;`,
+              ELSE evaluation_assignments.invitation_sent_at
+            END;`,
           [
             assignmentId,
             evaluationId,
@@ -460,6 +464,7 @@ export class EvaluationsRepository {
             assignment.interviewerName,
             assignment.caseFolderId,
             assignment.fitQuestionId,
+            roundNumber,
             refreshIds
           ]
         );
@@ -495,17 +500,29 @@ export class EvaluationsRepository {
               interviewer_name,
               case_folder_id,
               fit_question_id,
+              round_number,
               invitation_sent_at,
               created_at
          FROM evaluation_assignments
         WHERE lower(interviewer_email) = lower($1)
-        ORDER BY invitation_sent_at DESC, created_at DESC;`,
+        ORDER BY round_number DESC, invitation_sent_at DESC, created_at DESC;`,
       [email]
     );
     return result.rows.map((row) => mapRowToAssignment(row));
   }
 
-  async listAssignmentsForEvaluation(evaluationId: string): Promise<InterviewAssignmentRecord[]> {
+  async listAssignmentsForEvaluation(
+    evaluationId: string,
+    roundNumber?: number
+  ): Promise<InterviewAssignmentRecord[]> {
+    const filters: string[] = ['evaluation_id = $1'];
+    const params: Array<string | number> = [evaluationId];
+    if (typeof roundNumber === 'number' && Number.isFinite(roundNumber)) {
+      filters.push('round_number = $2');
+      params.push(roundNumber);
+    }
+    const whereClause = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
+
     const result = await postgresPool.query<AssignmentRow>(
       `SELECT id,
               evaluation_id,
@@ -514,12 +531,13 @@ export class EvaluationsRepository {
               interviewer_name,
               case_folder_id,
               fit_question_id,
+              round_number,
               invitation_sent_at,
               created_at
          FROM evaluation_assignments
-        WHERE evaluation_id = $1
-        ORDER BY invitation_sent_at DESC, created_at DESC;`,
-      [evaluationId]
+        ${whereClause}
+        ORDER BY round_number DESC, invitation_sent_at DESC, created_at DESC;`,
+      params
     );
     return result.rows.map((row) => mapRowToAssignment(row));
   }
@@ -536,6 +554,7 @@ export class EvaluationsRepository {
               interviewer_name,
               case_folder_id,
               fit_question_id,
+              round_number,
               invitation_sent_at,
               created_at
          FROM evaluation_assignments

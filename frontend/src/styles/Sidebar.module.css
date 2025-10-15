@@ -75,11 +75,31 @@
   gap: 12px;
 }
 
-.sessionInfo {
+.sessionInfoBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sessionEmail {
   margin: 0;
   font-size: 13px;
-  color: rgba(226, 232, 240, 0.75);
-  word-break: break-all;
+  color: rgba(226, 232, 240, 0.85);
+  word-break: break-word;
+}
+
+.sessionRole {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.25);
+  color: #e2e8f0;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: capitalize;
+  width: fit-content;
 }
 
 .logoutButton {

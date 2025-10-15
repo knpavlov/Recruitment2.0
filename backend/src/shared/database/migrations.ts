@@ -66,6 +66,41 @@ const createTables = async () => {
   `);
 
   await postgresPool.query(`
+    CREATE TABLE IF NOT EXISTS case_criteria (
+      id UUID PRIMARY KEY,
+      title TEXT NOT NULL,
+      rating_1 TEXT,
+      rating_2 TEXT,
+      rating_3 TEXT,
+      rating_4 TEXT,
+      rating_5 TEXT,
+      order_index INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  await postgresPool.query(`
+    ALTER TABLE case_criteria
+      ADD COLUMN IF NOT EXISTS order_index INTEGER NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+  `);
+
+  await postgresPool.query(`
+    CREATE TABLE IF NOT EXISTS case_criteria_state (
+      id TEXT PRIMARY KEY,
+      version INTEGER NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  await postgresPool.query(`
+    INSERT INTO case_criteria_state (id, version, updated_at)
+    VALUES ('default', 1, NOW())
+    ON CONFLICT (id) DO NOTHING;
+  `);
+
+  await postgresPool.query(`
     ALTER TABLE case_folders
       ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1;
@@ -189,6 +224,21 @@ const createTables = async () => {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       UNIQUE (evaluation_id, slot_id)
     );
+  `);
+
+  await postgresPool.query(`
+    ALTER TABLE evaluation_assignments
+      ADD COLUMN IF NOT EXISTS round_number INTEGER NOT NULL DEFAULT 1;
+  `);
+
+  await postgresPool.query(`
+    ALTER TABLE evaluation_assignments
+      DROP CONSTRAINT IF EXISTS evaluation_assignments_evaluation_id_slot_id_key;
+  `);
+
+  await postgresPool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS evaluation_assignments_unique_round
+      ON evaluation_assignments (evaluation_id, round_number, slot_id);
   `);
 
   await postgresPool.query(`
