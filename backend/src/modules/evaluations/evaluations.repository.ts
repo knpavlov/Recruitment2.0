@@ -246,6 +246,166 @@ const mapRowToAssignment = (row: AssignmentRow): InterviewAssignmentRecord => ({
 });
 
 export class EvaluationsRepository {
+  private assignmentSchemaReady = false;
+  private assignmentSchemaInit: Promise<void> | null = null;
+
+  // Гарантируем, что таблица назначений содержит все необходимые поля даже в старых инсталляциях
+  private async ensureAssignmentSchema(): Promise<void> {
+    if (this.assignmentSchemaReady) {
+      return;
+    }
+
+    if (this.assignmentSchemaInit) {
+      await this.assignmentSchemaInit;
+      return;
+    }
+
+    this.assignmentSchemaInit = this.initializeAssignmentSchema()
+      .then(() => {
+        this.assignmentSchemaReady = true;
+      })
+      .finally(() => {
+        this.assignmentSchemaInit = null;
+      });
+
+    await this.assignmentSchemaInit;
+  }
+
+  private async initializeAssignmentSchema(): Promise<void> {
+    const client = await (postgresPool as unknown as { connect: () => Promise<any> }).connect();
+    try {
+      const tableResult = await client.query(
+        `SELECT EXISTS (
+            SELECT 1
+              FROM information_schema.tables
+             WHERE table_name = 'evaluation_assignments'
+          ) AS exists;`
+      );
+      const tableRows = tableResult.rows as { exists: boolean }[];
+      const tableExists = tableRows[0]?.exists ?? false;
+
+      if (!tableExists) {
+        await client.query(`
+          CREATE TABLE evaluation_assignments (
+            id UUID PRIMARY KEY,
+            evaluation_id UUID NOT NULL REFERENCES evaluations(id) ON DELETE CASCADE,
+            slot_id TEXT NOT NULL,
+            interviewer_email TEXT NOT NULL,
+            interviewer_name TEXT NOT NULL,
+            case_folder_id UUID NOT NULL,
+            fit_question_id UUID NOT NULL,
+            round_number INTEGER NOT NULL DEFAULT 1,
+            invitation_sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            UNIQUE (evaluation_id, slot_id)
+          );
+        `);
+        return;
+      }
+
+      const columnsResult = await client.query(
+        `SELECT column_name, data_type
+           FROM information_schema.columns
+          WHERE table_name = 'evaluation_assignments';`
+      );
+      const columnRows = columnsResult.rows as { column_name: string; data_type: string }[];
+      const columns = new Map(columnRows.map((row) => [row.column_name, row.data_type] as const));
+
+      const needsCase = !columns.has('case_folder_id');
+      const needsFit = !columns.has('fit_question_id');
+      const needsRound = !columns.has('round_number');
+
+      const needsCaseTypeFix = columns.get('case_folder_id') && columns.get('case_folder_id') !== 'uuid';
+      const needsFitTypeFix = columns.get('fit_question_id') && columns.get('fit_question_id') !== 'uuid';
+
+      const statements: string[] = [];
+
+      if (needsCase) {
+        statements.push('ALTER TABLE evaluation_assignments ADD COLUMN case_folder_id UUID;');
+      } else if (needsCaseTypeFix) {
+        statements.push(`
+          ALTER TABLE evaluation_assignments
+            ALTER COLUMN case_folder_id TYPE UUID USING (
+              CASE
+                WHEN case_folder_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+                THEN case_folder_id::uuid
+                ELSE NULL
+              END
+            );
+        `);
+      }
+
+      if (needsFit) {
+        statements.push('ALTER TABLE evaluation_assignments ADD COLUMN fit_question_id UUID;');
+      } else if (needsFitTypeFix) {
+        statements.push(`
+          ALTER TABLE evaluation_assignments
+            ALTER COLUMN fit_question_id TYPE UUID USING (
+              CASE
+                WHEN fit_question_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+                THEN fit_question_id::uuid
+                ELSE NULL
+              END
+            );
+        `);
+      }
+
+      if (needsRound) {
+        statements.push('ALTER TABLE evaluation_assignments ADD COLUMN round_number INTEGER NOT NULL DEFAULT 1;');
+      }
+
+      if (statements.length === 0 && !needsCase && !needsFit) {
+        return;
+      }
+
+      await client.query('BEGIN');
+      try {
+        for (const statement of statements) {
+          await client.query(statement);
+        }
+
+        if (needsCase || needsFit || needsCaseTypeFix || needsFitTypeFix) {
+          await client.query(`
+            WITH slot_data AS (
+              SELECT
+                ea.id,
+                CASE
+                  WHEN slot.value ? 'caseFolderId'
+                    AND jsonb_typeof(slot.value->'caseFolderId') = 'string'
+                    AND slot.value->>'caseFolderId' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+                  THEN (slot.value->>'caseFolderId')::uuid
+                  ELSE NULL
+                END AS case_id,
+                CASE
+                  WHEN slot.value ? 'fitQuestionId'
+                    AND jsonb_typeof(slot.value->'fitQuestionId') = 'string'
+                    AND slot.value->>'fitQuestionId' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+                  THEN (slot.value->>'fitQuestionId')::uuid
+                  ELSE NULL
+                END AS question_id
+              FROM evaluation_assignments ea
+              JOIN evaluations e ON e.id = ea.evaluation_id
+              CROSS JOIN LATERAL jsonb_array_elements(e.interviews) AS slot(value)
+              WHERE slot.value->>'id' = ea.slot_id
+            )
+            UPDATE evaluation_assignments ea
+               SET case_folder_id = COALESCE(ea.case_folder_id, slot_data.case_id),
+                   fit_question_id = COALESCE(ea.fit_question_id, slot_data.question_id)
+              FROM slot_data
+             WHERE ea.id = slot_data.id;
+          `);
+        }
+
+        await client.query('COMMIT');
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      }
+    } finally {
+      client.release();
+    }
+  }
+
   async listEvaluations(): Promise<EvaluationRecord[]> {
     const result = await postgresPool.query<EvaluationRow>(
       `SELECT id,
@@ -407,6 +567,7 @@ export class EvaluationsRepository {
       roundNumber: number;
     }
   ): Promise<void> {
+    await this.ensureAssignmentSchema();
     const client = await (postgresPool as unknown as { connect: () => Promise<any> }).connect();
     try {
       await client.query('BEGIN');
