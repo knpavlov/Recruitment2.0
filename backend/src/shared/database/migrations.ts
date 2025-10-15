@@ -216,6 +216,70 @@ const createTables = async () => {
 
   await postgresPool.query(`
     ALTER TABLE evaluation_assignments
+      ADD COLUMN IF NOT EXISTS case_folder_id UUID,
+      ADD COLUMN IF NOT EXISTS fit_question_id UUID;
+  `);
+
+  await postgresPool.query(`
+    WITH slot_data AS (
+      SELECT
+        ea.id,
+        CASE
+          WHEN slot.value ? 'caseFolderId'
+            AND jsonb_typeof(slot.value->'caseFolderId') = 'string'
+            AND slot.value->>'caseFolderId' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+          THEN (slot.value->>'caseFolderId')::uuid
+          ELSE NULL
+        END AS case_id,
+        CASE
+          WHEN slot.value ? 'fitQuestionId'
+            AND jsonb_typeof(slot.value->'fitQuestionId') = 'string'
+            AND slot.value->>'fitQuestionId' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+          THEN (slot.value->>'fitQuestionId')::uuid
+          ELSE NULL
+        END AS question_id
+      FROM evaluation_assignments ea
+      JOIN evaluations e ON e.id = ea.evaluation_id
+      CROSS JOIN LATERAL jsonb_array_elements(e.interviews) AS slot(value)
+      WHERE slot.value->>'id' = ea.slot_id
+    )
+    UPDATE evaluation_assignments ea
+       SET case_folder_id = COALESCE(ea.case_folder_id, slot_data.case_id),
+           fit_question_id = COALESCE(ea.fit_question_id, slot_data.question_id)
+      FROM slot_data
+     WHERE ea.id = slot_data.id;
+  `);
+
+  await postgresPool.query(`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1
+          FROM information_schema.columns
+         WHERE table_name = 'evaluation_assignments'
+           AND column_name = 'case_folder_id'
+      ) AND NOT EXISTS (
+        SELECT 1 FROM evaluation_assignments WHERE case_folder_id IS NULL
+      ) THEN
+        EXECUTE 'ALTER TABLE evaluation_assignments ALTER COLUMN case_folder_id SET NOT NULL';
+      END IF;
+
+      IF EXISTS (
+        SELECT 1
+          FROM information_schema.columns
+         WHERE table_name = 'evaluation_assignments'
+           AND column_name = 'fit_question_id'
+      ) AND NOT EXISTS (
+        SELECT 1 FROM evaluation_assignments WHERE fit_question_id IS NULL
+      ) THEN
+        EXECUTE 'ALTER TABLE evaluation_assignments ALTER COLUMN fit_question_id SET NOT NULL';
+      END IF;
+    END
+    $$;
+  `);
+
+  await postgresPool.query(`
+    ALTER TABLE evaluation_assignments
       ADD COLUMN IF NOT EXISTS round_number INTEGER NOT NULL DEFAULT 1;
   `);
 

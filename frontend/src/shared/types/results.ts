@@ -7,6 +7,8 @@ export type DomainErrorCode =
   | 'process-already-started'
   | 'forms-pending'
   | 'missing-assignment-data'
+  | 'invalid-assignment-data'
+  | 'invalid-assignment-resources'
   | 'access-denied'
   | 'invalid-portal-url'
   | 'form-locked'
