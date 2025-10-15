@@ -426,15 +426,31 @@ export class EvaluationsRepository {
         ? Math.max(1, Math.trunc(options.roundNumber))
         : 1;
 
-      await client.query(
-        'DELETE FROM evaluation_assignments WHERE evaluation_id = $1 AND round_number = $3 AND NOT (slot_id = ANY($2::text[]));',
-        [evaluationId, slotIds, normalizedRound]
-      );
+      if (slotIds.length === 0) {
+        await client.query(
+          'DELETE FROM evaluation_assignments WHERE evaluation_id = $1 AND round_number = $2;',
+          [evaluationId, normalizedRound]
+        );
+      } else {
+        await client.query(
+          `DELETE FROM evaluation_assignments
+             WHERE evaluation_id = $1
+               AND round_number = $3
+               AND NOT EXISTS (
+                 SELECT 1
+                   FROM unnest($2::text[]) AS keep(slot_id)
+                  WHERE keep.slot_id = evaluation_assignments.slot_id
+               );`,
+          [evaluationId, slotIds, normalizedRound]
+        );
+      }
 
-      const refreshIds = Array.from(new Set(options.refreshSlotIds));
+      const refreshIdSet = new Set(options.refreshSlotIds);
 
       for (const assignment of assignments) {
         const assignmentId = randomUUID();
+        const shouldRefresh = refreshIdSet.has(assignment.slotId);
+
         await client.query(
           `INSERT INTO evaluation_assignments (
              id,
@@ -456,10 +472,9 @@ export class EvaluationsRepository {
              fit_question_id = EXCLUDED.fit_question_id,
              round_number = EXCLUDED.round_number,
              invitation_sent_at = CASE
-               WHEN EXCLUDED.slot_id = ANY($9::text[])
-                 THEN NOW()
-              ELSE evaluation_assignments.invitation_sent_at
-            END;`,
+               WHEN $9::boolean IS TRUE THEN NOW()
+               ELSE evaluation_assignments.invitation_sent_at
+           END;`,
           [
             assignmentId,
             evaluationId,
@@ -469,7 +484,7 @@ export class EvaluationsRepository {
             assignment.caseFolderId,
             assignment.fitQuestionId,
             normalizedRound,
-            refreshIds
+            shouldRefresh
           ]
         );
       }
