@@ -10,8 +10,12 @@ export const computeInvitationState = (
   evaluation: EvaluationRecord,
   assignments: InterviewAssignmentRecord[]
 ): EvaluationInvitationState => {
+  const currentRound = evaluation.roundNumber ?? 1;
+  const currentAssignments = assignments.filter(
+    (assignment) => assignment.roundNumber === currentRound
+  );
   const slotMap = new Map(evaluation.interviews.map((slot) => [slot.id, slot]));
-  const matchingAssignments = assignments.filter((assignment) => slotMap.has(assignment.slotId));
+  const matchingAssignments = currentAssignments.filter((assignment) => slotMap.has(assignment.slotId));
   const hasInvitations = matchingAssignments.length > 0;
 
   let hasPendingChanges = false;
@@ -54,7 +58,7 @@ export const computeInvitationState = (
 
   if (!hasPendingChanges) {
     const currentSlotIds = new Set(slotMap.keys());
-    if (assignments.some((assignment) => !currentSlotIds.has(assignment.slotId))) {
+    if (currentAssignments.some((assignment) => !currentSlotIds.has(assignment.slotId))) {
       hasPendingChanges = true;
     }
   }

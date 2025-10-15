@@ -77,6 +77,7 @@ export interface InterviewerAssignmentView {
   interviewerEmail: string;
   interviewerName: string;
   invitationSentAt: string;
+  roundNumber: number;
   evaluationUpdatedAt: string;
   evaluationProcessStatus: EvaluationProcessStatus;
   candidate?: import('./candidate').CandidateProfile;

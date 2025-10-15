@@ -191,86 +191,94 @@ export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: 
                 <td>{row.offerSummary}</td>
                 <td>{row.processLabel}</td>
                 <td className={styles.actionsCell}>
-                  <div className={styles.actionsRow}>
-                    <div className={styles.buttonWithMenu}>
+                  <div className={styles.actionsGrid}>
+                    <div className={styles.actionCell}>
                       <button
                         type="button"
                         className={`${styles.actionButton} ${styles.neutralButton}`}
-                        onClick={handleInvitesClick}
-                        disabled={row.invitesDisabled}
-                        data-tooltip={row.invitesTooltip ?? undefined}
+                        onClick={() => {
+                          closeMenus();
+                          row.onEdit();
+                        }}
                       >
-                        {row.invitesButtonLabel}
+                        Edit
                       </button>
-                      {row.invitesMenuAvailable && isInvitesMenuOpen && (
-                        <div className={styles.dropdownMenu}>
-                          <button
-                            type="button"
-                            className={styles.dropdownItem}
-                            onClick={() => {
-                              closeMenus();
-                              row.onSendInvitesAll();
-                            }}
-                          >
-                            Send invites to all interviewers
-                          </button>
-                          <button
-                            type="button"
-                            className={styles.dropdownItem}
-                            onClick={() => {
-                              closeMenus();
-                              row.onSendInvitesUpdated();
-                            }}
-                          >
-                            Send invites only to updated interviewers
-                          </button>
-                        </div>
-                      )}
                     </div>
-                    <button
-                      type="button"
-                      className={`${styles.actionButton} ${styles.neutralButton}`}
-                      onClick={() => {
-                        closeMenus();
-                        row.onEdit();
-                      }}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      className={`${styles.actionButton} ${styles.neutralButton}`}
-                      onClick={() => {
-                        closeMenus();
-                        row.onOpenStatus();
-                      }}
-                    >
-                      Results
-                    </button>
-                    <div className={styles.buttonWithMenu}>
-                      <button
-                        type="button"
-                        className={decisionButtonClassName}
-                        onClick={handleDecisionToggle}
-                        disabled={row.decisionDisabled}
-                        data-tooltip={row.decisionDisabled ? row.decisionTooltip : undefined}
-                      >
-                        {row.decisionLabel}
-                      </button>
-                      {isDecisionMenuOpen && (
-                        <div className={styles.dropdownMenu}>
-                          {DECISION_OPTIONS.map((item) => (
+                    <div className={styles.actionCell}>
+                      <div className={styles.buttonWithMenu}>
+                        <button
+                          type="button"
+                          className={`${styles.actionButton} ${styles.neutralButton}`}
+                          onClick={handleInvitesClick}
+                          disabled={row.invitesDisabled}
+                          data-tooltip={row.invitesTooltip ?? undefined}
+                        >
+                          {row.invitesButtonLabel}
+                        </button>
+                        {row.invitesMenuAvailable && isInvitesMenuOpen && (
+                          <div className={styles.dropdownMenu}>
                             <button
-                              key={item.option}
                               type="button"
                               className={styles.dropdownItem}
-                              onClick={() => handleDecisionSelect(item.option)}
+                              onClick={() => {
+                                closeMenus();
+                                row.onSendInvitesAll();
+                              }}
                             >
-                              {item.label}
+                              Send invites to all interviewers
                             </button>
-                          ))}
-                        </div>
-                      )}
+                            <button
+                              type="button"
+                              className={styles.dropdownItem}
+                              onClick={() => {
+                                closeMenus();
+                                row.onSendInvitesUpdated();
+                              }}
+                            >
+                              Send invites only to updated interviewers
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className={styles.actionCell}>
+                      <button
+                        type="button"
+                        className={`${styles.actionButton} ${styles.neutralButton}`}
+                        onClick={() => {
+                          closeMenus();
+                          row.onOpenStatus();
+                        }}
+                      >
+                        Results
+                      </button>
+                    </div>
+                    <div className={styles.actionCell}>
+                      <div className={styles.buttonWithMenu}>
+                        <button
+                          type="button"
+                          className={decisionButtonClassName}
+                          onClick={handleDecisionToggle}
+                          disabled={row.decisionDisabled}
+                          data-tooltip={row.decisionDisabled ? row.decisionTooltip : undefined}
+                        >
+                          {row.decisionLabel}
+                        </button>
+                        {isDecisionMenuOpen && (
+                          <div className={styles.dropdownMenu}>
+                            {DECISION_OPTIONS.map((item) => (
+                              <button
+                                key={item.option}
+                                type="button"
+                                className={styles.dropdownItem}
+                                onClick={() => handleDecisionSelect(item.option)}
+                              >
+                                {item.label}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </td>

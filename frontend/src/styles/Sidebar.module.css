@@ -75,11 +75,31 @@
   gap: 12px;
 }
 
+.sessionMeta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .sessionInfo {
-  margin: 0;
   font-size: 13px;
   color: rgba(226, 232, 240, 0.75);
   word-break: break-all;
+}
+
+.roleBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1d4ed8;
+  background: rgba(59, 130, 246, 0.2);
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  text-transform: capitalize;
 }
 
 .logoutButton {
