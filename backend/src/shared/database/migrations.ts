@@ -221,6 +221,16 @@ const createTables = async () => {
   `);
 
   await postgresPool.query(`
+    ALTER TABLE evaluation_assignments
+      ALTER COLUMN invitation_sent_at DROP NOT NULL;
+  `);
+
+  await postgresPool.query(`
+    ALTER TABLE evaluation_assignments
+      ALTER COLUMN invitation_sent_at DROP DEFAULT;
+  `);
+
+  await postgresPool.query(`
     WITH slot_data AS (
       SELECT
         ea.id,

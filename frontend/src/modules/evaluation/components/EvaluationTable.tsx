@@ -25,9 +25,9 @@ export interface EvaluationTableRow {
   invitesButtonLabel: string;
   invitesDisabled: boolean;
   invitesTooltip?: string;
-  invitesMenuAvailable: boolean;
-  onSendInvitesAll: () => void;
-  onSendInvitesUpdated: () => void;
+  hasInvitations: boolean;
+  invitees: Array<{ slotId: string; label: string }>;
+  onSendInvites: (slotIds?: string[]) => void;
   onEdit: () => void;
   onOpenStatus: () => void;
   decisionDisabled: boolean;
@@ -64,6 +64,7 @@ const DECISION_OPTIONS: Array<{ option: DecisionOption; label: string }> = [
 export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: EvaluationTableProps) => {
   const [openDecisionId, setOpenDecisionId] = useState<string | null>(null);
   const [openInvitesId, setOpenInvitesId] = useState<string | null>(null);
+  const [inviteSelections, setInviteSelections] = useState<Record<string, string[]>>({});
 
   const closeMenus = () => {
     setOpenDecisionId(null);
@@ -141,17 +142,62 @@ export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: 
               row.onRoundChange(Number(event.target.value));
             };
 
+            const currentSelection = inviteSelections[row.id] ?? row.invitees.map((item) => item.slotId);
+            const selectionSet = new Set(currentSelection);
+            const allSelected = row.invitees.length > 0 && selectionSet.size === row.invitees.length;
+
+            const updateSelection = (updater: (previous: Set<string>) => Set<string>) => {
+              setInviteSelections((prev) => {
+                const next = new Set(prev[row.id] ?? row.invitees.map((item) => item.slotId));
+                const updated = updater(next);
+                return { ...prev, [row.id]: Array.from(updated) };
+              });
+            };
+
+            const toggleInvitee = (slotId: string) => {
+              updateSelection((previous) => {
+                const copy = new Set(previous);
+                if (copy.has(slotId)) {
+                  copy.delete(slotId);
+                } else {
+                  copy.add(slotId);
+                }
+                return copy;
+              });
+            };
+
+            const toggleSelectAll = (checked: boolean) => {
+              setInviteSelections((prev) => ({
+                ...prev,
+                [row.id]: checked ? row.invitees.map((item) => item.slotId) : []
+              }));
+            };
+
             const handleInvitesClick = () => {
               if (row.invitesDisabled) {
                 return;
               }
-              if (!row.invitesMenuAvailable) {
+              if (!row.hasInvitations) {
                 closeMenus();
-                row.onSendInvitesAll();
+                row.onSendInvites();
+                return;
+              }
+              if (openInvitesId === row.id) {
+                setOpenInvitesId(null);
                 return;
               }
               setOpenDecisionId(null);
-              setOpenInvitesId((current) => (current === row.id ? null : row.id));
+              setInviteSelections((prev) => ({
+                ...prev,
+                [row.id]: row.invitees.map((item) => item.slotId)
+              }));
+              setOpenInvitesId(row.id);
+            };
+
+            const handleSendSelection = () => {
+              const unique = Array.from(new Set(inviteSelections[row.id] ?? row.invitees.map((item) => item.slotId)));
+              closeMenus();
+              row.onSendInvites(unique);
             };
 
             const handleDecisionToggle = () => {
@@ -215,27 +261,38 @@ export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: 
                         >
                           {row.invitesButtonLabel}
                         </button>
-                        {row.invitesMenuAvailable && isInvitesMenuOpen && (
+                        {row.hasInvitations && isInvitesMenuOpen && (
                           <div className={styles.dropdownMenu}>
+                            <label className={styles.inviteOption}>
+                              <input
+                                type="checkbox"
+                                checked={allSelected}
+                                onChange={(event) => toggleSelectAll(event.target.checked)}
+                              />
+                              <span>Select all</span>
+                            </label>
+                            <div className={styles.inviteOptions}>
+                              {row.invitees.map((invitee) => {
+                                const checked = selectionSet.has(invitee.slotId);
+                                return (
+                                  <label key={invitee.slotId} className={styles.inviteOption}>
+                                    <input
+                                      type="checkbox"
+                                      checked={checked}
+                                      onChange={() => toggleInvitee(invitee.slotId)}
+                                    />
+                                    <span>{invitee.label}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
                             <button
                               type="button"
-                              className={styles.dropdownItem}
-                              onClick={() => {
-                                closeMenus();
-                                row.onSendInvitesAll();
-                              }}
+                              className={`${styles.actionButton} ${styles.dropdownSendButton}`}
+                              onClick={handleSendSelection}
+                              disabled={selectionSet.size === 0}
                             >
-                              Send invites to all interviewers
-                            </button>
-                            <button
-                              type="button"
-                              className={styles.dropdownItem}
-                              onClick={() => {
-                                closeMenus();
-                                row.onSendInvitesUpdated();
-                              }}
-                            >
-                              Send invites only to updated interviewers
+                              Send
                             </button>
                           </div>
                         )}

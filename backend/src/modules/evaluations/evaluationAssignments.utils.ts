@@ -16,12 +16,20 @@ export const computeInvitationState = (
   );
   const slotMap = new Map(evaluation.interviews.map((slot) => [slot.id, slot]));
   const matchingAssignments = currentAssignments.filter((assignment) => slotMap.has(assignment.slotId));
-  const hasInvitations = matchingAssignments.length > 0;
+  const sentAssignments = matchingAssignments.filter((assignment) => assignment.invitationSentAt);
+  const hasInvitations = sentAssignments.length > 0;
 
   let hasPendingChanges = false;
 
   if (!hasInvitations) {
     hasPendingChanges = true;
+  }
+
+  if (!hasPendingChanges) {
+    const hasPendingDelivery = matchingAssignments.some((assignment) => !assignment.invitationSentAt);
+    if (hasPendingDelivery) {
+      hasPendingChanges = true;
+    }
   }
 
   if (!hasPendingChanges) {
@@ -63,9 +71,9 @@ export const computeInvitationState = (
     }
   }
 
-  const lastSentAt = matchingAssignments.length
-    ? matchingAssignments
-        .map((item) => new Date(item.invitationSentAt).getTime())
+  const lastSentAt = sentAssignments.length
+    ? sentAssignments
+        .map((item) => (item.invitationSentAt ? new Date(item.invitationSentAt).getTime() : Number.NaN))
         .filter((value) => Number.isFinite(value))
         .sort((a, b) => b - a)[0]
     : undefined;
