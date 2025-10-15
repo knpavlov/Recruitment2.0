@@ -431,10 +431,17 @@ export class EvaluationsRepository {
         [evaluationId, slotIds, normalizedRound]
       );
 
-      const refreshIds = Array.from(new Set(options.refreshSlotIds));
+      // Сохраняем только валидные идентификаторы слотов, требующих обновления отметки отправки
+      const refreshSet = new Set(
+        options.refreshSlotIds
+          .map((id) => (typeof id === 'string' ? id.trim() : ''))
+          .filter((id): id is string => Boolean(id))
+      );
 
       for (const assignment of assignments) {
         const assignmentId = randomUUID();
+        // Проверяем, нужно ли перезаписать дату отправки для текущего слота
+        const shouldRefresh = refreshSet.has(assignment.slotId);
         await client.query(
           `INSERT INTO evaluation_assignments (
              id,
@@ -456,10 +463,9 @@ export class EvaluationsRepository {
              fit_question_id = EXCLUDED.fit_question_id,
              round_number = EXCLUDED.round_number,
              invitation_sent_at = CASE
-               WHEN EXCLUDED.slot_id = ANY($9::text[])
-                 THEN NOW()
-              ELSE evaluation_assignments.invitation_sent_at
-            END;`,
+               WHEN $9::boolean IS TRUE THEN NOW()
+               ELSE evaluation_assignments.invitation_sent_at
+             END;`,
           [
             assignmentId,
             evaluationId,
@@ -469,7 +475,7 @@ export class EvaluationsRepository {
             assignment.caseFolderId,
             assignment.fitQuestionId,
             normalizedRound,
-            refreshIds
+            shouldRefresh
           ]
         );
       }
