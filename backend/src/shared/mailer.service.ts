@@ -234,6 +234,14 @@ export class MailerService {
   private readonly config = resolveConfig();
   private warned = false;
 
+  // Универсальный helper для ожидания между повторными попытками
+  private async pause(ms: number) {
+    if (ms <= 0) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
   private ensureConfig(): MailerConfig {
     if (!this.config) {
       if (!this.warned) {
@@ -257,29 +265,54 @@ export class MailerService {
     }
 
     if (config.kind === 'resend') {
-      try {
-        await sendWithResend({
-          apiKey: config.apiKey,
-          from: config.from,
-          to,
-          subject,
-          text
-        });
-        return;
-      } catch (error) {
-        if (error instanceof ResendError) {
-          const normalizedCode = error.code?.toLowerCase();
-          const reason: MailerDeliveryReason =
-            normalizedCode === 'domain_not_verified' || normalizedCode === 'missing_domain_verification'
-              ? 'domain-not-verified'
-              : error.status === 403 && error.message.toLowerCase().includes('domain')
-                ? 'domain-not-verified'
-                : 'provider-error';
+      let attempt = 0;
+      let nextDelay = 500;
+      const maxDelay = 8000;
+      const maxAttempts = 6;
+      let lastRateLimitError: ResendError | null = null;
 
-          throw new MailerDeliveryError(reason, error.message);
+      while (attempt < maxAttempts) {
+        attempt += 1;
+        try {
+          await sendWithResend({
+            apiKey: config.apiKey,
+            from: config.from,
+            to,
+            subject,
+            text
+          });
+          return;
+        } catch (error) {
+          if (error instanceof ResendError && error.status === 429) {
+            // Плавно замедляем отправку при превышении лимита, чтобы не терять письма
+            lastRateLimitError = error;
+            const waitMs = Math.max(error.retryAfterMs ?? nextDelay, 250);
+            console.warn(
+              `Resend вернул ограничение по скорости для ${to}. Повтор через ${waitMs} мс (попытка ${attempt}).`
+            );
+            await this.pause(waitMs);
+            nextDelay = Math.min(nextDelay * 2, maxDelay);
+            continue;
+          }
+          if (error instanceof ResendError) {
+            const normalizedCode = error.code?.toLowerCase();
+            const reason: MailerDeliveryReason =
+              normalizedCode === 'domain_not_verified' || normalizedCode === 'missing_domain_verification'
+                ? 'domain-not-verified'
+                : error.status === 403 && error.message.toLowerCase().includes('domain')
+                  ? 'domain-not-verified'
+                  : 'provider-error';
+
+            throw new MailerDeliveryError(reason, error.message);
+          }
+          throw error;
         }
-        throw error;
       }
+
+      const rateLimitMessage =
+        lastRateLimitError?.message ??
+        'Почтовый сервис временно ограничил скорость отправки. Попробуйте повторить позже.';
+      throw new MailerDeliveryError('provider-error', rateLimitMessage);
     }
 
     await sendViaSmtp(config, to, subject, text);
