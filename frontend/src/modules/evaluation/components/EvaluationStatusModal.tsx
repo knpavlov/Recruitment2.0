@@ -1,4 +1,5 @@
-import { Fragment } from 'react';
+import { Fragment, useMemo } from 'react';
+import type { CSSProperties } from 'react';
 import styles from '../../../styles/EvaluationStatusModal.module.css';
 import { EvaluationConfig, OfferRecommendationValue } from '../../../shared/types/evaluation';
 import { FitQuestion } from '../../../shared/types/fitQuestion';
@@ -62,6 +63,8 @@ interface InterviewerColumn {
   label: string;
   form?: EvaluationConfig['forms'][number];
 }
+
+const CRITERIA_COLUMN_WIDTH = 260;
 
 const buildCriteriaTitleMap = (
   fitQuestions: FitQuestion[],
@@ -240,22 +243,23 @@ const buildCriteriaRows = (
   columns.forEach((column) => {
     const criteria = getCriteria(column.form) ?? [];
     criteria.forEach((criterion) => {
-      const existing = rows.get(criterion.criterionId);
       const label = titleMap.get(criterion.criterionId) ?? fallbackTitle;
-      if (!existing) {
-        const row: SummaryTableRowData = {
+      if (!rows.has(label)) {
+        rows.set(label, {
           label,
           cells: columns.map(() => ({ primary: '—' }))
-        };
-        rows.set(criterion.criterionId, row);
+        });
       }
-      const targetRow = rows.get(criterion.criterionId);
+      const targetRow = rows.get(label);
       if (targetRow) {
         const idx = columnIndex.get(column.id);
         if (idx != null) {
-          targetRow.cells[idx] = {
-            primary: formatScore(criterion.score)
-          };
+          const currentCell = targetRow.cells[idx];
+          if (!currentCell || currentCell.primary === '—') {
+            targetRow.cells[idx] = {
+              primary: formatScore(criterion.score)
+            };
+          }
         }
       }
     });
@@ -285,11 +289,6 @@ export const EvaluationStatusModal = ({
   if (interviewerColumns.length > 0) {
     summarySections.push({ title: 'Overall summary', rows: buildGeneralRows(interviewerColumns) });
 
-    const commentRows = buildCommentRows(interviewerColumns);
-    if (commentRows.length > 0) {
-      summarySections.push({ title: 'Interviewer comments', rows: commentRows });
-    }
-
     const fitCriteriaRows = buildCriteriaRows(
       interviewerColumns,
       (form) => form?.fitCriteria,
@@ -309,7 +308,22 @@ export const EvaluationStatusModal = ({
     if (caseCriteriaRows.length > 0) {
       summarySections.push({ title: 'Case criteria', rows: caseCriteriaRows });
     }
+
+    const commentRows = buildCommentRows(interviewerColumns);
+    if (commentRows.length > 0) {
+      summarySections.push({ title: 'Interviewer comments', rows: commentRows });
+    }
   }
+
+  const tableStyle = useMemo<CSSProperties | undefined>(() => {
+    if (interviewerColumns.length === 0) {
+      return undefined;
+    }
+    return {
+      '--interviewer-column-width': `calc((100% - ${CRITERIA_COLUMN_WIDTH}px) / ${interviewerColumns.length})`,
+      '--criteria-column-width': `${CRITERIA_COLUMN_WIDTH}px`
+    } as CSSProperties;
+  }, [interviewerColumns.length]);
 
   return (
     <div className={styles.overlay}>
@@ -357,7 +371,13 @@ export const EvaluationStatusModal = ({
             {summarySections.length > 0 ? (
               <div className={styles.summaryTableSection}>
                 <div className={styles.summaryTableWrapper}>
-                  <table className={styles.summaryTable}>
+                  <table className={styles.summaryTable} style={tableStyle}>
+                    <colgroup>
+                      <col className={styles.summaryTableCriteriaColumn} />
+                      {interviewerColumns.map((column) => (
+                        <col key={`${column.id}-col`} className={styles.summaryTableColumn} />
+                      ))}
+                    </colgroup>
                     <thead>
                       <tr>
                         <th scope="col">Criteria</th>
