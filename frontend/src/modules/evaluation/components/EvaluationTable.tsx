@@ -8,6 +8,7 @@ type SortableColumnKey = 'name' | 'position' | 'created' | 'round' | 'avgFit' | 
 export interface EvaluationTableRow {
   id: string;
   candidateName: string;
+  candidateSortKey: string;
   candidatePosition: string;
   createdAt: string | null;
   createdOn: string;

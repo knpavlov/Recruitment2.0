@@ -7,11 +7,13 @@ import {
   useCandidatesState,
   useCasesState,
   useFitQuestionsState,
-  useCaseCriteriaState
+  useCaseCriteriaState,
+  useAccountsState
 } from '../../app/state/AppStateContext';
 import { EvaluationConfig } from '../../shared/types/evaluation';
 import { EvaluationTable, EvaluationTableRow } from './components/EvaluationTable';
 import { formatDate } from '../../shared/utils/date';
+import { composeFullName, buildLastNameSortKey } from '../../shared/utils/personName';
 
 type Banner = { type: 'info' | 'error'; text: string } | null;
 
@@ -33,11 +35,13 @@ const DECISION_LABELS: Record<DecisionOption, string> = {
 };
 
 export const EvaluationScreen = () => {
-  const { list, saveEvaluation, removeEvaluation, sendInvitations, advanceRound } = useEvaluationsState();
+  const { list, saveEvaluation, removeEvaluation, sendInvitations, advanceRound, setDecision } =
+    useEvaluationsState();
   const { list: candidates } = useCandidatesState();
   const { folders } = useCasesState();
   const { list: fitQuestions } = useFitQuestionsState();
   const { list: caseCriteria } = useCaseCriteriaState();
+  const { list: accounts } = useAccountsState();
   const [banner, setBanner] = useState<Banner>(null);
   const [modalEvaluation, setModalEvaluation] = useState<EvaluationConfig | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -52,13 +56,16 @@ export const EvaluationScreen = () => {
       string,
       {
         name: string;
+        sortKey: string;
         position: string;
       }
     >();
     candidates.forEach((candidate) => {
-      const name = `${candidate.lastName} ${candidate.firstName}`.trim() || 'Not selected';
+      const displayName = composeFullName(candidate.firstName, candidate.lastName);
+      const name = displayName || 'Not selected';
+      const sortKey = buildLastNameSortKey(candidate.firstName, candidate.lastName) || name;
       const position = candidate.desiredPosition?.trim() || '—';
-      map.set(candidate.id, { name, position });
+      map.set(candidate.id, { name, sortKey, position });
     });
     return map;
   }, [candidates]);
@@ -179,7 +186,11 @@ export const EvaluationScreen = () => {
       }
       const nextRound = result.data.roundNumber ?? (evaluation.roundNumber ?? 1) + 1;
       setRoundSelections((prev) => ({ ...prev, [evaluation.id]: nextRound }));
-      setDecisionSelections((prev) => ({ ...prev, [evaluation.id]: 'progress' }));
+      setDecisionSelections((prev) => {
+        const next = { ...prev };
+        delete next[evaluation.id];
+        return next;
+      });
       setBanner({
         type: 'info',
         text: `Candidate moved to round ${nextRound}. Configure the new round and send invites to interviewers.`
@@ -192,6 +203,7 @@ export const EvaluationScreen = () => {
     return list.map((evaluation) => {
       const metadata = evaluation.candidateId ? candidateIndex.get(evaluation.candidateId) : undefined;
       const candidateName = metadata?.name ?? 'Not selected';
+      const candidateSortKey = metadata?.sortKey ?? candidateName;
       const candidatePosition = metadata?.position ?? '—';
       const createdAt = evaluation.createdAt ?? null;
       const createdOn = formatDate(createdAt);
@@ -308,8 +320,17 @@ export const EvaluationScreen = () => {
         decisionTooltip = 'Wait until every interviewer submits their evaluation to enable these actions.';
       }
 
-      const decisionSelection = decisionSelections[evaluation.id] ?? null;
-      const decisionLabel = decisionSelection ? DECISION_LABELS[decisionSelection] : 'Decision';
+      const storedDecision = snapshot ? snapshot.decision ?? null : evaluation.decision ?? null;
+      const hasOverride = Object.prototype.hasOwnProperty.call(decisionSelections, evaluation.id);
+      const overrideDecision = hasOverride ? decisionSelections[evaluation.id] ?? null : undefined;
+      const effectiveDecision = overrideDecision !== undefined ? overrideDecision : storedDecision ?? null;
+      const isCurrentRoundIncomplete = !isHistoricalView && roundProcessStatus !== 'completed';
+      const decisionLabel = isCurrentRoundIncomplete
+        ? 'Decision'
+        : effectiveDecision
+          ? DECISION_LABELS[effectiveDecision]
+          : 'Decision';
+      const decisionState = isCurrentRoundIncomplete ? null : effectiveDecision;
 
       const evaluationForModal = snapshot
         ? {
@@ -340,13 +361,40 @@ export const EvaluationScreen = () => {
         void handleSendInvites(evaluation, slotIds);
       };
 
+      const updateDecision = async (target: 'offer' | 'reject') => {
+        setDecisionSelections((prev) => ({ ...prev, [evaluation.id]: target }));
+        const result = await setDecision(evaluation.id, target, evaluation.version);
+        if (!result.ok) {
+          setDecisionSelections((prev) => {
+            const next = { ...prev };
+            delete next[evaluation.id];
+            return next;
+          });
+          const message =
+            result.error === 'version-conflict'
+              ? 'Version conflict. Refresh the page to view the latest data.'
+              : result.error === 'invalid-input'
+                ? 'Failed to update the decision. Try again.'
+                : result.error === 'not-found'
+                  ? 'Evaluation not found. Refresh the page.'
+                  : 'Failed to update the decision.';
+          setBanner({ type: 'error', text: message });
+          return;
+        }
+        setDecisionSelections((prev) => {
+          const next = { ...prev };
+          delete next[evaluation.id];
+          return next;
+        });
+        setBanner({ type: 'info', text: `Decision updated: ${DECISION_LABELS[target]}.` });
+      };
+
       const decide = (option: DecisionOption) => {
         if (option === 'progress') {
           void handleAdvanceRound(evaluation);
           return;
         }
-        setDecisionSelections((prev) => ({ ...prev, [evaluation.id]: option }));
-        setBanner({ type: 'info', text: `Decision updated: ${DECISION_LABELS[option]}.` });
+        void updateDecision(option);
       };
 
       const processLabel =
@@ -359,6 +407,7 @@ export const EvaluationScreen = () => {
       return {
         id: evaluation.id,
         candidateName,
+        candidateSortKey,
         candidatePosition,
         createdAt,
         createdOn,
@@ -393,7 +442,7 @@ export const EvaluationScreen = () => {
         decisionDisabled,
         decisionTooltip,
         decisionLabel,
-        decisionState: decisionSelection,
+        decisionState,
         onDecisionSelect: decide
       } satisfies EvaluationTableRow;
     });
@@ -404,6 +453,7 @@ export const EvaluationScreen = () => {
     decisionSelections,
     handleSendInvites,
     handleAdvanceRound,
+    setDecision,
     setBanner
   ]);
 
@@ -420,7 +470,7 @@ export const EvaluationScreen = () => {
     copy.sort((a, b) => {
       let result = 0;
       if (sortKey === 'name') {
-        result = compareStrings(a.candidateName, b.candidateName);
+        result = compareStrings(a.candidateSortKey, b.candidateSortKey);
       } else if (sortKey === 'position') {
         result = compareStrings(a.candidatePosition, b.candidatePosition);
       } else if (sortKey === 'created') {
@@ -435,7 +485,7 @@ export const EvaluationScreen = () => {
         result = compareNumbers(a.avgCaseScore, b.avgCaseScore);
       }
 
-      if (result === 0 && sortKey !== 'name') {
+      if (result === 0) {
         result = compareStrings(a.candidateName, b.candidateName);
       }
 
@@ -546,6 +596,7 @@ export const EvaluationScreen = () => {
           candidates={candidates}
           folders={folders}
           fitQuestions={fitQuestions}
+          accounts={accounts}
         />
       )}
 
