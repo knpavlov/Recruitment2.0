@@ -26,8 +26,11 @@
   display: flex;
   gap: 12px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
+.firstNameInput,
+.lastNameInput,
 .emailInput {
   padding: 12px 16px;
   border-radius: 12px;

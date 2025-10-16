@@ -68,10 +68,20 @@ interface AppStateContextValue {
       slotIds?: string[]
     ) => Promise<DomainResult<{ evaluation: EvaluationConfig; deliveryReport: InvitationDeliveryReport }>>;
     advanceRound: (id: string) => Promise<DomainResult<EvaluationConfig>>;
+    setDecision: (
+      id: string,
+      decision: 'offer' | 'reject' | null,
+      expectedVersion: number
+    ) => Promise<DomainResult<EvaluationConfig>>;
   };
   accounts: {
     list: AccountRecord[];
-    inviteAccount: (email: string, role: AccountRole) => Promise<DomainResult<AccountRecord>>;
+    inviteAccount: (
+      email: string,
+      role: AccountRole,
+      firstName: string,
+      lastName: string
+    ) => Promise<DomainResult<AccountRecord>>;
     activateAccount: (id: string) => Promise<DomainResult<AccountRecord>>;
     removeAccount: (id: string) => Promise<DomainResult<string>>;
   };
@@ -633,17 +643,46 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
           console.error('Failed to advance evaluation round:', error);
           return { ok: false, error: 'unknown' };
         }
+      },
+      setDecision: async (id, decision, expectedVersion) => {
+        if (decision !== 'offer' && decision !== 'reject' && decision !== null) {
+          return { ok: false, error: 'invalid-input' };
+        }
+        try {
+          const updated = await evaluationsApi.setDecision(id, decision, expectedVersion);
+          setEvaluations((prev) => prev.map((item) => (item.id === id ? updated : item)));
+          return { ok: true, data: updated };
+        } catch (error) {
+          if (error instanceof ApiError) {
+            if (error.code === 'version-conflict') {
+              return { ok: false, error: 'version-conflict' };
+            }
+            if (error.code === 'invalid-input') {
+              return { ok: false, error: 'invalid-input' };
+            }
+            if (error.code === 'not-found') {
+              return { ok: false, error: 'not-found' };
+            }
+          }
+          console.error('Failed to update evaluation decision:', error);
+          return { ok: false, error: 'unknown' };
+        }
       }
     },
     accounts: {
       list: accounts,
-      inviteAccount: async (email, role) => {
-        const trimmed = email.trim().toLowerCase();
-        if (!trimmed) {
+      inviteAccount: async (email, role, firstName, lastName) => {
+        const trimmedEmail = email.trim().toLowerCase();
+        if (!trimmedEmail) {
+          return { ok: false, error: 'invalid-input' };
+        }
+        const normalizedFirst = firstName.trim();
+        const normalizedLast = lastName.trim();
+        if (!normalizedFirst || !normalizedLast) {
           return { ok: false, error: 'invalid-input' };
         }
         try {
-          const account = await accountsApi.invite(trimmed, role);
+          const account = await accountsApi.invite(trimmedEmail, role, normalizedFirst, normalizedLast);
           setAccounts((prev) => [...prev, account]);
           return { ok: true, data: account };
         } catch (error) {

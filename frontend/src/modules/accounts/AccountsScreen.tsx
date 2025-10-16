@@ -2,25 +2,39 @@ import { useMemo, useState } from 'react';
 import styles from '../../styles/AccountsScreen.module.css';
 import { useAccountsState } from '../../app/state/AppStateContext';
 import { useAuth } from '../auth/AuthContext';
+import { resolveAccountName } from '../../shared/utils/accountName';
 
 type Banner = { type: 'info' | 'error'; text: string } | null;
 
-type SortKey = 'email' | 'status' | 'role' | 'invitation';
+type SortKey = 'name' | 'email' | 'status' | 'role' | 'invitation';
 
 export const AccountsScreen = () => {
   const { session } = useAuth();
   const role = session?.role ?? 'user';
   const { list, inviteAccount, activateAccount, removeAccount } = useAccountsState();
   const [email, setEmail] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [targetRole, setTargetRole] = useState<'admin' | 'user'>('admin');
   const [banner, setBanner] = useState<Banner>(null);
-  const [sortKey, setSortKey] = useState<SortKey>('email');
+  const [sortKey, setSortKey] = useState<SortKey>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   const sortedAccounts = useMemo(() => {
     const copy = [...list];
 
-    const compareStrings = (a: string, b: string) => a.localeCompare(b, 'en-US', { sensitivity: 'base' });
+    const nameCache = new Map<string, string>();
+    const readName = (account: typeof copy[number]) => {
+      const cached = nameCache.get(account.id);
+      if (cached) {
+        return cached;
+      }
+      const resolved = resolveAccountName(account);
+      nameCache.set(account.id, resolved);
+      return resolved;
+    };
+
+    const compareStrings = (a: string, b: string) => a.localeCompare(b, 'ru', { sensitivity: 'base' });
     const compareRoles = (a: typeof copy[number], b: typeof copy[number]) => {
       const order = new Map([
         ['super-admin', 2],
@@ -44,7 +58,9 @@ export const AccountsScreen = () => {
     copy.sort((a, b) => {
       let result = 0;
 
-      if (sortKey === 'email') {
+      if (sortKey === 'name') {
+        result = compareStrings(readName(a), readName(b));
+      } else if (sortKey === 'email') {
         result = compareStrings(a.email, b.email);
       } else if (sortKey === 'role') {
         result = compareRoles(a, b);
@@ -57,7 +73,10 @@ export const AccountsScreen = () => {
       }
 
       if (result === 0 && sortKey !== 'email') {
-        result = compareStrings(a.email, b.email);
+        result = compareStrings(readName(a), readName(b));
+        if (result === 0) {
+          result = compareStrings(a.email, b.email);
+        }
       }
 
       return sortDirection === 'asc' ? result : -result;
@@ -89,13 +108,13 @@ export const AccountsScreen = () => {
   }
 
   const handleInvite = async () => {
-    const result = await inviteAccount(email, targetRole);
+    const result = await inviteAccount(email, targetRole, firstName, lastName);
     if (!result.ok) {
       const message =
         result.error === 'duplicate'
           ? 'This user has already been invited.'
           : result.error === 'invalid-input'
-            ? 'Enter a valid email.'
+            ? 'Enter a valid name and email.'
             : result.error === 'mailer-unavailable'
               ? 'Email delivery is not configured. Fix the settings and try again.'
               : 'Failed to send the invitation. Try again later.';
@@ -104,6 +123,8 @@ export const AccountsScreen = () => {
     }
     setBanner({ type: 'info', text: `Invitation email sent to ${result.data.email}.` });
     setEmail('');
+    setFirstName('');
+    setLastName('');
   };
 
   const handleCopyToken = async (token: string) => {
@@ -157,6 +178,18 @@ export const AccountsScreen = () => {
         </div>
         <div className={styles.inviteBlock}>
           <input
+            className={styles.firstNameInput}
+            placeholder="First name"
+            value={firstName}
+            onChange={(event) => setFirstName(event.target.value)}
+          />
+          <input
+            className={styles.lastNameInput}
+            placeholder="Last name"
+            value={lastName}
+            onChange={(event) => setLastName(event.target.value)}
+          />
+          <input
             className={styles.emailInput}
             placeholder="email@company.com"
             value={email}
@@ -184,6 +217,18 @@ export const AccountsScreen = () => {
         <table className={styles.table}>
           <thead>
             <tr>
+              <th>
+                <button
+                  type="button"
+                  className={`${styles.sortButton} ${sortKey === 'name' ? styles.sortButtonActive : ''}`}
+                  onClick={() => handleSortChange('name')}
+                >
+                  Name
+                  {sortKey === 'name' && (
+                    <span className={styles.sortIcon}>{sortDirection === 'asc' ? '▲' : '▼'}</span>
+                  )}
+                </button>
+              </th>
               <th>
                 <button
                   type="button"
@@ -238,6 +283,7 @@ export const AccountsScreen = () => {
           <tbody>
             {sortedAccounts.map((account) => (
               <tr key={account.id}>
+                <td>{resolveAccountName(account)}</td>
                 <td>{account.email}</td>
                 <td>
                   <span
