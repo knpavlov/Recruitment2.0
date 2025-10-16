@@ -10,6 +10,9 @@ export interface AccountRecord {
   email: string;
   role: AccountRole;
   status: AccountStatus;
+  firstName?: string;
+  lastName?: string;
+  name?: string;
   invitationToken: string;
   createdAt: Date;
   activatedAt?: Date;
@@ -26,21 +29,71 @@ export class AccountsService {
     return this.repository.findByEmail(email);
   }
 
-  async inviteAccount(email: string, role: AccountRole) {
+  private static deriveNameFromEmail(email: string): string | undefined {
+    const localPart = email.split('@')[0] ?? '';
+    const normalized = localPart.replace(/[._-]+/g, ' ').trim();
+    if (!normalized) {
+      return undefined;
+    }
+    return normalized.replace(/\b\w+/g, (segment) => segment.charAt(0).toUpperCase() + segment.slice(1).toLowerCase());
+  }
+
+  private static normalizeName(value: string | undefined | null): string | undefined {
+    if (typeof value !== 'string') {
+      return undefined;
+    }
+    const trimmed = value.replace(/\s+/g, ' ').trim();
+    return trimmed || undefined;
+  }
+
+  private static normalizeNamePart(value: string | undefined | null): string | undefined {
+    if (typeof value !== 'string') {
+      return undefined;
+    }
+    const trimmed = value.replace(/\s+/g, ' ').trim();
+    return trimmed || undefined;
+  }
+
+  private static extractNameParts(
+    fullName: string | undefined
+  ): { firstName?: string; lastName?: string; fullName?: string } {
+    const normalized = AccountsService.normalizeName(fullName);
+    if (!normalized) {
+      return {};
+    }
+    const segments = normalized.split(' ');
+    if (segments.length === 0) {
+      return {};
+    }
+    const firstName = segments[0];
+    const lastName = segments.length > 1 ? segments[segments.length - 1] : undefined;
+    return { firstName, lastName, fullName: normalized };
+  }
+
+  async inviteAccount(email: string, role: AccountRole, firstName?: string, lastName?: string) {
     const normalized = email.trim().toLowerCase();
     if (!normalized || role === 'super-admin') {
       throw new Error('INVALID_INVITE');
+    }
+    const normalizedFirstName = AccountsService.normalizeNamePart(firstName);
+    const normalizedLastName = AccountsService.normalizeNamePart(lastName);
+    if (!normalizedFirstName || !normalizedLastName) {
+      throw new Error('INVALID_NAME');
     }
     const exists = await this.findByEmail(normalized);
     if (exists) {
       throw new Error('ALREADY_EXISTS');
     }
     const invitationToken = randomUUID();
+    const fullName = `${normalizedFirstName} ${normalizedLastName}`.trim();
     const record: AccountRecord = {
       id: randomUUID(),
       email: normalized,
       role,
       status: 'pending',
+      firstName: normalizedFirstName,
+      lastName: normalizedLastName,
+      name: fullName,
       invitationToken,
       createdAt: new Date()
     };
@@ -57,7 +110,7 @@ export class AccountsService {
     return saved;
   }
 
-  async ensureUserAccount(email: string) {
+  async ensureUserAccount(email: string, name?: string) {
     const normalized = email.trim().toLowerCase();
     if (!normalized) {
       throw new Error('INVALID_INVITE');
@@ -66,13 +119,23 @@ export class AccountsService {
     if (existing) {
       return existing;
     }
+    const normalizedName = AccountsService.normalizeName(name);
+    const derivedName = normalizedName ?? AccountsService.deriveNameFromEmail(normalized);
+    const explicitParts = AccountsService.extractNameParts(normalizedName ?? undefined);
+    const derivedParts = AccountsService.extractNameParts(derivedName);
+    const firstName = explicitParts.firstName ?? derivedParts.firstName;
+    const lastName = explicitParts.lastName ?? derivedParts.lastName;
+    const fullName = explicitParts.fullName ?? derivedParts.fullName;
     const record: AccountRecord = {
       id: randomUUID(),
       email: normalized,
       role: 'user',
       status: 'pending',
       invitationToken: randomUUID(),
-      createdAt: new Date()
+      createdAt: new Date(),
+      firstName,
+      lastName,
+      name: fullName
     };
     return this.repository.insertAccount(record);
   }

@@ -349,20 +349,21 @@ export class MailerService {
     payload: {
       candidateName: string;
       interviewerName: string;
+      interviewerFirstName?: string;
       caseTitle: string;
       fitQuestionTitle: string;
       link: string;
     }
   ) {
     const subject = `Interview scheduled with ${payload.candidateName}`;
+    const greetingName = payload.interviewerFirstName?.trim() || payload.interviewerName;
     const lines = [
-      `Hello ${payload.interviewerName},`,
+      `Hello ${greetingName},`,
       `You have been assigned to interview ${payload.candidateName}.`,
-      `Case materials: ${payload.caseTitle}.`,
-      `Fit question: ${payload.fitQuestionTitle}.`,
       payload.link
         ? `Open the interviewer workspace here: ${payload.link}.`
         : 'Sign in to the interviewer workspace to review materials and submit feedback.',
+      'You will find the interview materials and the evaluation form on the interviewer portal.',
       'If you are not logged in, request a one-time code for this email address on the login screen.'
     ].filter((line): line is string => Boolean(line));
     await this.deliver(email, subject, lines.join('\n\n'));
