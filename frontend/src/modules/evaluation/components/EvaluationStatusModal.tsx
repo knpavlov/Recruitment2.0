@@ -256,8 +256,9 @@ const buildCriteriaRows = (
         if (idx != null) {
           const currentCell = targetRow.cells[idx];
           if (!currentCell || currentCell.primary === '—') {
+            const primaryValue = criterion.notApplicable ? 'N/A' : formatScore(criterion.score);
             targetRow.cells[idx] = {
-              primary: formatScore(criterion.score)
+              primary: primaryValue
             };
           }
         }

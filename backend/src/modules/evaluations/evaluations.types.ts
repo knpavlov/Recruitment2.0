@@ -30,6 +30,7 @@ export interface InterviewStatusModel {
 export interface EvaluationCriterionScore {
   criterionId: string;
   score?: number;
+  notApplicable?: boolean;
 }
 
 export type OfferRecommendationValue =
@@ -37,6 +38,8 @@ export type OfferRecommendationValue =
   | 'yes_strong'
   | 'yes_keep_warm'
   | 'no_offer';
+
+export type EvaluationDecision = 'offer' | 'reject' | 'progress';
 
 export type EvaluationProcessStatus = 'draft' | 'in-progress' | 'completed';
 
@@ -58,6 +61,7 @@ export interface EvaluationRoundSnapshot {
   processStartedAt?: string;
   completedAt?: string;
   createdAt: string;
+  decision?: EvaluationDecision | null;
 }
 
 export type InvitationSlotStatus = 'pending' | 'delivered' | 'stale' | 'failed' | 'unassigned';
@@ -124,6 +128,7 @@ export interface EvaluationRecord {
   processStartedAt?: string;
   roundHistory: EvaluationRoundSnapshot[];
   invitationState: EvaluationInvitationState;
+  decision?: EvaluationDecision | null;
 }
 
 export interface EvaluationWriteModel {
@@ -137,6 +142,7 @@ export interface EvaluationWriteModel {
   processStatus?: EvaluationProcessStatus;
   processStartedAt?: string | null;
   roundHistory: EvaluationRoundSnapshot[];
+  decision?: EvaluationDecision | null;
 }
 
 export interface InterviewerAssignmentView {

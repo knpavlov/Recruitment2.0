@@ -90,7 +90,8 @@ const normalizeCriteriaList = (value: unknown): EvaluationCriterionScore[] => {
         score = parsed;
       }
     }
-    result.push({ criterionId, score });
+    const notApplicable = payload.notApplicable === true;
+    result.push({ criterionId, score, notApplicable });
   }
   return result;
 };
