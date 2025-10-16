@@ -6,6 +6,7 @@ export interface AccountRecord {
   email: string;
   role: AccountRole;
   status: AccountStatus;
+  name?: string;
   invitedAt: string;
   activatedAt?: string;
   invitationToken: string;
