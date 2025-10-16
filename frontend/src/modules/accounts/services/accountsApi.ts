@@ -12,6 +12,10 @@ type AccountPayload = Partial<AccountRecord> & {
   activatedAt?: unknown;
   invitationToken?: unknown;
   createdAt?: unknown;
+  name?: unknown;
+  displayName?: unknown;
+  firstName?: unknown;
+  lastName?: unknown;
 };
 
 const isRole = (value: unknown): value is AccountRole =>
@@ -55,11 +59,32 @@ const normalizeAccount = (payload: unknown): AccountRecord | null => {
   const invitedAt = asIsoString(record.invitedAt ?? record.createdAt);
   const activatedAt = asIsoString(record.activatedAt);
 
+  const primaryName = typeof record.name === 'string' ? record.name.trim() : '';
+  const displayName = typeof record.displayName === 'string' ? record.displayName.trim() : '';
+  const firstNameRaw = typeof record.firstName === 'string' ? record.firstName.trim() : '';
+  const lastNameRaw = typeof record.lastName === 'string' ? record.lastName.trim() : '';
+  const composedName = [firstNameRaw, lastNameRaw].filter((value) => Boolean(value)).join(' ').trim();
+
+  let name: string | undefined;
+  if (primaryName) {
+    name = primaryName;
+  } else if (displayName) {
+    name = displayName;
+  } else if (composedName) {
+    name = composedName;
+  } else {
+    const legacy = [lastNameRaw, firstNameRaw].filter((value) => Boolean(value)).join(' ').trim();
+    name = legacy || undefined;
+  }
+
   return {
     id,
     email,
     role,
     status,
+    name,
+    firstName: firstNameRaw || undefined,
+    lastName: lastNameRaw || undefined,
     invitedAt: invitedAt ?? new Date(0).toISOString(),
     activatedAt,
     invitationToken
@@ -85,11 +110,11 @@ const ensureAccountList = (value: unknown): AccountRecord[] => {
 
 export const accountsApi = {
   list: async () => ensureAccountList(await apiRequest<unknown>('/accounts')),
-  invite: async (email: string, role: AccountRole) =>
+  invite: async (email: string, role: AccountRole, firstName: string, lastName: string) =>
     ensureAccount(
       await apiRequest<unknown>('/accounts/invite', {
         method: 'POST',
-        body: { email, role }
+        body: { email, role, firstName, lastName }
       })
     ),
   activate: async (id: string) =>

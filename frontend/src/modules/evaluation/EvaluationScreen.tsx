@@ -7,7 +7,8 @@ import {
   useCandidatesState,
   useCasesState,
   useFitQuestionsState,
-  useCaseCriteriaState
+  useCaseCriteriaState,
+  useAccountsState
 } from '../../app/state/AppStateContext';
 import { EvaluationConfig } from '../../shared/types/evaluation';
 import { EvaluationTable, EvaluationTableRow } from './components/EvaluationTable';
@@ -33,11 +34,13 @@ const DECISION_LABELS: Record<DecisionOption, string> = {
 };
 
 export const EvaluationScreen = () => {
-  const { list, saveEvaluation, removeEvaluation, sendInvitations, advanceRound } = useEvaluationsState();
+  const { list, saveEvaluation, removeEvaluation, sendInvitations, advanceRound, setDecision } =
+    useEvaluationsState();
   const { list: candidates } = useCandidatesState();
   const { folders } = useCasesState();
   const { list: fitQuestions } = useFitQuestionsState();
   const { list: caseCriteria } = useCaseCriteriaState();
+  const { list: accounts } = useAccountsState();
   const [banner, setBanner] = useState<Banner>(null);
   const [modalEvaluation, setModalEvaluation] = useState<EvaluationConfig | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -179,7 +182,11 @@ export const EvaluationScreen = () => {
       }
       const nextRound = result.data.roundNumber ?? (evaluation.roundNumber ?? 1) + 1;
       setRoundSelections((prev) => ({ ...prev, [evaluation.id]: nextRound }));
-      setDecisionSelections((prev) => ({ ...prev, [evaluation.id]: 'progress' }));
+      setDecisionSelections((prev) => {
+        const next = { ...prev };
+        delete next[evaluation.id];
+        return next;
+      });
       setBanner({
         type: 'info',
         text: `Candidate moved to round ${nextRound}. Configure the new round and send invites to interviewers.`
@@ -308,8 +315,17 @@ export const EvaluationScreen = () => {
         decisionTooltip = 'Wait until every interviewer submits their evaluation to enable these actions.';
       }
 
-      const decisionSelection = decisionSelections[evaluation.id] ?? null;
-      const decisionLabel = decisionSelection ? DECISION_LABELS[decisionSelection] : 'Decision';
+      const storedDecision = snapshot ? snapshot.decision ?? null : evaluation.decision ?? null;
+      const hasOverride = Object.prototype.hasOwnProperty.call(decisionSelections, evaluation.id);
+      const overrideDecision = hasOverride ? decisionSelections[evaluation.id] ?? null : undefined;
+      const effectiveDecision = overrideDecision !== undefined ? overrideDecision : storedDecision ?? null;
+      const isCurrentRoundIncomplete = !isHistoricalView && roundProcessStatus !== 'completed';
+      const decisionLabel = isCurrentRoundIncomplete
+        ? 'Decision'
+        : effectiveDecision
+          ? DECISION_LABELS[effectiveDecision]
+          : 'Decision';
+      const decisionState = isCurrentRoundIncomplete ? null : effectiveDecision;
 
       const evaluationForModal = snapshot
         ? {
@@ -340,13 +356,40 @@ export const EvaluationScreen = () => {
         void handleSendInvites(evaluation, slotIds);
       };
 
+      const updateDecision = async (target: 'offer' | 'reject') => {
+        setDecisionSelections((prev) => ({ ...prev, [evaluation.id]: target }));
+        const result = await setDecision(evaluation.id, target, evaluation.version);
+        if (!result.ok) {
+          setDecisionSelections((prev) => {
+            const next = { ...prev };
+            delete next[evaluation.id];
+            return next;
+          });
+          const message =
+            result.error === 'version-conflict'
+              ? 'Version conflict. Refresh the page to view the latest data.'
+              : result.error === 'invalid-input'
+                ? 'Failed to update the decision. Try again.'
+                : result.error === 'not-found'
+                  ? 'Evaluation not found. Refresh the page.'
+                  : 'Failed to update the decision.';
+          setBanner({ type: 'error', text: message });
+          return;
+        }
+        setDecisionSelections((prev) => {
+          const next = { ...prev };
+          delete next[evaluation.id];
+          return next;
+        });
+        setBanner({ type: 'info', text: `Decision updated: ${DECISION_LABELS[target]}.` });
+      };
+
       const decide = (option: DecisionOption) => {
         if (option === 'progress') {
           void handleAdvanceRound(evaluation);
           return;
         }
-        setDecisionSelections((prev) => ({ ...prev, [evaluation.id]: option }));
-        setBanner({ type: 'info', text: `Decision updated: ${DECISION_LABELS[option]}.` });
+        void updateDecision(option);
       };
 
       const processLabel =
@@ -393,7 +436,7 @@ export const EvaluationScreen = () => {
         decisionDisabled,
         decisionTooltip,
         decisionLabel,
-        decisionState: decisionSelection,
+        decisionState,
         onDecisionSelect: decide
       } satisfies EvaluationTableRow;
     });
@@ -404,6 +447,7 @@ export const EvaluationScreen = () => {
     decisionSelections,
     handleSendInvites,
     handleAdvanceRound,
+    setDecision,
     setBanner
   ]);
 
@@ -546,6 +590,7 @@ export const EvaluationScreen = () => {
           candidates={candidates}
           folders={folders}
           fitQuestions={fitQuestions}
+          accounts={accounts}
         />
       )}
 

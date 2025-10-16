@@ -12,7 +12,7 @@ import {
   InvitationDeliveryFailure
 } from './evaluations.types.js';
 import { computeInvitationState } from './evaluationAssignments.utils.js';
-import type { AccountsService } from '../accounts/accounts.service.js';
+import type { AccountRecord, AccountsService } from '../accounts/accounts.service.js';
 import type { CandidatesService } from '../candidates/candidates.service.js';
 import type { CasesService } from '../cases/cases.service.js';
 import type { QuestionsService } from '../questions/questions.service.js';
@@ -44,6 +44,32 @@ const buildPortalLink = (baseUrl: string, evaluationId: string, slotId: string) 
   return url.toString();
 };
 
+const toTitleCase = (value: string): string =>
+  value.replace(/\b\w+/g, (segment) => segment.charAt(0).toUpperCase() + segment.slice(1).toLowerCase());
+
+const extractFirstName = (value: string | undefined | null): string | undefined => {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+  const token = value.trim().split(/\s+/)[0] ?? '';
+  if (!token) {
+    return undefined;
+  }
+  return toTitleCase(token);
+};
+
+const deriveFirstNameFromEmail = (email: string | undefined): string | undefined => {
+  if (typeof email !== 'string') {
+    return undefined;
+  }
+  const localPart = email.split('@')[0] ?? '';
+  const normalized = localPart.replace(/[._-]+/g, ' ').trim();
+  if (!normalized) {
+    return undefined;
+  }
+  return extractFirstName(normalized);
+};
+
 const buildWriteModelFromRecord = (record: EvaluationRecord): EvaluationWriteModel => ({
   id: record.id,
   candidateId: record.candidateId,
@@ -54,7 +80,8 @@ const buildWriteModelFromRecord = (record: EvaluationRecord): EvaluationWriteMod
   forms: record.forms,
   processStatus: record.processStatus,
   processStartedAt: record.processStartedAt ?? null,
-  roundHistory: record.roundHistory
+  roundHistory: record.roundHistory,
+  decision: record.decision ?? null
 });
 
 const createEmptySlot = (): EvaluationRecord['interviews'][number] => ({
@@ -91,7 +118,8 @@ const readCriteriaList = (value: unknown): EvaluationCriterionScore[] => {
       continue;
     }
     const scoreValue = readScore(payload.score);
-    result.push({ criterionId, score: scoreValue });
+    const notApplicable = payload.notApplicable === true;
+    result.push({ criterionId, score: scoreValue, notApplicable });
   }
   return result;
 };
@@ -179,8 +207,23 @@ export class EvaluationWorkflowService {
 
   private async ensureAccounts(assignments: InterviewAssignmentModel[]) {
     for (const assignment of assignments) {
-      await this.accounts.ensureUserAccount(assignment.interviewerEmail);
+      await this.accounts.ensureUserAccount(assignment.interviewerEmail, assignment.interviewerName);
     }
+  }
+
+  private resolveInterviewerFirstName(assignment: InterviewAssignmentModel, account: AccountRecord | null): string {
+    const candidates = [
+      extractFirstName(account?.firstName),
+      extractFirstName(account?.name),
+      extractFirstName(assignment.interviewerName),
+      deriveFirstNameFromEmail(assignment.interviewerEmail)
+    ];
+    for (const candidate of candidates) {
+      if (candidate) {
+        return candidate;
+      }
+    }
+    return 'Interviewer';
   }
 
   private async loadContext(assignments: InterviewAssignmentModel[], evaluation: EvaluationRecord) {
@@ -322,15 +365,24 @@ export class EvaluationWorkflowService {
 
     const sent: string[] = [];
     const failed: InvitationDeliveryFailure[] = [];
+    const accountCache = new Map<string, AccountRecord | null>();
 
     for (const assignment of assignments) {
       const caseFolder = context.caseMap.get(assignment.caseFolderId);
       const question = context.questionMap.get(assignment.fitQuestionId);
       const link = buildPortalLink(portalBaseUrl, evaluation.id, assignment.slotId);
+      const normalizedEmail = normalizeEmail(assignment.interviewerEmail);
+      let account = accountCache.get(normalizedEmail);
+      if (account === undefined) {
+        account = (await this.accounts.findByEmail(normalizedEmail)) ?? null;
+        accountCache.set(normalizedEmail, account);
+      }
+      const interviewerFirstName = this.resolveInterviewerFirstName(assignment, account);
       try {
         await this.mailer.sendInterviewAssignment(assignment.interviewerEmail, {
           candidateName,
           interviewerName: assignment.interviewerName,
+          interviewerFirstName,
           caseTitle: caseFolder?.name ?? 'Case',
           fitQuestionTitle: question?.shortTitle ?? 'Fit question',
           link
@@ -517,7 +569,8 @@ export class EvaluationWorkflowService {
       processStatus: 'completed' as const,
       processStartedAt: evaluation.processStartedAt,
       completedAt: new Date().toISOString(),
-      createdAt: snapshotCreatedAt
+      createdAt: snapshotCreatedAt,
+      decision: 'progress' as const
     };
 
     const filteredHistory = evaluation.roundHistory.filter((entry) => entry.roundNumber !== currentRound);
@@ -538,6 +591,7 @@ export class EvaluationWorkflowService {
     writeModel.fitQuestionId = undefined;
     writeModel.processStatus = 'draft';
     writeModel.processStartedAt = null;
+    writeModel.decision = null;
     writeModel.roundHistory = [...filteredHistory, snapshot].sort((a, b) => a.roundNumber - b.roundNumber);
 
     const updated = await this.evaluations.updateEvaluation(writeModel, evaluation.version);
@@ -545,6 +599,48 @@ export class EvaluationWorkflowService {
       throw new Error('VERSION_CONFLICT');
     }
     if (!updated) {
+      throw new Error('NOT_FOUND');
+    }
+
+    return this.loadEvaluationWithState(trimmed);
+  }
+
+  async updateDecision(
+    id: string,
+    decision: 'offer' | 'reject' | null,
+    expectedVersion: number
+  ): Promise<EvaluationRecord> {
+    const trimmed = id.trim();
+    if (!trimmed) {
+      throw new Error('INVALID_INPUT');
+    }
+
+    if (decision !== 'offer' && decision !== 'reject' && decision !== null) {
+      throw new Error('INVALID_INPUT');
+    }
+
+    if (!Number.isInteger(expectedVersion) || expectedVersion <= 0) {
+      throw new Error('INVALID_INPUT');
+    }
+
+    const evaluation = await this.evaluations.findEvaluation(trimmed);
+    if (!evaluation) {
+      throw new Error('NOT_FOUND');
+    }
+
+    const allSubmitted = evaluation.forms.length > 0 && evaluation.forms.every((form) => form.submitted);
+    if (!allSubmitted) {
+      throw new Error('FORMS_PENDING');
+    }
+
+    const writeModel = buildWriteModelFromRecord(evaluation);
+    writeModel.decision = decision;
+
+    const result = await this.evaluations.updateEvaluation(writeModel, expectedVersion);
+    if (result === 'version-conflict') {
+      throw new Error('VERSION_CONFLICT');
+    }
+    if (!result) {
       throw new Error('NOT_FOUND');
     }
 
