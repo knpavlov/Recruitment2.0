@@ -15,7 +15,9 @@ const createTables = async () => {
       status TEXT NOT NULL,
       invitation_token TEXT NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      activated_at TIMESTAMPTZ
+      activated_at TIMESTAMPTZ,
+      first_name TEXT,
+      last_name TEXT
     );
   `);
 
@@ -181,7 +183,8 @@ const createTables = async () => {
       forms JSONB NOT NULL DEFAULT '[]'::JSONB,
       process_status TEXT NOT NULL DEFAULT 'draft',
       process_started_at TIMESTAMPTZ,
-      round_history JSONB NOT NULL DEFAULT '[]'::JSONB
+      round_history JSONB NOT NULL DEFAULT '[]'::JSONB,
+      round_decisions JSONB NOT NULL DEFAULT '{}'::JSONB
     );
   `);
 
@@ -195,7 +198,14 @@ const createTables = async () => {
       ADD COLUMN IF NOT EXISTS forms JSONB NOT NULL DEFAULT '[]'::JSONB,
       ADD COLUMN IF NOT EXISTS process_status TEXT NOT NULL DEFAULT 'draft',
       ADD COLUMN IF NOT EXISTS process_started_at TIMESTAMPTZ,
-      ADD COLUMN IF NOT EXISTS round_history JSONB NOT NULL DEFAULT '[]'::JSONB;
+      ADD COLUMN IF NOT EXISTS round_history JSONB NOT NULL DEFAULT '[]'::JSONB,
+      ADD COLUMN IF NOT EXISTS round_decisions JSONB NOT NULL DEFAULT '{}'::JSONB;
+  `);
+
+  await postgresPool.query(`
+    ALTER TABLE accounts
+      ADD COLUMN IF NOT EXISTS first_name TEXT,
+      ADD COLUMN IF NOT EXISTS last_name TEXT;
   `);
 
   await postgresPool.query(`

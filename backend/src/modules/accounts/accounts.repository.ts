@@ -8,7 +8,9 @@ const mapRowToAccount = (row: any): AccountRecord => ({
   status: row.status,
   invitationToken: row.invitation_token,
   createdAt: new Date(row.created_at),
-  activatedAt: row.activated_at ? new Date(row.activated_at) : undefined
+  activatedAt: row.activated_at ? new Date(row.activated_at) : undefined,
+  firstName: typeof row.first_name === 'string' && row.first_name.trim() ? row.first_name.trim() : undefined,
+  lastName: typeof row.last_name === 'string' && row.last_name.trim() ? row.last_name.trim() : undefined
 });
 
 export class AccountsRepository {
@@ -31,8 +33,18 @@ export class AccountsRepository {
 
   async insertAccount(record: AccountRecord): Promise<AccountRecord> {
     const result = await postgresPool.query(
-      `INSERT INTO accounts (id, email, role, status, invitation_token, created_at, activated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO accounts (
+         id,
+         email,
+         role,
+         status,
+         invitation_token,
+         created_at,
+         activated_at,
+         first_name,
+         last_name
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING *;`,
       [
         record.id,
@@ -41,7 +53,9 @@ export class AccountsRepository {
         record.status,
         record.invitationToken,
         record.createdAt,
-        record.activatedAt ?? null
+        record.activatedAt ?? null,
+        record.firstName ?? null,
+        record.lastName ?? null
       ]
     );
     return mapRowToAccount(result.rows[0]);
@@ -55,6 +69,22 @@ export class AccountsRepository {
        WHERE id = $1
        RETURNING *;`,
       [id, activatedAt]
+    );
+    const row = result.rows[0];
+    return row ? mapRowToAccount(row) : null;
+  }
+
+  async updateNames(
+    id: string,
+    names: { firstName?: string; lastName?: string }
+  ): Promise<AccountRecord | null> {
+    const result = await postgresPool.query(
+      `UPDATE accounts
+          SET first_name = $2,
+              last_name = $3
+        WHERE id = $1
+        RETURNING *;`,
+      [id, names.firstName ?? null, names.lastName ?? null]
     );
     const row = result.rows[0];
     return row ? mapRowToAccount(row) : null;

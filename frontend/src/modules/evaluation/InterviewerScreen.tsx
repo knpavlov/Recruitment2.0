@@ -46,6 +46,10 @@ const CriterionSelector = ({ criterion, value, disabled, onChange }: CriterionSe
     score,
     description: criterion.ratings[Number(score) as 1 | 2 | 3 | 4 | 5]
   }));
+  const allOptions = [
+    ...ratingEntries,
+    { score: 'n/a' as const, description: 'Not applicable' }
+  ];
 
   return (
     <div className={styles.criterionCard}>
@@ -54,9 +58,9 @@ const CriterionSelector = ({ criterion, value, disabled, onChange }: CriterionSe
         <span className={styles.tooltipWrapper}>
           <span className={styles.tooltipIcon}>?</span>
           <span className={styles.tooltipContent}>
-            {ratingEntries.map(({ score, description }) => (
+            {allOptions.map(({ score, description }) => (
               <Fragment key={score}>
-                <strong>{score}</strong>
+                <strong>{score.toUpperCase()}</strong>
                 <span>{description ?? '—'}</span>
               </Fragment>
             ))}
@@ -64,7 +68,7 @@ const CriterionSelector = ({ criterion, value, disabled, onChange }: CriterionSe
         </span>
       </div>
       <div className={styles.criterionScale}>
-        {ratingEntries.map(({ score }) => (
+        {allOptions.map(({ score }) => (
           <label key={score} className={styles.criterionOption}>
             <input
               type="radio"
@@ -102,7 +106,11 @@ const createFormState = (assignment: InterviewerAssignmentView | null): FormStat
     const map: Record<string, string> = {};
     for (const item of entries) {
       if (item.criterionId) {
-        map[item.criterionId] = item.score != null ? String(item.score) : '';
+        if (item.notApplicable) {
+          map[item.criterionId] = 'n/a';
+        } else {
+          map[item.criterionId] = item.score != null ? String(item.score) : '';
+        }
       }
     }
     return map;
@@ -130,7 +138,7 @@ const computeAverageScore = (values: Record<string, string>): number | null => {
   const numericValues = Object.values(values)
     .map((raw) => {
       const trimmed = raw.trim();
-      if (!trimmed) {
+      if (!trimmed || trimmed.toLowerCase() === 'n/a') {
         return null;
       }
       const parsed = Number(trimmed);
@@ -189,6 +197,29 @@ export const InterviewerScreen = () => {
 
   const isSubmitted = selectedAssignment?.form?.submitted ?? false;
   const disableInputs = saving || isSubmitted;
+
+  const fitCriteriaDefinitions = useMemo<CriterionDefinition[]>(
+    () => selectedAssignment?.fitQuestion?.criteria ?? [],
+    [selectedAssignment]
+  );
+
+  const caseCriteriaDefinitions = useMemo<CriterionDefinition[]>(() => {
+    if (!selectedAssignment) {
+      return [];
+    }
+    const mergedCaseCriteriaMap = new Map<string, CriterionDefinition>();
+    (selectedAssignment.caseFolder?.evaluationCriteria ?? []).forEach((criterion) => {
+      mergedCaseCriteriaMap.set(criterion.id, criterion);
+    });
+    globalCaseCriteria.forEach((criterion) => {
+      mergedCaseCriteriaMap.set(criterion.id, {
+        id: criterion.id,
+        title: criterion.title,
+        ratings: criterion.ratings
+      });
+    });
+    return sortCaseCriteria(Array.from(mergedCaseCriteriaMap.values()));
+  }, [selectedAssignment, globalCaseCriteria]);
 
   useEffect(() => {
     setFormState(createFormState(selectedAssignment));
@@ -258,12 +289,28 @@ export const InterviewerScreen = () => {
         if (!trimmed) {
           return { criterionId, score: undefined };
         }
+        if (trimmed.toLowerCase() === 'n/a') {
+          return { criterionId, score: undefined, notApplicable: true };
+        }
         const parsed = Number(trimmed);
         return Number.isFinite(parsed)
           ? ({ criterionId, score: parsed } as EvaluationCriterionScore)
           : { criterionId, score: undefined };
       })
       .filter((item): item is EvaluationCriterionScore => Boolean(item));
+  };
+
+  const areCriteriaComplete = (criteria: CriterionDefinition[], values: Record<string, string>): boolean => {
+    return criteria.every((criterion) => {
+      const rawValue = values[criterion.id]?.trim() ?? '';
+      if (!rawValue) {
+        return false;
+      }
+      if (rawValue.toLowerCase() === 'n/a') {
+        return true;
+      }
+      return ['1', '2', '3', '4', '5'].includes(rawValue);
+    });
   };
 
   const persistForm = async ({ submitted }: { submitted: boolean }) => {
@@ -273,6 +320,18 @@ export const InterviewerScreen = () => {
     if (submitted && selectedAssignment.form?.submitted) {
       setBanner({ type: 'error', text: 'This evaluation has already been submitted.' });
       return;
+    }
+    if (submitted) {
+      const fitComplete = areCriteriaComplete(fitCriteriaDefinitions, formState.fitCriteria);
+      const caseComplete = areCriteriaComplete(caseCriteriaDefinitions, formState.caseCriteria);
+      const offerSelected = formState.offerRecommendation.trim().length > 0;
+      if (!fitComplete || !caseComplete || !offerSelected) {
+        setBanner({
+          type: 'error',
+          text: 'Complete all ratings and select a final recommendation before submitting.'
+        });
+        return;
+      }
     }
     setSaving(true);
     setBanner(null);
@@ -404,22 +463,8 @@ export const InterviewerScreen = () => {
       ? `${candidate.lastName} ${candidate.firstName}`.trim() || candidate.id
       : 'Candidate not assigned';
     const fitQuestion = selectedAssignment.fitQuestion;
-    const fitCriteria: CriterionDefinition[] = fitQuestion?.criteria ?? [];
-    const mergedCaseCriteriaMap = new Map<string, CriterionDefinition>();
-
-    (selectedAssignment.caseFolder?.evaluationCriteria ?? []).forEach((criterion) => {
-      mergedCaseCriteriaMap.set(criterion.id, criterion);
-    });
-
-    globalCaseCriteria.forEach((criterion) => {
-      mergedCaseCriteriaMap.set(criterion.id, {
-        id: criterion.id,
-        title: criterion.title,
-        ratings: criterion.ratings
-      });
-    });
-
-    const caseCriteria = sortCaseCriteria(Array.from(mergedCaseCriteriaMap.values()));
+    const fitCriteria = fitCriteriaDefinitions;
+    const caseCriteria = caseCriteriaDefinitions;
     const resumeLink = candidate?.resume ? (
       <a className={styles.fileLink} href={candidate.resume.dataUrl} download={candidate.resume.fileName}>
         Download resume ({candidate.resume.fileName})
@@ -445,6 +490,10 @@ export const InterviewerScreen = () => {
     const displayCaseScore = calculatedCaseScore ?? storedCaseScore;
     const targetOffice = candidate?.targetOffice?.trim();
     const targetRole = candidate?.desiredPosition?.trim();
+    const fitCriteriaComplete = areCriteriaComplete(fitCriteria, formState.fitCriteria);
+    const caseCriteriaComplete = areCriteriaComplete(caseCriteria, formState.caseCriteria);
+    const offerSelected = formState.offerRecommendation.trim().length > 0;
+    const submitDisabled = isSubmitted || saving || !fitCriteriaComplete || !caseCriteriaComplete || !offerSelected;
 
     return (
       <div className={styles.detailPanel}>
@@ -670,7 +719,7 @@ export const InterviewerScreen = () => {
                 <button
                   type="button"
                   className={styles.primaryButton}
-                  disabled={isSubmitted || saving}
+                  disabled={submitDisabled}
                   onClick={handleSubmitFinal}
                 >
                   Submit evaluation

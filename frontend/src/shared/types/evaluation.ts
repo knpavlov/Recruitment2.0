@@ -28,6 +28,7 @@ export type EvaluationProcessStatus = 'draft' | 'in-progress' | 'completed';
 export interface EvaluationCriterionScore {
   criterionId: string;
   score?: number;
+  notApplicable?: boolean;
 }
 
 export type OfferRecommendationValue =
@@ -51,6 +52,7 @@ export interface EvaluationConfig {
   processStartedAt?: string;
   roundHistory: EvaluationRoundSnapshot[];
   invitationState: EvaluationInvitationState;
+  roundDecisions: Record<number, 'offer' | 'reject' | 'progress'>;
 }
 
 export interface EvaluationRoundSnapshot {

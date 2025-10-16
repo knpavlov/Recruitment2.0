@@ -68,6 +68,11 @@ interface AppStateContextValue {
       slotIds?: string[]
     ) => Promise<DomainResult<{ evaluation: EvaluationConfig; deliveryReport: InvitationDeliveryReport }>>;
     advanceRound: (id: string) => Promise<DomainResult<EvaluationConfig>>;
+    setDecision: (
+      id: string,
+      roundNumber: number,
+      decision: 'offer' | 'reject' | null
+    ) => Promise<DomainResult<EvaluationConfig>>;
   };
   accounts: {
     list: AccountRecord[];
@@ -629,8 +634,29 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
             if (error.code === 'not-found') {
               return { ok: false, error: 'not-found' };
             }
+        }
+        console.error('Failed to advance evaluation round:', error);
+        return { ok: false, error: 'unknown' };
+      }
+      },
+      setDecision: async (id, roundNumber, decision) => {
+        try {
+          const updated = await evaluationsApi.saveDecision(id, roundNumber, decision ?? null);
+          setEvaluations((prev) => prev.map((item) => (item.id === id ? updated : item)));
+          return { ok: true, data: updated };
+        } catch (error) {
+          if (error instanceof ApiError) {
+            if (error.code === 'version-conflict') {
+              return { ok: false, error: 'version-conflict' };
+            }
+            if (error.code === 'not-found') {
+              return { ok: false, error: 'not-found' };
+            }
+            if (error.code === 'invalid-input' || error.status === 400) {
+              return { ok: false, error: 'invalid-input' };
+            }
           }
-          console.error('Failed to advance evaluation round:', error);
+          console.error('Failed to update evaluation decision:', error);
           return { ok: false, error: 'unknown' };
         }
       }

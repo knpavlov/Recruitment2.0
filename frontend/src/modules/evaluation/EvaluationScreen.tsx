@@ -7,7 +7,8 @@ import {
   useCandidatesState,
   useCasesState,
   useFitQuestionsState,
-  useCaseCriteriaState
+  useCaseCriteriaState,
+  useAccountsState
 } from '../../app/state/AppStateContext';
 import { EvaluationConfig } from '../../shared/types/evaluation';
 import { EvaluationTable, EvaluationTableRow } from './components/EvaluationTable';
@@ -33,11 +34,13 @@ const DECISION_LABELS: Record<DecisionOption, string> = {
 };
 
 export const EvaluationScreen = () => {
-  const { list, saveEvaluation, removeEvaluation, sendInvitations, advanceRound } = useEvaluationsState();
+  const { list, saveEvaluation, removeEvaluation, sendInvitations, advanceRound, setDecision } =
+    useEvaluationsState();
   const { list: candidates } = useCandidatesState();
   const { folders } = useCasesState();
   const { list: fitQuestions } = useFitQuestionsState();
   const { list: caseCriteria } = useCaseCriteriaState();
+  const { list: accounts } = useAccountsState();
   const [banner, setBanner] = useState<Banner>(null);
   const [modalEvaluation, setModalEvaluation] = useState<EvaluationConfig | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -45,7 +48,29 @@ export const EvaluationScreen = () => {
   const [sortKey, setSortKey] = useState<SortKey>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [roundSelections, setRoundSelections] = useState<Record<string, number>>({});
-  const [decisionSelections, setDecisionSelections] = useState<Record<string, DecisionOption | null>>({});
+  const [decisionSelections, setDecisionSelections] = useState<
+    Record<string, Record<number, DecisionOption | null>>
+  >({});
+
+  const updateDecisionSelection = useCallback(
+    (evaluationId: string, roundNumber: number, decision: DecisionOption | null) => {
+      setDecisionSelections((prev) => {
+        const current = prev[evaluationId] ?? {};
+        const nextRoundMap: Record<number, DecisionOption | null> = { ...current };
+        if (decision === null) {
+          delete nextRoundMap[roundNumber];
+        } else {
+          nextRoundMap[roundNumber] = decision;
+        }
+        if (Object.keys(nextRoundMap).length === 0) {
+          const { [evaluationId]: _removed, ...rest } = prev;
+          return rest;
+        }
+        return { ...prev, [evaluationId]: nextRoundMap };
+      });
+    },
+    []
+  );
 
   const candidateIndex = useMemo(() => {
     const map = new Map<
@@ -154,6 +179,7 @@ export const EvaluationScreen = () => {
 
   const handleAdvanceRound = useCallback(
     async (evaluation: EvaluationConfig) => {
+      const currentRound = evaluation.roundNumber ?? 1;
       const result = await advanceRound(evaluation.id);
       if (!result.ok) {
         if (result.error === 'forms-pending') {
@@ -179,13 +205,14 @@ export const EvaluationScreen = () => {
       }
       const nextRound = result.data.roundNumber ?? (evaluation.roundNumber ?? 1) + 1;
       setRoundSelections((prev) => ({ ...prev, [evaluation.id]: nextRound }));
-      setDecisionSelections((prev) => ({ ...prev, [evaluation.id]: 'progress' }));
+      updateDecisionSelection(evaluation.id, currentRound, 'progress');
+      updateDecisionSelection(evaluation.id, nextRound, null);
       setBanner({
         type: 'info',
         text: `Candidate moved to round ${nextRound}. Configure the new round and send invites to interviewers.`
       });
     },
-    [advanceRound]
+    [advanceRound, updateDecisionSelection]
   );
 
   const tableRows = useMemo<EvaluationTableRow[]>(() => {
@@ -308,7 +335,17 @@ export const EvaluationScreen = () => {
         decisionTooltip = 'Wait until every interviewer submits their evaluation to enable these actions.';
       }
 
-      const decisionSelection = decisionSelections[evaluation.id] ?? null;
+      const roundDecisionOverrides = decisionSelections[evaluation.id];
+      const persistedDecision = evaluation.roundDecisions[effectiveSelectedRound] ?? null;
+      let decisionSelection: DecisionOption | null;
+      if (
+        roundDecisionOverrides &&
+        Object.prototype.hasOwnProperty.call(roundDecisionOverrides, effectiveSelectedRound)
+      ) {
+        decisionSelection = roundDecisionOverrides[effectiveSelectedRound] ?? null;
+      } else {
+        decisionSelection = persistedDecision;
+      }
       const decisionLabel = decisionSelection ? DECISION_LABELS[decisionSelection] : 'Decision';
 
       const evaluationForModal = snapshot
@@ -345,8 +382,24 @@ export const EvaluationScreen = () => {
           void handleAdvanceRound(evaluation);
           return;
         }
-        setDecisionSelections((prev) => ({ ...prev, [evaluation.id]: option }));
-        setBanner({ type: 'info', text: `Decision updated: ${DECISION_LABELS[option]}.` });
+        const roundNumber = effectiveSelectedRound;
+        void (async () => {
+          const result = await setDecision(evaluation.id, roundNumber, option);
+          if (!result.ok) {
+            const message =
+              result.error === 'version-conflict'
+                ? 'Version conflict. Refresh the page to view the latest data.'
+                : result.error === 'not-found'
+                  ? 'Evaluation not found. Refresh the page.'
+                  : result.error === 'invalid-input'
+                    ? 'Decision could not be saved. Try again.'
+                    : 'Failed to update the decision.';
+            setBanner({ type: 'error', text: message });
+            return;
+          }
+          updateDecisionSelection(evaluation.id, roundNumber, option);
+          setBanner({ type: 'info', text: `Decision updated: ${DECISION_LABELS[option]}.` });
+        })();
       };
 
       const processLabel =
@@ -404,6 +457,8 @@ export const EvaluationScreen = () => {
     decisionSelections,
     handleSendInvites,
     handleAdvanceRound,
+    setDecision,
+    updateDecisionSelection,
     setBanner
   ]);
 
@@ -546,6 +601,7 @@ export const EvaluationScreen = () => {
           candidates={candidates}
           folders={folders}
           fitQuestions={fitQuestions}
+          accounts={accounts}
         />
       )}
 

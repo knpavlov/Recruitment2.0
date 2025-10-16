@@ -12,6 +12,8 @@ type AccountPayload = Partial<AccountRecord> & {
   activatedAt?: unknown;
   invitationToken?: unknown;
   createdAt?: unknown;
+  firstName?: unknown;
+  lastName?: unknown;
 };
 
 const isRole = (value: unknown): value is AccountRole =>
@@ -62,7 +64,9 @@ const normalizeAccount = (payload: unknown): AccountRecord | null => {
     status,
     invitedAt: invitedAt ?? new Date(0).toISOString(),
     activatedAt,
-    invitationToken
+    invitationToken,
+    firstName: typeof record.firstName === 'string' && record.firstName.trim() ? record.firstName.trim() : undefined,
+    lastName: typeof record.lastName === 'string' && record.lastName.trim() ? record.lastName.trim() : undefined
   };
 };
 

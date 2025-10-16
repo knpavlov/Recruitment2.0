@@ -100,7 +100,8 @@ const sanitizeForms = (
         continue;
       }
       const score = readOptionalPositiveScore(payload.score);
-      result.push({ criterionId, score });
+      const notApplicable = payload.notApplicable === true;
+      result.push({ criterionId, score, notApplicable: notApplicable ? true : undefined });
     }
     return result;
   };
@@ -194,6 +195,24 @@ const readProcessStatus = (value: unknown): EvaluationRecord['processStatus'] =>
   return 'draft';
 };
 
+const sanitizeRoundDecisions = (value: unknown): Record<number, 'offer' | 'reject' | 'progress'> => {
+  if (!value || typeof value !== 'object') {
+    return {};
+  }
+  const payload = value as Record<string, unknown>;
+  const result: Record<number, 'offer' | 'reject' | 'progress'> = {};
+  for (const [key, decision] of Object.entries(payload)) {
+    const round = Number(key);
+    if (!Number.isInteger(round) || round <= 0) {
+      continue;
+    }
+    if (decision === 'offer' || decision === 'reject' || decision === 'progress') {
+      result[round] = decision;
+    }
+  }
+  return result;
+};
+
 const ensurePositiveInteger = (value: unknown): number | null => {
   if (typeof value !== 'number' || !Number.isInteger(value) || value <= 0) {
     return null;
@@ -234,7 +253,8 @@ const buildWriteModel = (payload: unknown): EvaluationWriteModel => {
     forms,
     processStatus: readProcessStatus(source.processStatus),
     processStartedAt,
-    roundHistory
+    roundHistory,
+    roundDecisions: sanitizeRoundDecisions(source.roundDecisions)
   };
 };
 
