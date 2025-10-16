@@ -54,7 +54,8 @@ const buildWriteModelFromRecord = (record: EvaluationRecord): EvaluationWriteMod
   forms: record.forms,
   processStatus: record.processStatus,
   processStartedAt: record.processStartedAt ?? null,
-  roundHistory: record.roundHistory
+  roundHistory: record.roundHistory,
+  decision: record.decision ?? null
 });
 
 const createEmptySlot = (): EvaluationRecord['interviews'][number] => ({
@@ -91,7 +92,8 @@ const readCriteriaList = (value: unknown): EvaluationCriterionScore[] => {
       continue;
     }
     const scoreValue = readScore(payload.score);
-    result.push({ criterionId, score: scoreValue });
+    const notApplicable = payload.notApplicable === true;
+    result.push({ criterionId, score: scoreValue, notApplicable });
   }
   return result;
 };
@@ -517,7 +519,8 @@ export class EvaluationWorkflowService {
       processStatus: 'completed' as const,
       processStartedAt: evaluation.processStartedAt,
       completedAt: new Date().toISOString(),
-      createdAt: snapshotCreatedAt
+      createdAt: snapshotCreatedAt,
+      decision: 'progress' as const
     };
 
     const filteredHistory = evaluation.roundHistory.filter((entry) => entry.roundNumber !== currentRound);
@@ -538,6 +541,7 @@ export class EvaluationWorkflowService {
     writeModel.fitQuestionId = undefined;
     writeModel.processStatus = 'draft';
     writeModel.processStartedAt = null;
+    writeModel.decision = null;
     writeModel.roundHistory = [...filteredHistory, snapshot].sort((a, b) => a.roundNumber - b.roundNumber);
 
     const updated = await this.evaluations.updateEvaluation(writeModel, evaluation.version);
@@ -545,6 +549,48 @@ export class EvaluationWorkflowService {
       throw new Error('VERSION_CONFLICT');
     }
     if (!updated) {
+      throw new Error('NOT_FOUND');
+    }
+
+    return this.loadEvaluationWithState(trimmed);
+  }
+
+  async updateDecision(
+    id: string,
+    decision: 'offer' | 'reject' | null,
+    expectedVersion: number
+  ): Promise<EvaluationRecord> {
+    const trimmed = id.trim();
+    if (!trimmed) {
+      throw new Error('INVALID_INPUT');
+    }
+
+    if (decision !== 'offer' && decision !== 'reject' && decision !== null) {
+      throw new Error('INVALID_INPUT');
+    }
+
+    if (!Number.isInteger(expectedVersion) || expectedVersion <= 0) {
+      throw new Error('INVALID_INPUT');
+    }
+
+    const evaluation = await this.evaluations.findEvaluation(trimmed);
+    if (!evaluation) {
+      throw new Error('NOT_FOUND');
+    }
+
+    const allSubmitted = evaluation.forms.length > 0 && evaluation.forms.every((form) => form.submitted);
+    if (!allSubmitted) {
+      throw new Error('FORMS_PENDING');
+    }
+
+    const writeModel = buildWriteModelFromRecord(evaluation);
+    writeModel.decision = decision;
+
+    const result = await this.evaluations.updateEvaluation(writeModel, expectedVersion);
+    if (result === 'version-conflict') {
+      throw new Error('VERSION_CONFLICT');
+    }
+    if (!result) {
       throw new Error('NOT_FOUND');
     }
 

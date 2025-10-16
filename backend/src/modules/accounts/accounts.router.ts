@@ -9,13 +9,21 @@ router.get('/', async (_req, res) => {
 });
 
 router.post('/invite', async (req, res) => {
-  const { email, role = 'admin' } = req.body as { email?: string; role?: 'admin' | 'user' };
+  const { email, role = 'admin', name } = req.body as {
+    email?: string;
+    role?: 'admin' | 'user';
+    name?: string;
+  };
   try {
-    const account = await accountsService.inviteAccount(email ?? '', role);
+    const account = await accountsService.inviteAccount(email ?? '', role, name);
     res.status(201).json(account);
   } catch (error) {
     if (error instanceof Error && error.message === 'ALREADY_EXISTS') {
       res.status(409).json({ code: 'duplicate', message: 'The specified user has already been invited.' });
+      return;
+    }
+    if (error instanceof Error && (error.message === 'INVALID_NAME' || error.message === 'INVALID_INVITE')) {
+      res.status(400).json({ code: 'invalid-input', message: 'Provide a valid name and email.' });
       return;
     }
     if (error instanceof Error && error.message === 'MAILER_UNAVAILABLE') {
