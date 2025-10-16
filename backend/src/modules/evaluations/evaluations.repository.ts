@@ -25,6 +25,7 @@ interface EvaluationRow extends Record<string, unknown> {
   process_status: string | null;
   process_started_at: Date | null;
   round_history: unknown;
+  decision: string | null;
 }
 
 const mapSlots = (value: unknown): InterviewSlotModel[] => {
@@ -69,7 +70,8 @@ const mapCriterionScore = (value: unknown): EvaluationCriterionScore | null => {
       score = parsed;
     }
   }
-  return { criterionId, score };
+  const notApplicable = payload.notApplicable === true;
+  return { criterionId, score, notApplicable };
 };
 
 const mapCriteriaList = (value: unknown): EvaluationCriterionScore[] => {
@@ -177,6 +179,13 @@ const mapRoundHistory = (value: unknown): EvaluationRoundSnapshot[] => {
         ? new Date(item.createdAt).toISOString()
         : new Date().toISOString();
 
+    let decision: EvaluationRoundSnapshot['decision'];
+    if (item.decision === 'offer' || item.decision === 'reject' || item.decision === 'progress') {
+      decision = item.decision;
+    } else if (item.decision === null) {
+      decision = null;
+    }
+
     history.push({
       roundNumber,
       interviewCount,
@@ -186,7 +195,8 @@ const mapRoundHistory = (value: unknown): EvaluationRoundSnapshot[] => {
       processStatus,
       processStartedAt,
       completedAt,
-      createdAt
+      createdAt,
+      decision
     });
   }
 
@@ -200,6 +210,13 @@ const mapRowToRecord = (row: EvaluationRow): EvaluationRecord => {
     typeof row.interview_count === 'number' && Number.isFinite(row.interview_count)
       ? row.interview_count
       : interviews.length;
+
+  let decision: EvaluationRecord['decision'];
+  if (row.decision === 'offer' || row.decision === 'reject' || row.decision === 'progress') {
+    decision = row.decision;
+  } else if (row.decision === null) {
+    decision = null;
+  }
 
   return {
     id: row.id,
@@ -215,7 +232,8 @@ const mapRowToRecord = (row: EvaluationRow): EvaluationRecord => {
     processStatus: (row.process_status as EvaluationRecord['processStatus']) ?? 'draft',
     processStartedAt: row.process_started_at ? row.process_started_at.toISOString() : undefined,
     roundHistory: mapRoundHistory(row.round_history),
-    invitationState: { hasInvitations: false, hasPendingChanges: false, slots: [] }
+    invitationState: { hasInvitations: false, hasPendingChanges: false, slots: [] },
+    decision
   } satisfies EvaluationRecord;
 };
 
@@ -283,7 +301,8 @@ export class EvaluationsRepository {
               forms,
               process_status,
               process_started_at,
-              round_history
+              round_history,
+              decision
          FROM evaluations
         ORDER BY updated_at DESC, created_at DESC;`
     );
@@ -304,7 +323,8 @@ export class EvaluationsRepository {
               forms,
               process_status,
               process_started_at,
-              round_history
+              round_history,
+              decision
          FROM evaluations
         WHERE id = $1
         LIMIT 1;`,
@@ -322,8 +342,8 @@ export class EvaluationsRepository {
     const historyJson = JSON.stringify(model.roundHistory ?? []);
 
     const result = await postgresPool.query<EvaluationRow>(
-      `INSERT INTO evaluations (id, candidate_id, round_number, interview_count, interviews, fit_question_id, version, created_at, updated_at, forms, round_history, process_status, process_started_at)
-         VALUES ($1, $2, $3, $4, $5::jsonb, $6, 1, NOW(), NOW(), $7::jsonb, $8::jsonb, $9, $10)
+      `INSERT INTO evaluations (id, candidate_id, round_number, interview_count, interviews, fit_question_id, version, created_at, updated_at, forms, round_history, process_status, process_started_at, decision)
+         VALUES ($1, $2, $3, $4, $5::jsonb, $6, 1, NOW(), NOW(), $7::jsonb, $8::jsonb, $9, $10, $11)
       RETURNING id,
                 candidate_id,
                 round_number,
@@ -336,7 +356,8 @@ export class EvaluationsRepository {
                 forms,
                 process_status,
                 process_started_at,
-                round_history;`,
+                round_history,
+                decision;`,
       [
         model.id,
         model.candidateId ?? null,
@@ -347,7 +368,8 @@ export class EvaluationsRepository {
         formsJson,
         historyJson,
         model.processStatus ?? 'draft',
-        model.processStartedAt ?? null
+        model.processStartedAt ?? null,
+        model.decision ?? null
       ]
     );
 
@@ -373,9 +395,10 @@ export class EvaluationsRepository {
               round_history = $7::jsonb,
               process_status = $8,
               process_started_at = $9,
+              decision = $10,
               version = version + 1,
               updated_at = NOW()
-        WHERE id = $10 AND version = $11
+        WHERE id = $11 AND version = $12
       RETURNING id,
                 candidate_id,
                 round_number,
@@ -388,7 +411,8 @@ export class EvaluationsRepository {
                 forms,
                 process_status,
                 process_started_at,
-                round_history;`,
+                round_history,
+                decision;`,
       [
         model.candidateId ?? null,
         model.roundNumber ?? null,
@@ -399,6 +423,7 @@ export class EvaluationsRepository {
         historyJson,
         model.processStatus ?? 'draft',
         model.processStartedAt ?? null,
+        model.decision ?? null,
         model.id,
         expectedVersion
       ]

@@ -12,6 +12,9 @@ type AccountPayload = Partial<AccountRecord> & {
   activatedAt?: unknown;
   invitationToken?: unknown;
   createdAt?: unknown;
+  firstName?: unknown;
+  lastName?: unknown;
+  name?: unknown;
 };
 
 const isRole = (value: unknown): value is AccountRole =>
@@ -55,11 +58,18 @@ const normalizeAccount = (payload: unknown): AccountRecord | null => {
   const invitedAt = asIsoString(record.invitedAt ?? record.createdAt);
   const activatedAt = asIsoString(record.activatedAt);
 
+  const firstName = typeof record.firstName === 'string' && record.firstName.trim() ? record.firstName.trim() : undefined;
+  const lastName = typeof record.lastName === 'string' && record.lastName.trim() ? record.lastName.trim() : undefined;
+  const name = typeof record.name === 'string' && record.name.trim() ? record.name.trim() : undefined;
+
   return {
     id,
     email,
     role,
     status,
+    firstName,
+    lastName,
+    name,
     invitedAt: invitedAt ?? new Date(0).toISOString(),
     activatedAt,
     invitationToken
@@ -85,11 +95,11 @@ const ensureAccountList = (value: unknown): AccountRecord[] => {
 
 export const accountsApi = {
   list: async () => ensureAccountList(await apiRequest<unknown>('/accounts')),
-  invite: async (email: string, role: AccountRole) =>
+  invite: async (email: string, role: AccountRole, name: string) =>
     ensureAccount(
       await apiRequest<unknown>('/accounts/invite', {
         method: 'POST',
-        body: { email, role }
+        body: { email, role, name }
       })
     ),
   activate: async (id: string) =>
