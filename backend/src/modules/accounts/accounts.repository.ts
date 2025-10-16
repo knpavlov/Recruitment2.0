@@ -6,6 +6,8 @@ const mapRowToAccount = (row: any): AccountRecord => ({
   email: row.email,
   role: row.role,
   status: row.status,
+  firstName: typeof row.first_name === 'string' ? row.first_name : undefined,
+  lastName: typeof row.last_name === 'string' ? row.last_name : undefined,
   invitationToken: row.invitation_token,
   createdAt: new Date(row.created_at),
   activatedAt: row.activated_at ? new Date(row.activated_at) : undefined
