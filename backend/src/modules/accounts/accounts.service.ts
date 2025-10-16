@@ -10,6 +10,9 @@ export interface AccountRecord {
   email: string;
   role: AccountRole;
   status: AccountStatus;
+  name?: string;
+  firstName?: string;
+  lastName?: string;
   invitationToken: string;
   createdAt: Date;
   activatedAt?: Date;
@@ -17,6 +20,33 @@ export interface AccountRecord {
 
 export class AccountsService {
   constructor(private readonly repository: AccountsRepository, private readonly mailer = new MailerService()) {}
+
+  private normalizeWhitespace(value: string): string {
+    return value.replace(/\s+/g, ' ').trim();
+  }
+
+  private deriveNameFromEmail(email: string): string | undefined {
+    const localPart = email.split('@')[0] ?? '';
+    const normalized = localPart.replace(/[._-]+/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!normalized) {
+      return undefined;
+    }
+    return normalized
+      .split(' ')
+      .filter(Boolean)
+      .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+      .join(' ');
+  }
+
+  private resolveAccountName(email: string, rawName?: string): string | undefined {
+    if (rawName) {
+      const prepared = this.normalizeWhitespace(rawName);
+      if (prepared) {
+        return prepared;
+      }
+    }
+    return this.deriveNameFromEmail(email);
+  }
 
   async listAccounts() {
     return this.repository.listAccounts();
@@ -26,9 +56,14 @@ export class AccountsService {
     return this.repository.findByEmail(email);
   }
 
-  async inviteAccount(email: string, role: AccountRole) {
+  async inviteAccount(email: string, role: AccountRole, name: string) {
     const normalized = email.trim().toLowerCase();
-    if (!normalized || role === 'super-admin') {
+    const normalizedName = typeof name === 'string' ? name.trim() : '';
+    if (!normalized || role === 'super-admin' || !normalizedName) {
+      throw new Error('INVALID_INVITE');
+    }
+    const preparedName = this.resolveAccountName(normalized, normalizedName);
+    if (!preparedName) {
       throw new Error('INVALID_INVITE');
     }
     const exists = await this.findByEmail(normalized);
@@ -42,7 +77,8 @@ export class AccountsService {
       role,
       status: 'pending',
       invitationToken,
-      createdAt: new Date()
+      createdAt: new Date(),
+      name: preparedName
     };
     const saved = await this.repository.insertAccount(record);
     try {
@@ -72,7 +108,8 @@ export class AccountsService {
       role: 'user',
       status: 'pending',
       invitationToken: randomUUID(),
-      createdAt: new Date()
+      createdAt: new Date(),
+      name: this.resolveAccountName(normalized)
     };
     return this.repository.insertAccount(record);
   }

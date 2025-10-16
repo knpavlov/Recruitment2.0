@@ -1,11 +1,22 @@
 import { AccountRecord } from './accounts.service.js';
 import { postgresPool } from '../../shared/database/postgres.client.js';
 
+const readOptionalString = (value: unknown): string | undefined => {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed ? trimmed : undefined;
+};
+
 const mapRowToAccount = (row: any): AccountRecord => ({
   id: row.id,
   email: row.email,
   role: row.role,
   status: row.status,
+  name: readOptionalString(row.full_name),
+  firstName: readOptionalString(row.first_name),
+  lastName: readOptionalString(row.last_name),
   invitationToken: row.invitation_token,
   createdAt: new Date(row.created_at),
   activatedAt: row.activated_at ? new Date(row.activated_at) : undefined
@@ -31,8 +42,17 @@ export class AccountsRepository {
 
   async insertAccount(record: AccountRecord): Promise<AccountRecord> {
     const result = await postgresPool.query(
-      `INSERT INTO accounts (id, email, role, status, invitation_token, created_at, activated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO accounts (
+         id,
+         email,
+         role,
+         status,
+         invitation_token,
+         created_at,
+         activated_at,
+         full_name
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *;`,
       [
         record.id,
@@ -41,7 +61,8 @@ export class AccountsRepository {
         record.status,
         record.invitationToken,
         record.createdAt,
-        record.activatedAt ?? null
+        record.activatedAt ?? null,
+        record.name ?? null
       ]
     );
     return mapRowToAccount(result.rows[0]);

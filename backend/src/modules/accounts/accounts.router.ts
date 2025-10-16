@@ -9,9 +9,13 @@ router.get('/', async (_req, res) => {
 });
 
 router.post('/invite', async (req, res) => {
-  const { email, role = 'admin' } = req.body as { email?: string; role?: 'admin' | 'user' };
+  const { email, role = 'admin', name } = req.body as {
+    email?: string;
+    role?: 'admin' | 'user';
+    name?: string;
+  };
   try {
-    const account = await accountsService.inviteAccount(email ?? '', role);
+    const account = await accountsService.inviteAccount(email ?? '', role, name ?? '');
     res.status(201).json(account);
   } catch (error) {
     if (error instanceof Error && error.message === 'ALREADY_EXISTS') {

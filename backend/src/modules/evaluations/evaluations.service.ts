@@ -48,6 +48,16 @@ const readOptionalIsoDate = (value: unknown): string | undefined => {
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 };
 
+const readDecision = (value: unknown): EvaluationRecord['decision'] | undefined => {
+  if (value === 'offer' || value === 'reject' || value === 'progress') {
+    return value;
+  }
+  if (value === null) {
+    return null;
+  }
+  return undefined;
+};
+
 const sanitizeSlots = (value: unknown): EvaluationWriteModel['interviews'] => {
   if (!Array.isArray(value)) {
     return [];
@@ -85,12 +95,12 @@ const sanitizeForms = (
     return [];
   }
 
-  const sanitizeCriteria = (input: unknown): EvaluationWriteModel['forms'][number]['fitCriteria'] => {
-    if (!Array.isArray(input)) {
-      return [];
-    }
-    const result: EvaluationWriteModel['forms'][number]['fitCriteria'] = [];
-    for (const entry of input) {
+    const sanitizeCriteria = (input: unknown): EvaluationWriteModel['forms'][number]['fitCriteria'] => {
+      if (!Array.isArray(input)) {
+        return [];
+      }
+      const result: EvaluationWriteModel['forms'][number]['fitCriteria'] = [];
+      for (const entry of input) {
       if (!entry || typeof entry !== 'object') {
         continue;
       }
@@ -98,12 +108,13 @@ const sanitizeForms = (
       const criterionId = readOptionalString(payload.criterionId);
       if (!criterionId) {
         continue;
+        }
+        const score = readOptionalPositiveScore(payload.score);
+        const notApplicable = payload.notApplicable === true;
+        result.push({ criterionId, score, notApplicable });
       }
-      const score = readOptionalPositiveScore(payload.score);
-      result.push({ criterionId, score });
-    }
-    return result;
-  };
+      return result;
+    };
 
   const sanitizeOfferRecommendation = (
     input: unknown
@@ -180,7 +191,8 @@ const sanitizeRoundHistory = (value: unknown): EvaluationRoundSnapshot[] => {
       processStatus: readProcessStatus(payload.processStatus),
       processStartedAt: readOptionalIsoDate(payload.processStartedAt),
       completedAt: readOptionalIsoDate(payload.completedAt),
-      createdAt: readOptionalIsoDate(payload.createdAt) ?? new Date().toISOString()
+      createdAt: readOptionalIsoDate(payload.createdAt) ?? new Date().toISOString(),
+      decision: readDecision(payload.decision)
     });
   }
 
@@ -234,7 +246,8 @@ const buildWriteModel = (payload: unknown): EvaluationWriteModel => {
     forms,
     processStatus: readProcessStatus(source.processStatus),
     processStartedAt,
-    roundHistory
+    roundHistory,
+    decision: readDecision(source.decision) ?? null
   };
 };
 
