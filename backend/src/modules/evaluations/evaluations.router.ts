@@ -125,6 +125,37 @@ router.post('/:id/advance', async (req, res) => {
   }
 });
 
+router.post('/:id/decision', async (req, res) => {
+  try {
+    const { decision, expectedVersion } = (req.body ?? {}) as {
+      decision?: unknown;
+      expectedVersion?: unknown;
+    };
+    if (typeof expectedVersion !== 'number') {
+      res.status(400).json({ code: 'invalid-input', message: 'Provide the expected version.' });
+      return;
+    }
+    const normalizedDecision =
+      decision === 'offer' || decision === 'reject'
+        ? (decision as 'offer' | 'reject')
+        : decision === null
+          ? null
+          : undefined;
+    if (normalizedDecision === undefined) {
+      res.status(400).json({ code: 'invalid-input', message: 'Provide a valid decision value.' });
+      return;
+    }
+    const evaluation = await evaluationWorkflowService.updateDecision(
+      req.params.id,
+      normalizedDecision,
+      expectedVersion
+    );
+    res.json(evaluation);
+  } catch (error) {
+    handleError(error, res);
+  }
+});
+
 router.post('/', async (req, res) => {
   const { config } = req.body as { config?: unknown };
   if (!config) {

@@ -1,15 +1,69 @@
 import { AccountRecord } from './accounts.service.js';
 import { postgresPool } from '../../shared/database/postgres.client.js';
 
-const mapRowToAccount = (row: any): AccountRecord => ({
-  id: row.id,
-  email: row.email,
-  role: row.role,
-  status: row.status,
-  invitationToken: row.invitation_token,
-  createdAt: new Date(row.created_at),
-  activatedAt: row.activated_at ? new Date(row.activated_at) : undefined
-});
+const toTitleCase = (value: string): string =>
+  value.replace(/\b\w+/g, (segment) => segment.charAt(0).toUpperCase() + segment.slice(1).toLowerCase());
+
+const deriveNameFromEmail = (email: string): string | undefined => {
+  const localPart = email.split('@')[0] ?? '';
+  const normalized = localPart.replace(/[._-]+/g, ' ').trim();
+  if (!normalized) {
+    return undefined;
+  }
+  return toTitleCase(normalized);
+};
+
+const readLegacyName = (row: any): string | undefined => {
+  const parts = [row.last_name, row.first_name]
+    .map((value) => (typeof value === 'string' ? value.trim() : ''))
+    .filter((value) => Boolean(value));
+  if (parts.length === 0) {
+    return undefined;
+  }
+  return parts.join(' ');
+};
+
+const splitFullName = (value: string | undefined | null): { firstName?: string; lastName?: string } => {
+  if (typeof value !== 'string') {
+    return {};
+  }
+  const tokens = value
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter((token) => Boolean(token));
+  if (!tokens.length) {
+    return {};
+  }
+  const [first, ...rest] = tokens;
+  const last = rest.join(' ').trim();
+  return {
+    firstName: first ? toTitleCase(first) : undefined,
+    lastName: last ? toTitleCase(last) : undefined
+  };
+};
+
+const mapRowToAccount = (row: any): AccountRecord => {
+  const displayName = typeof row.display_name === 'string' ? row.display_name.trim() : '';
+  const legacyName = readLegacyName(row);
+  const fallbackName =
+    displayName || legacyName || (typeof row.email === 'string' ? deriveNameFromEmail(row.email) ?? '' : '');
+  const firstNameRaw = typeof row.first_name === 'string' ? row.first_name.trim() : '';
+  const lastNameRaw = typeof row.last_name === 'string' ? row.last_name.trim() : '';
+  const derivedParts = splitFullName(displayName || legacyName || fallbackName);
+
+  return {
+    id: row.id,
+    email: row.email,
+    role: row.role,
+    status: row.status,
+    name: fallbackName || undefined,
+    firstName: firstNameRaw || derivedParts.firstName,
+    lastName: lastNameRaw || derivedParts.lastName,
+    invitationToken: row.invitation_token,
+    createdAt: new Date(row.created_at),
+    activatedAt: row.activated_at ? new Date(row.activated_at) : undefined
+  };
+};
 
 export class AccountsRepository {
   async listAccounts(): Promise<AccountRecord[]> {
@@ -31,8 +85,8 @@ export class AccountsRepository {
 
   async insertAccount(record: AccountRecord): Promise<AccountRecord> {
     const result = await postgresPool.query(
-      `INSERT INTO accounts (id, email, role, status, invitation_token, created_at, activated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO accounts (id, email, role, status, invitation_token, created_at, activated_at, display_name, first_name, last_name)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING *;`,
       [
         record.id,
@@ -41,7 +95,10 @@ export class AccountsRepository {
         record.status,
         record.invitationToken,
         record.createdAt,
-        record.activatedAt ?? null
+        record.activatedAt ?? null,
+        record.name ?? null,
+        record.firstName ?? null,
+        record.lastName ?? null
       ]
     );
     return mapRowToAccount(result.rows[0]);
