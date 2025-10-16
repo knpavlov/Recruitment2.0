@@ -1,5 +1,6 @@
 import { apiRequest } from '../../../shared/api/httpClient';
 import { AccountRecord, AccountRole } from '../../../shared/types/account';
+import { deriveNameFromEmail } from '../../../shared/utils/accountName';
 
 type AccountStatus = 'pending' | 'active';
 
@@ -12,6 +13,10 @@ type AccountPayload = Partial<AccountRecord> & {
   activatedAt?: unknown;
   invitationToken?: unknown;
   createdAt?: unknown;
+  name?: unknown;
+  displayName?: unknown;
+  firstName?: unknown;
+  lastName?: unknown;
 };
 
 const isRole = (value: unknown): value is AccountRole =>
@@ -55,11 +60,64 @@ const normalizeAccount = (payload: unknown): AccountRecord | null => {
   const invitedAt = asIsoString(record.invitedAt ?? record.createdAt);
   const activatedAt = asIsoString(record.activatedAt);
 
+  const primaryName = typeof record.name === 'string' ? record.name.trim() : '';
+  const displayName = typeof record.displayName === 'string' ? record.displayName.trim() : '';
+  const firstNameRaw = typeof record.firstName === 'string' ? record.firstName.trim() : '';
+  const lastNameRaw = typeof record.lastName === 'string' ? record.lastName.trim() : '';
+
+  let firstName = firstNameRaw;
+  let lastName = lastNameRaw;
+  let name: string | undefined;
+  if (primaryName) {
+    name = primaryName;
+  } else if (displayName) {
+    name = displayName;
+  }
+
+  if (!name && firstName && lastName) {
+    name = `${firstName} ${lastName}`;
+  }
+
+  if (!firstName || !lastName) {
+    const legacy = name ?? '';
+    if (legacy) {
+      const parts = legacy.split(' ').filter((value) => value.trim().length > 0);
+      if (!firstName && parts[0]) {
+        firstName = parts[0];
+      }
+      if (!lastName && parts.length > 1) {
+        lastName = parts[parts.length - 1];
+      }
+    }
+  }
+
+  const derivedDisplay = deriveNameFromEmail(email) ?? '';
+
+  if (!name && derivedDisplay) {
+    name = derivedDisplay;
+  }
+
+  if (!firstName && derivedDisplay) {
+    firstName = derivedDisplay.split(' ')[0] ?? '';
+  }
+
+  if (!lastName && derivedDisplay.includes(' ')) {
+    const parts = derivedDisplay.split(' ').filter((value) => value.trim().length > 0);
+    lastName = parts.length > 1 ? parts[parts.length - 1] : lastName;
+  }
+
+  if (!name) {
+    name = email;
+  }
+
   return {
     id,
     email,
     role,
     status,
+    firstName: firstName || undefined,
+    lastName: lastName || undefined,
+    name,
     invitedAt: invitedAt ?? new Date(0).toISOString(),
     activatedAt,
     invitationToken
@@ -85,11 +143,11 @@ const ensureAccountList = (value: unknown): AccountRecord[] => {
 
 export const accountsApi = {
   list: async () => ensureAccountList(await apiRequest<unknown>('/accounts')),
-  invite: async (email: string, role: AccountRole) =>
+  invite: async (email: string, role: AccountRole, firstName: string, lastName: string) =>
     ensureAccount(
       await apiRequest<unknown>('/accounts/invite', {
         method: 'POST',
-        body: { email, role }
+        body: { email, role, firstName, lastName }
       })
     ),
   activate: async (id: string) =>

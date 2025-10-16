@@ -20,6 +20,58 @@ const createTables = async () => {
   `);
 
   await postgresPool.query(`
+    ALTER TABLE accounts
+      ADD COLUMN IF NOT EXISTS first_name TEXT,
+      ADD COLUMN IF NOT EXISTS last_name TEXT;
+  `);
+
+  await postgresPool.query(`
+    ALTER TABLE accounts
+      ADD COLUMN IF NOT EXISTS display_name TEXT;
+  `);
+
+  await postgresPool.query(`
+    UPDATE accounts
+       SET display_name = COALESCE(display_name, NULLIF(trim(concat_ws(' ', first_name, last_name)), ''))
+      WHERE display_name IS NULL;
+  `);
+
+  await postgresPool.query(`
+    WITH normalized AS (
+      SELECT
+        id,
+        trim(regexp_replace(COALESCE(display_name, ''), '\\s+', ' ', 'g')) AS full_name,
+        NULLIF(trim(first_name), '') AS existing_first_name,
+        NULLIF(trim(last_name), '') AS existing_last_name
+      FROM accounts
+    ),
+    parts AS (
+      SELECT
+        id,
+        existing_first_name,
+        existing_last_name,
+        CASE
+          WHEN full_name IS NULL OR full_name = '' THEN NULL
+          ELSE split_part(full_name, ' ', 1)
+        END AS derived_first_name,
+        CASE
+          WHEN full_name IS NULL OR full_name = '' THEN NULL
+          ELSE split_part(
+            full_name,
+            ' ',
+            array_length(regexp_split_to_array(full_name, ' '), 1)
+          )
+        END AS derived_last_name
+      FROM normalized
+    )
+    UPDATE accounts AS a
+       SET first_name = COALESCE(p.existing_first_name, p.derived_first_name),
+           last_name = COALESCE(p.existing_last_name, p.derived_last_name)
+      FROM parts AS p
+     WHERE a.id = p.id;
+  `);
+
+  await postgresPool.query(`
     CREATE TABLE IF NOT EXISTS access_codes (
       email TEXT PRIMARY KEY,
       code TEXT NOT NULL,
@@ -181,7 +233,8 @@ const createTables = async () => {
       forms JSONB NOT NULL DEFAULT '[]'::JSONB,
       process_status TEXT NOT NULL DEFAULT 'draft',
       process_started_at TIMESTAMPTZ,
-      round_history JSONB NOT NULL DEFAULT '[]'::JSONB
+      round_history JSONB NOT NULL DEFAULT '[]'::JSONB,
+      decision TEXT
     );
   `);
 
@@ -195,7 +248,8 @@ const createTables = async () => {
       ADD COLUMN IF NOT EXISTS forms JSONB NOT NULL DEFAULT '[]'::JSONB,
       ADD COLUMN IF NOT EXISTS process_status TEXT NOT NULL DEFAULT 'draft',
       ADD COLUMN IF NOT EXISTS process_started_at TIMESTAMPTZ,
-      ADD COLUMN IF NOT EXISTS round_history JSONB NOT NULL DEFAULT '[]'::JSONB;
+      ADD COLUMN IF NOT EXISTS round_history JSONB NOT NULL DEFAULT '[]'::JSONB,
+      ADD COLUMN IF NOT EXISTS decision TEXT;
   `);
 
   await postgresPool.query(`
