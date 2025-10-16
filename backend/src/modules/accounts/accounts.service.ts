@@ -10,6 +10,8 @@ export interface AccountRecord {
   email: string;
   role: AccountRole;
   status: AccountStatus;
+  firstName?: string;
+  lastName?: string;
   invitationToken: string;
   createdAt: Date;
   activatedAt?: Date;

@@ -9,6 +9,7 @@ import {
 import { CandidateProfile } from '../../../shared/types/candidate';
 import { CaseFolder } from '../../../shared/types/caseLibrary';
 import { FitQuestion } from '../../../shared/types/fitQuestion';
+import { AccountRecord } from '../../../shared/types/account';
 import { generateId } from '../../../shared/ui/generateId';
 
 interface EvaluationModalProps {
@@ -22,6 +23,7 @@ interface EvaluationModalProps {
   candidates: CandidateProfile[];
   folders: CaseFolder[];
   fitQuestions: FitQuestion[];
+  accounts: AccountRecord[];
 }
 
 const createInterviewSlot = (): InterviewSlot => ({
@@ -78,6 +80,33 @@ const shuffleArray = <T,>(source: T[]): T[] => {
   return items;
 };
 
+const toTitleCase = (value: string): string =>
+  value.replace(/\b\w+/g, (segment) => segment.charAt(0).toUpperCase() + segment.slice(1).toLowerCase());
+
+const deriveNameFromEmail = (email: string): string => {
+  const localPart = email.split('@')[0] ?? '';
+  const normalized = localPart.replace(/[._-]+/g, ' ').trim();
+  if (!normalized) {
+    return '';
+  }
+  return toTitleCase(normalized);
+};
+
+const buildAccountName = (account: AccountRecord): string => {
+  const lastName = account.lastName?.trim();
+  const firstName = account.firstName?.trim();
+  if (lastName || firstName) {
+    return [lastName, firstName].filter(Boolean).join(' ').trim();
+  }
+  return deriveNameFromEmail(account.email);
+};
+
+const buildAccountLabel = (account: AccountRecord): { name: string; label: string } => {
+  const name = buildAccountName(account);
+  const label = name ? `${name} — ${account.email}` : account.email;
+  return { name: name || account.email, label };
+};
+
 const buildUniqueAssignments = <T,>(source: T[], count: number): (T | undefined)[] => {
   if (count <= 0) {
     return [];
@@ -104,7 +133,8 @@ export const EvaluationModal = ({
   onClose,
   candidates,
   folders,
-  fitQuestions
+  fitQuestions,
+  accounts
 }: EvaluationModalProps) => {
   const [config, setConfig] = useState<EvaluationConfig>(createDefaultConfig());
 
@@ -229,6 +259,55 @@ export const EvaluationModal = ({
     [fitQuestions]
   );
 
+  const accountMaps = useMemo(() => {
+    const byId = new Map<string, AccountRecord>();
+    const byEmail = new Map<string, AccountRecord>();
+    const labels = new Map<string, { name: string; label: string }>();
+
+    accounts.forEach((account) => {
+      byId.set(account.id, account);
+      const normalizedEmail = account.email.trim().toLowerCase();
+      if (normalizedEmail) {
+        byEmail.set(normalizedEmail, account);
+      }
+      labels.set(account.id, buildAccountLabel(account));
+    });
+
+    const options = accounts
+      .map((account) => {
+        const descriptor = labels.get(account.id);
+        return descriptor
+          ? {
+              id: account.id,
+              sortKey: descriptor.name.toLowerCase(),
+              label: descriptor.label
+            }
+          : {
+              id: account.id,
+              sortKey: account.email.toLowerCase(),
+              label: account.email
+            };
+      })
+      .sort((a, b) => a.sortKey.localeCompare(b.sortKey, 'ru'));
+
+    return { byId, byEmail, labels, options };
+  }, [accounts]);
+
+  const applyAccountSelection = (slotId: string, accountId: string | null) => {
+    if (!accountId) {
+      updateInterview(slotId, { interviewerName: '', interviewerEmail: '' });
+      return;
+    }
+    const account = accountMaps.byId.get(accountId);
+    if (!account) {
+      updateInterview(slotId, { interviewerName: '', interviewerEmail: '' });
+      return;
+    }
+    const descriptor = accountMaps.labels.get(accountId);
+    const resolvedName = descriptor?.name || account.email;
+    updateInterview(slotId, { interviewerName: resolvedName, interviewerEmail: account.email });
+  };
+
   return (
     <div className={styles.overlay}>
       <div className={styles.modal}>
@@ -327,18 +406,32 @@ export const EvaluationModal = ({
                   </button>
                 </div>
                 <label>
-                  <span>Interviewer name</span>
-                  <input
-                    value={slot.interviewerName}
-                    onChange={(e) => updateInterview(slot.id, { interviewerName: e.target.value })}
-                  />
+                  <span>Interviewer</span>
+                  <select
+                    value={(() => {
+                      const normalizedEmail = slot.interviewerEmail.trim().toLowerCase();
+                      const selected = normalizedEmail
+                        ? accountMaps.byEmail.get(normalizedEmail)
+                        : undefined;
+                      return selected?.id ?? '';
+                    })()}
+                    onChange={(event) => applyAccountSelection(slot.id, event.target.value || null)}
+                  >
+                    <option value="">Not selected</option>
+                    {accountMaps.options.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>Assigned name</span>
+                  <input value={slot.interviewerName} readOnly />
                 </label>
                 <label>
                   <span>Interviewer email</span>
-                  <input
-                    value={slot.interviewerEmail}
-                    onChange={(e) => updateInterview(slot.id, { interviewerEmail: e.target.value })}
-                  />
+                  <input value={slot.interviewerEmail} readOnly />
                 </label>
                 <label>
                   <span>Case</span>

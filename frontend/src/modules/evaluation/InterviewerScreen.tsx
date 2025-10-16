@@ -23,6 +23,8 @@ type CriterionDefinition = {
   ratings: Partial<Record<1 | 2 | 3 | 4 | 5, string>>;
 };
 
+type CriterionScoreValue = '1' | '2' | '3' | '4' | '5' | 'n/a';
+
 interface FormState {
   fitNotes: string;
   caseNotes: string;
@@ -38,14 +40,18 @@ interface CriterionSelectorProps {
   criterion: CriterionDefinition;
   value: string;
   disabled: boolean;
-  onChange: (next: string) => void;
+  onChange: (next: CriterionScoreValue) => void;
 }
 
 const CriterionSelector = ({ criterion, value, disabled, onChange }: CriterionSelectorProps) => {
-  const ratingEntries = (['1', '2', '3', '4', '5'] as const).map((score) => ({
-    score,
-    description: criterion.ratings[Number(score) as 1 | 2 | 3 | 4 | 5]
-  }));
+  const numericScores = ['1', '2', '3', '4', '5'] as const;
+  const ratingEntries: Array<{ score: CriterionScoreValue; description?: string }> = [
+    ...numericScores.map((score) => ({
+      score,
+      description: criterion.ratings[Number(score) as 1 | 2 | 3 | 4 | 5]
+    })),
+    { score: 'n/a', description: 'Not applicable' }
+  ];
 
   return (
     <div className={styles.criterionCard}>
@@ -56,7 +62,7 @@ const CriterionSelector = ({ criterion, value, disabled, onChange }: CriterionSe
           <span className={styles.tooltipContent}>
             {ratingEntries.map(({ score, description }) => (
               <Fragment key={score}>
-                <strong>{score}</strong>
+                <strong>{score === 'n/a' ? 'N/A' : score}</strong>
                 <span>{description ?? '—'}</span>
               </Fragment>
             ))}
@@ -72,9 +78,9 @@ const CriterionSelector = ({ criterion, value, disabled, onChange }: CriterionSe
               value={score}
               checked={value === score}
               disabled={disabled}
-              onChange={(event) => onChange(event.target.value)}
+              onChange={(event) => onChange(event.target.value as CriterionScoreValue)}
             />
-            <span>{score}</span>
+            <span>{score === 'n/a' ? 'N/A' : score}</span>
           </label>
         ))}
       </div>
@@ -102,7 +108,11 @@ const createFormState = (assignment: InterviewerAssignmentView | null): FormStat
     const map: Record<string, string> = {};
     for (const item of entries) {
       if (item.criterionId) {
-        map[item.criterionId] = item.score != null ? String(item.score) : '';
+        if (item.notApplicable) {
+          map[item.criterionId] = 'n/a';
+        } else {
+          map[item.criterionId] = item.score != null ? String(item.score) : '';
+        }
       }
     }
     return map;
@@ -149,6 +159,24 @@ const formatScoreValue = (value: number | null | undefined): string => {
     return '—';
   }
   return (Math.round(value * 10) / 10).toFixed(1);
+};
+
+const isRatingComplete = (value: string | undefined): boolean => {
+  if (!value) {
+    return false;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'n/a') {
+    return true;
+  }
+  return ['1', '2', '3', '4', '5'].includes(normalized);
+};
+
+const areRatingsComplete = (criteria: CriterionDefinition[], values: Record<string, string>): boolean => {
+  if (criteria.length === 0) {
+    return true;
+  }
+  return criteria.every((criterion) => isRatingComplete(values[criterion.id]));
 };
 
 const CASE_CRITERIA_ORDER = [
@@ -257,6 +285,9 @@ export const InterviewerScreen = () => {
         const trimmed = scoreValue.trim();
         if (!trimmed) {
           return { criterionId, score: undefined };
+        }
+        if (trimmed.toLowerCase() === 'n/a') {
+          return { criterionId, score: undefined, notApplicable: true };
         }
         const parsed = Number(trimmed);
         return Number.isFinite(parsed)
@@ -445,6 +476,10 @@ export const InterviewerScreen = () => {
     const displayCaseScore = calculatedCaseScore ?? storedCaseScore;
     const targetOffice = candidate?.targetOffice?.trim();
     const targetRole = candidate?.desiredPosition?.trim();
+
+    const fitRatingsComplete = areRatingsComplete(fitCriteria, formState.fitCriteria);
+    const caseRatingsComplete = areRatingsComplete(caseCriteria, formState.caseCriteria);
+    const canSubmitFinal = fitRatingsComplete && caseRatingsComplete;
 
     return (
       <div className={styles.detailPanel}>
@@ -667,14 +702,23 @@ export const InterviewerScreen = () => {
                 >
                   {saving ? 'Saving…' : 'Save draft'}
                 </button>
-                <button
-                  type="button"
-                  className={styles.primaryButton}
-                  disabled={isSubmitted || saving}
-                  onClick={handleSubmitFinal}
-                >
-                  Submit evaluation
-                </button>
+            <button
+              type="button"
+              className={styles.primaryButton}
+              disabled={isSubmitted || saving || !canSubmitFinal}
+              onClick={() => {
+                if (!canSubmitFinal) {
+                  setBanner({
+                    type: 'error',
+                    text: 'Complete all quantitative ratings before submitting the evaluation.'
+                  });
+                  return;
+                }
+                handleSubmitFinal();
+              }}
+            >
+              Submit evaluation
+            </button>
               </div>
             </form>
           </div>
