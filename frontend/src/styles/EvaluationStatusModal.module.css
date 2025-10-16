@@ -136,6 +136,12 @@
   width: 100%;
   border-collapse: collapse;
   min-width: 920px;
+  table-layout: fixed;
+  --criteria-column-width: 260px;
+}
+
+.summaryTableCriteriaColumn {
+  width: var(--criteria-column-width);
 }
 
 .summaryTable thead th {
@@ -154,6 +160,7 @@
 
 .summaryTableColumn {
   min-width: 220px;
+  width: var(--interviewer-column-width, auto);
 }
 
 .summaryTableGroupRow td {
