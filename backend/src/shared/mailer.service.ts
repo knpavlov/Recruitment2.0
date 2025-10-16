@@ -349,8 +349,6 @@ export class MailerService {
     payload: {
       candidateName: string;
       interviewerName: string;
-      caseTitle: string;
-      fitQuestionTitle: string;
       link: string;
     }
   ) {
@@ -358,11 +356,9 @@ export class MailerService {
     const lines = [
       `Hello ${payload.interviewerName},`,
       `You have been assigned to interview ${payload.candidateName}.`,
-      `Case materials: ${payload.caseTitle}.`,
-      `Fit question: ${payload.fitQuestionTitle}.`,
       payload.link
-        ? `Open the interviewer workspace here: ${payload.link}.`
-        : 'Sign in to the interviewer workspace to review materials and submit feedback.',
+        ? `All interview materials and the evaluation form are available in the interviewer portal: ${payload.link}.`
+        : 'Sign in to the interviewer workspace to review materials, download case files, and submit feedback.',
       'If you are not logged in, request a one-time code for this email address on the login screen.'
     ].filter((line): line is string => Boolean(line));
     await this.deliver(email, subject, lines.join('\n\n'));

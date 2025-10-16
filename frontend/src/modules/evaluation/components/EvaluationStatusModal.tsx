@@ -257,7 +257,7 @@ const buildCriteriaRows = (
           const currentCell = targetRow.cells[idx];
           if (!currentCell || currentCell.primary === '—') {
             targetRow.cells[idx] = {
-              primary: formatScore(criterion.score)
+              primary: criterion.notApplicable ? 'n/a' : formatScore(criterion.score)
             };
           }
         }

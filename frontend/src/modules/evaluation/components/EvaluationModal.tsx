@@ -6,6 +6,7 @@ import {
   InterviewStatusRecord,
   InvitationSlotStatus
 } from '../../../shared/types/evaluation';
+import { AccountRecord } from '../../../shared/types/account';
 import { CandidateProfile } from '../../../shared/types/candidate';
 import { CaseFolder } from '../../../shared/types/caseLibrary';
 import { FitQuestion } from '../../../shared/types/fitQuestion';
@@ -22,6 +23,7 @@ interface EvaluationModalProps {
   candidates: CandidateProfile[];
   folders: CaseFolder[];
   fitQuestions: FitQuestion[];
+  accounts: AccountRecord[];
 }
 
 const createInterviewSlot = (): InterviewSlot => ({
@@ -63,7 +65,8 @@ const createDefaultConfig = (): EvaluationConfig => {
       hasInvitations: false,
       hasPendingChanges: true,
       slots: []
-    }
+    },
+    roundDecisions: {}
   };
 };
 
@@ -104,7 +107,8 @@ export const EvaluationModal = ({
   onClose,
   candidates,
   folders,
-  fitQuestions
+  fitQuestions,
+  accounts
 }: EvaluationModalProps) => {
   const [config, setConfig] = useState<EvaluationConfig>(createDefaultConfig());
 
@@ -211,6 +215,22 @@ export const EvaluationModal = ({
     void onSave(config, { closeAfterSave, expectedVersion });
   };
 
+  const handleAccountSelection = (slotId: string, accountId: string) => {
+    if (!accountId) {
+      updateInterview(slotId, { interviewerName: '', interviewerEmail: '' });
+      return;
+    }
+    const account = accountIndexById.get(accountId);
+    if (!account) {
+      updateInterview(slotId, { interviewerName: '', interviewerEmail: '' });
+      return;
+    }
+    const firstName = account.firstName?.trim() ?? '';
+    const lastName = account.lastName?.trim() ?? '';
+    const interviewerName = [firstName, lastName].filter(Boolean).join(' ').trim() || account.email;
+    updateInterview(slotId, { interviewerName, interviewerEmail: account.email });
+  };
+
   const candidateOptions = useMemo(
     () =>
       candidates.map((candidate) => ({
@@ -227,6 +247,37 @@ export const EvaluationModal = ({
         label: question.shortTitle.trim() || question.content.trim() || question.id
       })),
     [fitQuestions]
+  );
+
+  const accountIndexById = useMemo(() => {
+    const map = new Map<string, AccountRecord>();
+    accounts.forEach((account) => {
+      map.set(account.id, account);
+    });
+    return map;
+  }, [accounts]);
+
+  const accountIndexByEmail = useMemo(() => {
+    const map = new Map<string, AccountRecord>();
+    accounts.forEach((account) => {
+      const normalized = account.email.trim().toLowerCase();
+      map.set(normalized, account);
+    });
+    return map;
+  }, [accounts]);
+
+  const accountOptions = useMemo(
+    () =>
+      accounts
+        .map((account) => {
+          const firstName = account.firstName?.trim() ?? '';
+          const lastName = account.lastName?.trim() ?? '';
+          const nameForLabel = [lastName, firstName].filter(Boolean).join(' ').trim();
+          const label = nameForLabel ? `${nameForLabel} — ${account.email}` : account.email;
+          return { id: account.id, label };
+        })
+        .sort((a, b) => a.label.localeCompare(b.label, 'en-US', { sensitivity: 'base' })),
+    [accounts]
   );
 
   return (
@@ -288,11 +339,14 @@ export const EvaluationModal = ({
                   ? styles.statusDelivered
                   : statusKey === 'stale'
                     ? styles.statusStale
-                    : statusKey === 'failed'
-                      ? styles.statusFailed
-                      : statusKey === 'unassigned'
-                        ? styles.statusUnassigned
-                        : styles.statusPending;
+                  : statusKey === 'failed'
+                    ? styles.statusFailed
+                    : statusKey === 'unassigned'
+                      ? styles.statusUnassigned
+                      : styles.statusPending;
+              const normalizedEmail = slot.interviewerEmail.trim().toLowerCase();
+              const selectedAccount = normalizedEmail ? accountIndexByEmail.get(normalizedEmail) : undefined;
+              const selectedAccountId = selectedAccount?.id ?? '';
               let note: string | null = null;
               if (statusKey === 'delivered') {
                 note = invitationSlot?.invitationSentAt
@@ -327,18 +381,26 @@ export const EvaluationModal = ({
                   </button>
                 </div>
                 <label>
+                  <span>Interviewer account</span>
+                  <select
+                    value={selectedAccountId}
+                    onChange={(e) => handleAccountSelection(slot.id, e.target.value)}
+                  >
+                    <option value="">Not selected</option>
+                    {accountOptions.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
                   <span>Interviewer name</span>
-                  <input
-                    value={slot.interviewerName}
-                    onChange={(e) => updateInterview(slot.id, { interviewerName: e.target.value })}
-                  />
+                  <input value={slot.interviewerName} readOnly placeholder="Select an account" />
                 </label>
                 <label>
                   <span>Interviewer email</span>
-                  <input
-                    value={slot.interviewerEmail}
-                    onChange={(e) => updateInterview(slot.id, { interviewerEmail: e.target.value })}
-                  />
+                  <input value={slot.interviewerEmail} readOnly placeholder="Select an account" />
                 </label>
                 <label>
                   <span>Case</span>

@@ -9,4 +9,6 @@ export interface AccountRecord {
   invitedAt: string;
   activatedAt?: string;
   invitationToken: string;
+  firstName?: string;
+  lastName?: string;
 }

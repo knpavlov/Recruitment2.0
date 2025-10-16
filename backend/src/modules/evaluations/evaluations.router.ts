@@ -125,6 +125,38 @@ router.post('/:id/advance', async (req, res) => {
   }
 });
 
+router.post('/:id/decision', async (req, res) => {
+  try {
+    const { roundNumber, decision } = (req.body ?? {}) as {
+      roundNumber?: unknown;
+      decision?: unknown;
+    };
+    const normalizedRound = typeof roundNumber === 'number' ? roundNumber : Number(roundNumber);
+    if (!Number.isInteger(normalizedRound) || normalizedRound <= 0) {
+      res.status(400).json({ code: 'invalid-input', message: 'Provide a valid round number.' });
+      return;
+    }
+    const allowed: Array<'offer' | 'reject'> = ['offer', 'reject'];
+    let normalizedDecision: 'offer' | 'reject' | null;
+    if (decision == null) {
+      normalizedDecision = null;
+    } else if (allowed.includes(decision as any)) {
+      normalizedDecision = decision as 'offer' | 'reject';
+    } else {
+      res.status(400).json({ code: 'invalid-input', message: 'Decision must be offer or reject.' });
+      return;
+    }
+    const evaluation = await evaluationWorkflowService.setRoundDecision(
+      req.params.id,
+      normalizedRound,
+      normalizedDecision
+    );
+    res.json(evaluation);
+  } catch (error) {
+    handleError(error, res);
+  }
+});
+
 router.post('/', async (req, res) => {
   const { config } = req.body as { config?: unknown };
   if (!config) {

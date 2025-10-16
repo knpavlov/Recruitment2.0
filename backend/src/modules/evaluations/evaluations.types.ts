@@ -30,6 +30,7 @@ export interface InterviewStatusModel {
 export interface EvaluationCriterionScore {
   criterionId: string;
   score?: number;
+  notApplicable?: boolean;
 }
 
 export type OfferRecommendationValue =
@@ -124,6 +125,7 @@ export interface EvaluationRecord {
   processStartedAt?: string;
   roundHistory: EvaluationRoundSnapshot[];
   invitationState: EvaluationInvitationState;
+  roundDecisions: Record<number, 'offer' | 'reject' | 'progress'>;
 }
 
 export interface EvaluationWriteModel {
@@ -137,6 +139,7 @@ export interface EvaluationWriteModel {
   processStatus?: EvaluationProcessStatus;
   processStartedAt?: string | null;
   roundHistory: EvaluationRoundSnapshot[];
+  roundDecisions?: Record<number, 'offer' | 'reject' | 'progress'>;
 }
 
 export interface InterviewerAssignmentView {

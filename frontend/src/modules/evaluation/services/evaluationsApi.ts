@@ -146,6 +146,24 @@ const normalizeInvitationState = (value: unknown): EvaluationInvitationState => 
   return { hasInvitations, hasPendingChanges, lastSentAt, slots };
 };
 
+const normalizeRoundDecisions = (value: unknown): Record<number, 'offer' | 'reject' | 'progress'> => {
+  if (!value || typeof value !== 'object') {
+    return {};
+  }
+  const result: Record<number, 'offer' | 'reject' | 'progress'> = {};
+  const entries = value as Record<string, unknown>;
+  for (const [key, rawDecision] of Object.entries(entries)) {
+    const round = Number(key);
+    if (!Number.isInteger(round) || round <= 0) {
+      continue;
+    }
+    if (rawDecision === 'offer' || rawDecision === 'reject' || rawDecision === 'progress') {
+      result[round] = rawDecision;
+    }
+  }
+  return result;
+};
+
 const normalizeSlot = (value: unknown): InterviewSlot | null => {
   if (!value || typeof value !== 'object') {
     return null;
@@ -191,7 +209,11 @@ const normalizeCriterion = (value: unknown): EvaluationCriterionScore | null => 
       score = parsed;
     }
   }
-  return { criterionId, score };
+  return {
+    criterionId,
+    score,
+    notApplicable: payload.notApplicable === true ? true : undefined
+  };
 };
 
 const normalizeCriteriaList = (value: unknown): EvaluationCriterionScore[] => {
@@ -315,7 +337,8 @@ const normalizeEvaluation = (value: unknown): EvaluationConfig | null => {
     processStatus: (normalizeString(payload.processStatus) as EvaluationProcessStatus | undefined) ?? 'draft',
     processStartedAt: normalizeIsoString(payload.processStartedAt),
     roundHistory: normalizeRoundHistory(payload.roundHistory),
-    invitationState: normalizeInvitationState(payload.invitationState)
+    invitationState: normalizeInvitationState(payload.invitationState),
+    roundDecisions: normalizeRoundDecisions(payload.roundDecisions)
   };
 };
 
@@ -405,13 +428,15 @@ const serializeRoundHistory = (history: EvaluationRoundSnapshot[]) =>
       fitCriteria: Array.isArray(form.fitCriteria)
         ? form.fitCriteria.map((criterion) => ({
             criterionId: criterion.criterionId,
-            score: typeof criterion.score === 'number' ? criterion.score : null
+            score: typeof criterion.score === 'number' ? criterion.score : null,
+            notApplicable: criterion.notApplicable === true ? true : undefined
           }))
         : [],
       caseCriteria: Array.isArray(form.caseCriteria)
         ? form.caseCriteria.map((criterion) => ({
             criterionId: criterion.criterionId,
-            score: typeof criterion.score === 'number' ? criterion.score : null
+            score: typeof criterion.score === 'number' ? criterion.score : null,
+            notApplicable: criterion.notApplicable === true ? true : undefined
           }))
         : [],
       interestNotes: form.interestNotes ?? null,
@@ -419,6 +444,19 @@ const serializeRoundHistory = (history: EvaluationRoundSnapshot[]) =>
       offerRecommendation: form.offerRecommendation ?? null
     }))
   }));
+
+const serializeRoundDecisions = (decisions: Record<number, 'offer' | 'reject' | 'progress'>) => {
+  const entries = Object.entries(decisions ?? {});
+  const result: Record<string, 'offer' | 'reject' | 'progress'> = {};
+  for (const [key, value] of entries) {
+    const round = Number(key);
+    if (!Number.isInteger(round) || round <= 0) {
+      continue;
+    }
+    result[String(round)] = value;
+  }
+  return result;
+};
 
 const serializeEvaluation = (config: EvaluationConfig) => ({
   id: config.id,
@@ -438,13 +476,15 @@ const serializeEvaluation = (config: EvaluationConfig) => ({
     fitCriteria: Array.isArray(form.fitCriteria)
       ? form.fitCriteria.map((criterion) => ({
           criterionId: criterion.criterionId,
-          score: typeof criterion.score === 'number' ? criterion.score : null
+          score: typeof criterion.score === 'number' ? criterion.score : null,
+          notApplicable: criterion.notApplicable === true ? true : undefined
         }))
       : [],
     caseCriteria: Array.isArray(form.caseCriteria)
       ? form.caseCriteria.map((criterion) => ({
           criterionId: criterion.criterionId,
-          score: typeof criterion.score === 'number' ? criterion.score : null
+          score: typeof criterion.score === 'number' ? criterion.score : null,
+          notApplicable: criterion.notApplicable === true ? true : undefined
         }))
       : [],
     interestNotes: form.interestNotes ?? null,
@@ -453,7 +493,8 @@ const serializeEvaluation = (config: EvaluationConfig) => ({
   })),
   processStatus: config.processStatus,
   processStartedAt: config.processStartedAt ?? null,
-  roundHistory: serializeRoundHistory(config.roundHistory)
+  roundHistory: serializeRoundHistory(config.roundHistory),
+  roundDecisions: serializeRoundDecisions(config.roundDecisions ?? {})
 });
 
 export const evaluationsApi = {
@@ -493,6 +534,13 @@ export const evaluationsApi = {
     ensureEvaluation(
       await apiRequest<unknown>(`/evaluations/${id}/advance`, {
         method: 'POST'
+      })
+    ),
+  saveDecision: async (id: string, roundNumber: number, decision: 'offer' | 'reject' | null) =>
+    ensureEvaluation(
+      await apiRequest<unknown>(`/evaluations/${id}/decision`, {
+        method: 'POST',
+        body: { roundNumber, decision: decision ?? null }
       })
     ),
   remove: async (id: string) =>

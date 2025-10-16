@@ -13,7 +13,32 @@ export interface AccountRecord {
   invitationToken: string;
   createdAt: Date;
   activatedAt?: Date;
+  firstName?: string;
+  lastName?: string;
 }
+
+const splitDisplayName = (displayName: string | undefined): { firstName?: string; lastName?: string } => {
+  if (!displayName) {
+    return {};
+  }
+  const trimmed = displayName.trim();
+  if (!trimmed) {
+    return {};
+  }
+  const parts = trimmed.split(/\s+/).filter(Boolean);
+  if (parts.length === 0) {
+    return {};
+  }
+  if (parts.length === 1) {
+    return { firstName: parts[0] };
+  }
+  const lastName = parts[parts.length - 1];
+  const firstName = parts.slice(0, -1).join(' ');
+  return {
+    firstName: firstName || undefined,
+    lastName: lastName || undefined
+  };
+};
 
 export class AccountsService {
   constructor(private readonly repository: AccountsRepository, private readonly mailer = new MailerService()) {}
@@ -57,13 +82,27 @@ export class AccountsService {
     return saved;
   }
 
-  async ensureUserAccount(email: string) {
+  async ensureUserAccount(email: string, displayName?: string) {
     const normalized = email.trim().toLowerCase();
     if (!normalized) {
       throw new Error('INVALID_INVITE');
     }
     const existing = await this.findByEmail(normalized);
     if (existing) {
+      if (displayName) {
+        const { firstName, lastName } = splitDisplayName(displayName);
+        const missingFirst = !existing.firstName && firstName;
+        const missingLast = !existing.lastName && lastName;
+        if (missingFirst || missingLast) {
+          const updated = await this.repository.updateNames(existing.id, {
+            firstName: missingFirst ? firstName : existing.firstName,
+            lastName: missingLast ? lastName : existing.lastName
+          });
+          if (updated) {
+            return updated;
+          }
+        }
+      }
       return existing;
     }
     const record: AccountRecord = {
@@ -74,6 +113,13 @@ export class AccountsService {
       invitationToken: randomUUID(),
       createdAt: new Date()
     };
+    const { firstName, lastName } = splitDisplayName(displayName);
+    if (firstName) {
+      record.firstName = firstName;
+    }
+    if (lastName) {
+      record.lastName = lastName;
+    }
     return this.repository.insertAccount(record);
   }
 

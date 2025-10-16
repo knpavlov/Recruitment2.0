@@ -54,7 +54,8 @@ const buildWriteModelFromRecord = (record: EvaluationRecord): EvaluationWriteMod
   forms: record.forms,
   processStatus: record.processStatus,
   processStartedAt: record.processStartedAt ?? null,
-  roundHistory: record.roundHistory
+  roundHistory: record.roundHistory,
+  roundDecisions: record.roundDecisions
 });
 
 const createEmptySlot = (): EvaluationRecord['interviews'][number] => ({
@@ -91,14 +92,20 @@ const readCriteriaList = (value: unknown): EvaluationCriterionScore[] => {
       continue;
     }
     const scoreValue = readScore(payload.score);
-    result.push({ criterionId, score: scoreValue });
+    const notApplicable = payload.notApplicable === true;
+    result.push({ criterionId, score: scoreValue, notApplicable: notApplicable ? true : undefined });
   }
   return result;
 };
 
 const computeAverageFromCriteria = (criteria: EvaluationCriterionScore[]): number | undefined => {
   const numericScores = criteria
-    .map((item) => (typeof item.score === 'number' && Number.isFinite(item.score) ? item.score : null))
+    .map((item) => {
+      if (item.notApplicable) {
+        return null;
+      }
+      return typeof item.score === 'number' && Number.isFinite(item.score) ? item.score : null;
+    })
     .filter((value): value is number => value != null);
   if (!numericScores.length) {
     return undefined;
@@ -179,7 +186,7 @@ export class EvaluationWorkflowService {
 
   private async ensureAccounts(assignments: InterviewAssignmentModel[]) {
     for (const assignment of assignments) {
-      await this.accounts.ensureUserAccount(assignment.interviewerEmail);
+      await this.accounts.ensureUserAccount(assignment.interviewerEmail, assignment.interviewerName);
     }
   }
 
@@ -324,15 +331,11 @@ export class EvaluationWorkflowService {
     const failed: InvitationDeliveryFailure[] = [];
 
     for (const assignment of assignments) {
-      const caseFolder = context.caseMap.get(assignment.caseFolderId);
-      const question = context.questionMap.get(assignment.fitQuestionId);
       const link = buildPortalLink(portalBaseUrl, evaluation.id, assignment.slotId);
       try {
         await this.mailer.sendInterviewAssignment(assignment.interviewerEmail, {
           candidateName,
           interviewerName: assignment.interviewerName,
-          caseTitle: caseFolder?.name ?? 'Case',
-          fitQuestionTitle: question?.shortTitle ?? 'Fit question',
           link
         });
         sent.push(assignment.slotId);
@@ -539,6 +542,11 @@ export class EvaluationWorkflowService {
     writeModel.processStatus = 'draft';
     writeModel.processStartedAt = null;
     writeModel.roundHistory = [...filteredHistory, snapshot].sort((a, b) => a.roundNumber - b.roundNumber);
+    writeModel.roundDecisions = {
+      ...evaluation.roundDecisions,
+      [currentRound]: 'progress'
+    };
+    delete writeModel.roundDecisions[nextRoundNumber];
 
     const updated = await this.evaluations.updateEvaluation(writeModel, evaluation.version);
     if (updated === 'version-conflict') {
@@ -548,6 +556,43 @@ export class EvaluationWorkflowService {
       throw new Error('NOT_FOUND');
     }
 
+    return this.loadEvaluationWithState(trimmed);
+  }
+
+  async setRoundDecision(
+    id: string,
+    roundNumber: number,
+    decision: 'offer' | 'reject' | null
+  ): Promise<EvaluationRecord> {
+    const trimmed = id.trim();
+    if (!trimmed) {
+      throw new Error('INVALID_INPUT');
+    }
+    if (!Number.isInteger(roundNumber) || roundNumber <= 0) {
+      throw new Error('INVALID_INPUT');
+    }
+    if (decision !== null && decision !== 'offer' && decision !== 'reject') {
+      throw new Error('INVALID_INPUT');
+    }
+
+    const evaluation = await this.loadEvaluationWithState(trimmed);
+    const normalizedRound = roundNumber;
+    const writeModel = buildWriteModelFromRecord(evaluation);
+    const updatedDecisions = { ...evaluation.roundDecisions };
+    if (decision === null) {
+      delete updatedDecisions[normalizedRound];
+    } else {
+      updatedDecisions[normalizedRound] = decision;
+    }
+    writeModel.roundDecisions = updatedDecisions;
+
+    const result = await this.evaluations.updateEvaluation(writeModel, evaluation.version);
+    if (result === 'version-conflict') {
+      throw new Error('VERSION_CONFLICT');
+    }
+    if (!result) {
+      throw new Error('NOT_FOUND');
+    }
     return this.loadEvaluationWithState(trimmed);
   }
 

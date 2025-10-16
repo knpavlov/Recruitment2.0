@@ -25,6 +25,7 @@ interface EvaluationRow extends Record<string, unknown> {
   process_status: string | null;
   process_started_at: Date | null;
   round_history: unknown;
+  round_decisions: unknown;
 }
 
 const mapSlots = (value: unknown): InterviewSlotModel[] => {
@@ -69,7 +70,8 @@ const mapCriterionScore = (value: unknown): EvaluationCriterionScore | null => {
       score = parsed;
     }
   }
-  return { criterionId, score };
+  const notApplicable = payload.notApplicable === true;
+  return { criterionId, score, notApplicable: notApplicable ? true : undefined };
 };
 
 const mapCriteriaList = (value: unknown): EvaluationCriterionScore[] => {
@@ -79,6 +81,24 @@ const mapCriteriaList = (value: unknown): EvaluationCriterionScore[] => {
   return value
     .map((entry) => mapCriterionScore(entry))
     .filter((item): item is EvaluationCriterionScore => Boolean(item));
+};
+
+const mapRoundDecisions = (value: unknown): Record<number, 'offer' | 'reject' | 'progress'> => {
+  if (!value || typeof value !== 'object') {
+    return {};
+  }
+  const result: Record<number, 'offer' | 'reject' | 'progress'> = {};
+  const entries = value as Record<string, unknown>;
+  for (const [key, rawValue] of Object.entries(entries)) {
+    const round = Number(key);
+    if (!Number.isInteger(round) || round <= 0) {
+      continue;
+    }
+    if (rawValue === 'offer' || rawValue === 'reject' || rawValue === 'progress') {
+      result[round] = rawValue;
+    }
+  }
+  return result;
 };
 
 const readOfferRecommendation = (value: unknown): InterviewStatusModel['offerRecommendation'] | undefined => {
@@ -215,7 +235,8 @@ const mapRowToRecord = (row: EvaluationRow): EvaluationRecord => {
     processStatus: (row.process_status as EvaluationRecord['processStatus']) ?? 'draft',
     processStartedAt: row.process_started_at ? row.process_started_at.toISOString() : undefined,
     roundHistory: mapRoundHistory(row.round_history),
-    invitationState: { hasInvitations: false, hasPendingChanges: false, slots: [] }
+    invitationState: { hasInvitations: false, hasPendingChanges: false, slots: [] },
+    roundDecisions: mapRoundDecisions(row.round_decisions)
   } satisfies EvaluationRecord;
 };
 
@@ -283,7 +304,8 @@ export class EvaluationsRepository {
               forms,
               process_status,
               process_started_at,
-              round_history
+              round_history,
+              round_decisions
          FROM evaluations
         ORDER BY updated_at DESC, created_at DESC;`
     );
@@ -304,7 +326,8 @@ export class EvaluationsRepository {
               forms,
               process_status,
               process_started_at,
-              round_history
+              round_history,
+              round_decisions
          FROM evaluations
         WHERE id = $1
         LIMIT 1;`,
@@ -320,10 +343,11 @@ export class EvaluationsRepository {
     const interviewsJson = JSON.stringify(model.interviews);
     const formsJson = JSON.stringify(model.forms);
     const historyJson = JSON.stringify(model.roundHistory ?? []);
+    const decisionsJson = JSON.stringify(model.roundDecisions ?? {});
 
     const result = await postgresPool.query<EvaluationRow>(
-      `INSERT INTO evaluations (id, candidate_id, round_number, interview_count, interviews, fit_question_id, version, created_at, updated_at, forms, round_history, process_status, process_started_at)
-         VALUES ($1, $2, $3, $4, $5::jsonb, $6, 1, NOW(), NOW(), $7::jsonb, $8::jsonb, $9, $10)
+      `INSERT INTO evaluations (id, candidate_id, round_number, interview_count, interviews, fit_question_id, version, created_at, updated_at, forms, round_history, process_status, process_started_at, round_decisions)
+         VALUES ($1, $2, $3, $4, $5::jsonb, $6, 1, NOW(), NOW(), $7::jsonb, $8::jsonb, $9, $10, $11::jsonb)
       RETURNING id,
                 candidate_id,
                 round_number,
@@ -336,7 +360,8 @@ export class EvaluationsRepository {
                 forms,
                 process_status,
                 process_started_at,
-                round_history;`,
+                round_history,
+                round_decisions;`,
       [
         model.id,
         model.candidateId ?? null,
@@ -347,7 +372,8 @@ export class EvaluationsRepository {
         formsJson,
         historyJson,
         model.processStatus ?? 'draft',
-        model.processStartedAt ?? null
+        model.processStartedAt ?? null,
+        decisionsJson
       ]
     );
 
@@ -361,6 +387,7 @@ export class EvaluationsRepository {
     const interviewsJson = JSON.stringify(model.interviews);
     const formsJson = JSON.stringify(model.forms);
     const historyJson = JSON.stringify(model.roundHistory ?? []);
+    const decisionsJson = JSON.stringify(model.roundDecisions ?? {});
 
     const result = await postgresPool.query<EvaluationRow>(
       `UPDATE evaluations
@@ -373,9 +400,10 @@ export class EvaluationsRepository {
               round_history = $7::jsonb,
               process_status = $8,
               process_started_at = $9,
+              round_decisions = $10::jsonb,
               version = version + 1,
               updated_at = NOW()
-        WHERE id = $10 AND version = $11
+        WHERE id = $11 AND version = $12
       RETURNING id,
                 candidate_id,
                 round_number,
@@ -388,7 +416,8 @@ export class EvaluationsRepository {
                 forms,
                 process_status,
                 process_started_at,
-                round_history;`,
+                round_history,
+                round_decisions;`,
       [
         model.candidateId ?? null,
         model.roundNumber ?? null,
@@ -399,6 +428,7 @@ export class EvaluationsRepository {
         historyJson,
         model.processStatus ?? 'draft',
         model.processStartedAt ?? null,
+        decisionsJson,
         model.id,
         expectedVersion
       ]
