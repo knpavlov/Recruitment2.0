@@ -233,6 +233,12 @@ const createTables = async () => {
   `);
 
   await postgresPool.query(`
+    ALTER TABLE evaluations
+      ADD COLUMN IF NOT EXISTS offer_accepted BOOLEAN,
+      ADD COLUMN IF NOT EXISTS offer_accepted_at TIMESTAMPTZ;
+  `);
+
+  await postgresPool.query(`
     CREATE TABLE IF NOT EXISTS evaluation_assignments (
       id UUID PRIMARY KEY,
       evaluation_id UUID NOT NULL REFERENCES evaluations(id) ON DELETE CASCADE,

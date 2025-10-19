@@ -129,6 +129,8 @@ export interface EvaluationRecord {
   roundHistory: EvaluationRoundSnapshot[];
   invitationState: EvaluationInvitationState;
   decision?: EvaluationDecision | null;
+  offerAccepted?: boolean;
+  offerAcceptedAt?: string;
 }
 
 export interface EvaluationWriteModel {

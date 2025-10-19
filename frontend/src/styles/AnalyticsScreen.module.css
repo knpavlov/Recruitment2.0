@@ -1,0 +1,295 @@
+.screen {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  padding-bottom: 48px;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 32px;
+  color: #0f172a;
+}
+
+.subtitle {
+  margin: 0;
+  color: #475569;
+  font-size: 15px;
+}
+
+.section {
+  background: rgba(255, 255, 255, 0.78);
+  border-radius: 24px;
+  padding: 24px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.sectionHeader {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sectionHeader h2 {
+  margin: 0;
+  font-size: 24px;
+  color: #0f172a;
+}
+
+.controls {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.controls label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #475569;
+}
+
+.controls select {
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: white;
+  font-size: 14px;
+}
+
+.cardsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.card {
+  padding: 20px;
+  border-radius: 18px;
+  background: linear-gradient(160deg, rgba(59, 130, 246, 0.12), rgba(34, 211, 238, 0.12));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 16px;
+  color: #0f172a;
+}
+
+.cardValue {
+  font-size: 28px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.cardHint {
+  font-size: 13px;
+  color: #475569;
+}
+
+.chartContainer {
+  width: 100%;
+  height: 360px;
+}
+
+.chartInner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.chartTooltip {
+  position: absolute;
+  background: rgba(15, 23, 42, 0.85);
+  color: white;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 13px;
+  pointer-events: none;
+  transform: translate(-50%, -100%);
+  white-space: nowrap;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.25);
+}
+
+.metricToggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.metricToggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: rgba(255, 255, 255, 0.9);
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.metricToggle input {
+  margin: 0;
+}
+
+.legendRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  font-size: 13px;
+  color: #475569;
+}
+
+.legendDot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.interviewersLayout {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.interviewersContent {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 20px;
+}
+
+@media (max-width: 1100px) {
+  .interviewersContent {
+    grid-template-columns: 1fr;
+  }
+}
+
+.interviewerChartContainer {
+  width: 100%;
+  height: 320px;
+}
+
+.filterList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.filterSearch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.filterSearch input {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  font-size: 14px;
+}
+
+.filterSearch button {
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: none;
+  background: rgba(100, 116, 139, 0.12);
+  color: #475569;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.filterSearch button:hover {
+  background: rgba(100, 116, 139, 0.2);
+}
+
+.filterItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: rgba(255, 255, 255, 0.9);
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.filterItem input {
+  margin: 0;
+}
+
+.downloadButton {
+  padding: 8px 14px;
+  border-radius: 12px;
+  border: none;
+  background: linear-gradient(135deg, #22d3ee, #818cf8);
+  color: white;
+  cursor: pointer;
+  font-size: 14px;
+  transition: transform 0.2s ease;
+}
+
+.downloadButton:hover {
+  transform: translateY(-1px);
+}
+
+.downloadButton:disabled {
+  opacity: 0.6;
+  cursor: default;
+  transform: none;
+}
+
+.errorMessage {
+  color: #b91c1c;
+  font-size: 14px;
+}
+
+.loading {
+  font-size: 14px;
+  color: #475569;
+}
+
+.tableWrapper {
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 20px;
+  padding: 16px;
+}
+
+.summaryTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.summaryTable th,
+.summaryTable td {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+  font-size: 13px;
+}
+
+.summaryTable th {
+  color: #475569;
+  font-weight: 500;
+}

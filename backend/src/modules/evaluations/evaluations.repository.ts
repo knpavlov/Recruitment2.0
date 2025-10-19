@@ -26,6 +26,8 @@ interface EvaluationRow extends Record<string, unknown> {
   process_started_at: Date | null;
   round_history: unknown;
   decision: string | null;
+  offer_accepted: boolean | null;
+  offer_accepted_at: Date | null;
 }
 
 const mapSlots = (value: unknown): InterviewSlotModel[] => {
@@ -233,7 +235,9 @@ const mapRowToRecord = (row: EvaluationRow): EvaluationRecord => {
     processStartedAt: row.process_started_at ? row.process_started_at.toISOString() : undefined,
     roundHistory: mapRoundHistory(row.round_history),
     invitationState: { hasInvitations: false, hasPendingChanges: false, slots: [] },
-    decision
+    decision,
+    offerAccepted: row.offer_accepted ?? undefined,
+    offerAcceptedAt: row.offer_accepted_at ? row.offer_accepted_at.toISOString() : undefined
   } satisfies EvaluationRecord;
 };
 
