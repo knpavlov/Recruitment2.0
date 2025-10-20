@@ -1,0 +1,89 @@
+import { buildApiUrl } from '../../../shared/config/runtimeConfig';
+import { apiRequest } from '../../../shared/api/httpClient';
+import type {
+  AnalyticsDataset,
+  InterviewerStatsResponse,
+  SummaryPeriod,
+  SummaryResponse,
+  TimelineGrouping,
+  TimelineResponse
+} from '../types/analytics';
+
+const buildQueryString = (params: Record<string, string | undefined>) => {
+  const searchParams = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value && value.length > 0) {
+      searchParams.set(key, value);
+    }
+  });
+  const query = searchParams.toString();
+  return query ? `?${query}` : '';
+};
+
+const readFileName = (contentDisposition: string | null): string | undefined => {
+  if (!contentDisposition) {
+    return undefined;
+  }
+  const match = contentDisposition.match(/filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i);
+  if (!match) {
+    return undefined;
+  }
+  const encoded = match[1] || match[2];
+  if (!encoded) {
+    return undefined;
+  }
+  try {
+    return decodeURIComponent(encoded);
+  } catch {
+    return encoded;
+  }
+};
+
+export const analyticsApi = {
+  async getSummary(period: SummaryPeriod): Promise<SummaryResponse> {
+    return apiRequest<SummaryResponse>(`/analytics/summary${buildQueryString({ period })}`);
+  },
+
+  async getTimeline(
+    groupBy: TimelineGrouping,
+    options: { from?: string; to?: string } = {}
+  ): Promise<TimelineResponse> {
+    const query = buildQueryString({ groupBy, from: options.from, to: options.to });
+    return apiRequest<TimelineResponse>(`/analytics/timeline${query}`);
+  },
+
+  async getInterviewerStats(options: {
+    groupBy?: TimelineGrouping;
+    from?: string;
+    to?: string;
+    interviewerIds?: string[];
+  }): Promise<InterviewerStatsResponse> {
+    const groupBy = options.groupBy ?? 'month';
+    const interviewerValue = options.interviewerIds?.length ? options.interviewerIds.join(',') : undefined;
+    const query = buildQueryString({ groupBy, from: options.from, to: options.to, interviewers: interviewerValue });
+    return apiRequest<InterviewerStatsResponse>(`/analytics/interviewers${query}`);
+  },
+
+  async downloadDataset(
+    dataset: AnalyticsDataset,
+    params: Record<string, string | undefined>
+  ): Promise<void> {
+    const query = buildQueryString(params);
+    const url = buildApiUrl(`/analytics/export/${dataset}${query}`);
+    const response = await fetch(url, { method: 'GET' });
+    if (!response.ok) {
+      throw new Error('Failed to download file.');
+    }
+    const blob = await response.blob();
+    const fileName = readFileName(response.headers.get('Content-Disposition')) ?? `${dataset}.csv`;
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = fileName;
+    link.rel = 'noopener noreferrer';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(objectUrl);
+  }
+};
