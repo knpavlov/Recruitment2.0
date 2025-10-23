@@ -1,25 +1,22 @@
 import { randomUUID } from 'crypto';
 import { MailerService, MAILER_NOT_CONFIGURED } from '../../shared/mailer.service.js';
 import { AccountsRepository } from './accounts.repository.js';
-
-export type AccountRole = 'super-admin' | 'admin' | 'user';
-export type AccountStatus = 'pending' | 'active';
-
-export interface AccountRecord {
-  id: string;
-  email: string;
-  role: AccountRole;
-  status: AccountStatus;
-  name?: string;
-  firstName?: string;
-  lastName?: string;
-  invitationToken: string;
-  createdAt: Date;
-  activatedAt?: Date;
-}
+import type { AccountRecord, AccountRole, InterviewerSeniority } from './accounts.types.js';
 
 export class AccountsService {
   constructor(private readonly repository: AccountsRepository, private readonly mailer = new MailerService()) {}
+
+  private static readonly interviewerRoles: InterviewerSeniority[] = ['MD', 'SD', 'D', 'SM', 'M', 'SA', 'A'];
+
+  private static normalizeInterviewerRole(value: InterviewerSeniority | string | null | undefined) {
+    if (!value) {
+      return null;
+    }
+    const normalized = value.toString().trim().toUpperCase();
+    return AccountsService.interviewerRoles.includes(normalized as InterviewerSeniority)
+      ? (normalized as InterviewerSeniority)
+      : null;
+  }
 
   async listAccounts() {
     return this.repository.listAccounts();
@@ -75,7 +72,13 @@ export class AccountsService {
     };
   }
 
-  async inviteAccount(email: string, role: AccountRole, firstName?: string, lastName?: string) {
+  async inviteAccount(
+    email: string,
+    role: AccountRole,
+    firstName?: string,
+    lastName?: string,
+    interviewerRole?: InterviewerSeniority | null
+  ) {
     const normalized = email.trim().toLowerCase();
     if (!normalized || role === 'super-admin') {
       throw new Error('INVALID_INVITE');
@@ -86,6 +89,7 @@ export class AccountsService {
       throw new Error('INVALID_NAME');
     }
     const displayName = AccountsService.composeFullName(normalizedFirstName, normalizedLastName);
+    const normalizedInterviewerRole = AccountsService.normalizeInterviewerRole(interviewerRole);
     const exists = await this.findByEmail(normalized);
     if (exists) {
       throw new Error('ALREADY_EXISTS');
@@ -100,7 +104,8 @@ export class AccountsService {
       firstName: normalizedFirstName,
       lastName: normalizedLastName,
       invitationToken,
-      createdAt: new Date()
+      createdAt: new Date(),
+      interviewerRole: normalizedInterviewerRole
     };
     const saved = await this.repository.insertAccount(record);
     try {
