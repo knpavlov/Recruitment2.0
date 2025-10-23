@@ -13,6 +13,7 @@ import { FitQuestionsScreen } from './modules/questions/FitQuestionsScreen';
 import { CaseCriteriaScreen } from './modules/caseCriteria/CaseCriteriaScreen';
 import { InterviewerScreen } from './modules/evaluation/InterviewerScreen';
 import { useHasInterviewerAssignments } from './app/hooks/useHasInterviewerAssignments';
+import { AnalyticsScreen } from './modules/analytics/AnalyticsScreen';
 
 const AppContent = () => {
   const { session } = useAuth();
@@ -78,12 +79,7 @@ const AppContent = () => {
       case 'interviews':
         return <InterviewerScreen />;
       case 'stats':
-        return (
-          <PlaceholderScreen
-            title="Analytics"
-            description="This section will be added in the next iteration."
-          />
-        );
+        return <AnalyticsScreen />;
       case 'accounts':
         return <AccountsScreen />;
       default:
