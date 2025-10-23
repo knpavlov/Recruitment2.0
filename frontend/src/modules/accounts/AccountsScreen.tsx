@@ -3,6 +3,7 @@ import styles from '../../styles/AccountsScreen.module.css';
 import { useAccountsState } from '../../app/state/AppStateContext';
 import { useAuth } from '../auth/AuthContext';
 import { resolveAccountName } from '../../shared/utils/accountName';
+import type { InterviewerSeniority } from '../../shared/types/account';
 
 type Banner = { type: 'info' | 'error'; text: string } | null;
 
@@ -19,6 +20,7 @@ export const AccountsScreen = () => {
   const [banner, setBanner] = useState<Banner>(null);
   const [sortKey, setSortKey] = useState<SortKey>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [interviewerRole, setInterviewerRole] = useState<InterviewerSeniority | 'none'>('none');
 
   const sortedAccounts = useMemo(() => {
     const copy = [...list];
@@ -108,7 +110,13 @@ export const AccountsScreen = () => {
   }
 
   const handleInvite = async () => {
-    const result = await inviteAccount(email, targetRole, firstName, lastName);
+    const result = await inviteAccount(
+      email,
+      targetRole,
+      firstName,
+      lastName,
+      interviewerRole === 'none' ? null : interviewerRole
+    );
     if (!result.ok) {
       const message =
         result.error === 'duplicate'
@@ -125,6 +133,7 @@ export const AccountsScreen = () => {
     setEmail('');
     setFirstName('');
     setLastName('');
+    setInterviewerRole('none');
   };
 
   const handleCopyToken = async (token: string) => {
@@ -203,6 +212,20 @@ export const AccountsScreen = () => {
             <option value="admin">Admin</option>
             <option value="user">User</option>
           </select>
+          <select
+            className={styles.roleSelect}
+            value={interviewerRole}
+            onChange={(event) => setInterviewerRole(event.target.value as InterviewerSeniority | 'none')}
+          >
+            <option value="none">Interview role (optional)</option>
+            <option value="MD">Managing Director</option>
+            <option value="SD">Senior Director</option>
+            <option value="D">Director</option>
+            <option value="SM">Senior Manager</option>
+            <option value="M">Manager</option>
+            <option value="SA">Senior Associate</option>
+            <option value="A">Associate</option>
+          </select>
           <button className={styles.primaryButton} onClick={() => void handleInvite()}>
             Send invitation
           </button>
@@ -265,6 +288,7 @@ export const AccountsScreen = () => {
                   )}
                 </button>
               </th>
+              <th>Interview role</th>
               <th>
                 <button
                   type="button"
@@ -295,6 +319,7 @@ export const AccountsScreen = () => {
                   </span>
                 </td>
                 <td>{account.role === 'super-admin' ? 'Super admin' : account.role === 'admin' ? 'Admin' : 'User'}</td>
+                <td>{account.interviewerRole ?? '—'}</td>
                 <td>
                   {account.status === 'pending' ? (
                     <div className={styles.tokenCell}>

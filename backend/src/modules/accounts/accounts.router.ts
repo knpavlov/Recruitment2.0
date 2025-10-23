@@ -9,22 +9,30 @@ router.get('/', async (_req, res) => {
 });
 
 router.post('/invite', async (req, res) => {
-  const { email, role = 'admin', firstName, lastName } = req.body as {
+  const { email, role = 'admin', firstName, lastName, interviewerRole } = req.body as {
     email?: string;
     role?: 'admin' | 'user';
     firstName?: string;
     lastName?: string;
+    interviewerRole?: string | null;
   };
   try {
-    const account = await accountsService.inviteAccount(email ?? '', role, firstName, lastName);
+    const account = await accountsService.inviteAccount(email ?? '', role, firstName, lastName, interviewerRole ?? null);
     res.status(201).json(account);
   } catch (error) {
     if (error instanceof Error && error.message === 'ALREADY_EXISTS') {
       res.status(409).json({ code: 'duplicate', message: 'The specified user has already been invited.' });
       return;
     }
-    if (error instanceof Error && (error.message === 'INVALID_NAME' || error.message === 'INVALID_INVITE')) {
-      res.status(400).json({ code: 'invalid-input', message: 'Provide a valid name and email.' });
+    if (
+      error instanceof Error &&
+      (error.message === 'INVALID_NAME' ||
+        error.message === 'INVALID_INVITE' ||
+        error.message === 'INVALID_INTERVIEWER_ROLE')
+    ) {
+      res
+        .status(400)
+        .json({ code: 'invalid-input', message: 'Provide a valid name, email, and interviewer role.' });
       return;
     }
     if (error instanceof Error && error.message === 'MAILER_UNAVAILABLE') {

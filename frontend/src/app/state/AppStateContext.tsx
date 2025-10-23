@@ -2,7 +2,7 @@ import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, 
 import { CaseFolder, CaseFileUploadDto } from '../../shared/types/caseLibrary';
 import { CandidateProfile } from '../../shared/types/candidate';
 import { EvaluationConfig, InvitationDeliveryReport } from '../../shared/types/evaluation';
-import { AccountRecord, AccountRole } from '../../shared/types/account';
+import { AccountRecord, AccountRole, InterviewerSeniority } from '../../shared/types/account';
 import { FitQuestion } from '../../shared/types/fitQuestion';
 import { CaseCriterion } from '../../shared/types/caseCriteria';
 import { DomainResult } from '../../shared/types/results';
@@ -80,7 +80,8 @@ interface AppStateContextValue {
       email: string,
       role: AccountRole,
       firstName: string,
-      lastName: string
+      lastName: string,
+      interviewerRole: InterviewerSeniority | null
     ) => Promise<DomainResult<AccountRecord>>;
     activateAccount: (id: string) => Promise<DomainResult<AccountRecord>>;
     removeAccount: (id: string) => Promise<DomainResult<string>>;
@@ -671,7 +672,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     },
     accounts: {
       list: accounts,
-      inviteAccount: async (email, role, firstName, lastName) => {
+      inviteAccount: async (email, role, firstName, lastName, interviewerRole) => {
         const trimmedEmail = email.trim().toLowerCase();
         if (!trimmedEmail) {
           return { ok: false, error: 'invalid-input' };
@@ -682,7 +683,13 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
           return { ok: false, error: 'invalid-input' };
         }
         try {
-          const account = await accountsApi.invite(trimmedEmail, role, normalizedFirst, normalizedLast);
+          const account = await accountsApi.invite(
+            trimmedEmail,
+            role,
+            normalizedFirst,
+            normalizedLast,
+            interviewerRole
+          );
           setAccounts((prev) => [...prev, account]);
           return { ok: true, data: account };
         } catch (error) {

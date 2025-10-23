@@ -50,6 +50,12 @@ const mapRowToAccount = (row: any): AccountRecord => {
   const firstNameRaw = typeof row.first_name === 'string' ? row.first_name.trim() : '';
   const lastNameRaw = typeof row.last_name === 'string' ? row.last_name.trim() : '';
   const derivedParts = splitFullName(displayName || legacyName || fallbackName);
+  let interviewerRole: AccountRecord['interviewerRole'] = null;
+  if (typeof row.interviewer_role === 'string') {
+    const normalized = row.interviewer_role.trim().toUpperCase();
+    const allowed = new Set(['MD', 'SD', 'D', 'SM', 'M', 'SA', 'A']);
+    interviewerRole = allowed.has(normalized) ? (normalized as AccountRecord['interviewerRole']) : null;
+  }
 
   return {
     id: row.id,
@@ -59,6 +65,7 @@ const mapRowToAccount = (row: any): AccountRecord => {
     name: fallbackName || undefined,
     firstName: firstNameRaw || derivedParts.firstName,
     lastName: lastNameRaw || derivedParts.lastName,
+    interviewerRole,
     invitationToken: row.invitation_token,
     createdAt: new Date(row.created_at),
     activatedAt: row.activated_at ? new Date(row.activated_at) : undefined
@@ -85,8 +92,20 @@ export class AccountsRepository {
 
   async insertAccount(record: AccountRecord): Promise<AccountRecord> {
     const result = await postgresPool.query(
-      `INSERT INTO accounts (id, email, role, status, invitation_token, created_at, activated_at, display_name, first_name, last_name)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      `INSERT INTO accounts (
+         id,
+         email,
+         role,
+         status,
+         invitation_token,
+         created_at,
+         activated_at,
+         display_name,
+         first_name,
+         last_name,
+         interviewer_role
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        RETURNING *;`,
       [
         record.id,
@@ -98,7 +117,8 @@ export class AccountsRepository {
         record.activatedAt ?? null,
         record.name ?? null,
         record.firstName ?? null,
-        record.lastName ?? null
+        record.lastName ?? null,
+        record.interviewerRole ?? null
       ]
     );
     return mapRowToAccount(result.rows[0]);
