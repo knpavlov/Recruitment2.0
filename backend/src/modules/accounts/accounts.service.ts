@@ -3,6 +3,7 @@ import { MailerService, MAILER_NOT_CONFIGURED } from '../../shared/mailer.servic
 import { AccountsRepository } from './accounts.repository.js';
 
 export type AccountRole = 'super-admin' | 'admin' | 'user';
+export type InterviewerSeniority = 'MD' | 'SD' | 'D' | 'SM' | 'M' | 'SA' | 'A';
 export type AccountStatus = 'pending' | 'active';
 
 export interface AccountRecord {
@@ -13,6 +14,7 @@ export interface AccountRecord {
   name?: string;
   firstName?: string;
   lastName?: string;
+  interviewerRole?: InterviewerSeniority | null;
   invitationToken: string;
   createdAt: Date;
   activatedAt?: Date;
@@ -75,7 +77,25 @@ export class AccountsService {
     };
   }
 
-  async inviteAccount(email: string, role: AccountRole, firstName?: string, lastName?: string) {
+  private static normalizeInterviewerRole(role: string | undefined): InterviewerSeniority | null {
+    if (!role) {
+      return null;
+    }
+    const normalized = role.trim().toUpperCase();
+    const allowed: InterviewerSeniority[] = ['MD', 'SD', 'D', 'SM', 'M', 'SA', 'A'];
+    if (!allowed.includes(normalized as InterviewerSeniority)) {
+      throw new Error('INVALID_INTERVIEWER_ROLE');
+    }
+    return normalized as InterviewerSeniority;
+  }
+
+  async inviteAccount(
+    email: string,
+    role: AccountRole,
+    firstName?: string,
+    lastName?: string,
+    interviewerRole?: string | null
+  ) {
     const normalized = email.trim().toLowerCase();
     if (!normalized || role === 'super-admin') {
       throw new Error('INVALID_INVITE');
@@ -86,6 +106,7 @@ export class AccountsService {
       throw new Error('INVALID_NAME');
     }
     const displayName = AccountsService.composeFullName(normalizedFirstName, normalizedLastName);
+    const normalizedInterviewerRole = AccountsService.normalizeInterviewerRole(interviewerRole ?? undefined);
     const exists = await this.findByEmail(normalized);
     if (exists) {
       throw new Error('ALREADY_EXISTS');
@@ -99,6 +120,7 @@ export class AccountsService {
       name: displayName,
       firstName: normalizedFirstName,
       lastName: normalizedLastName,
+      interviewerRole: normalizedInterviewerRole,
       invitationToken,
       createdAt: new Date()
     };
@@ -139,7 +161,8 @@ export class AccountsService {
       createdAt: new Date(),
       name: displayName,
       firstName,
-      lastName
+      lastName,
+      interviewerRole: null
     };
     return this.repository.insertAccount(record);
   }

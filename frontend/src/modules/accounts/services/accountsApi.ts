@@ -1,5 +1,5 @@
 import { apiRequest } from '../../../shared/api/httpClient';
-import { AccountRecord, AccountRole } from '../../../shared/types/account';
+import { AccountRecord, AccountRole, InterviewerSeniority } from '../../../shared/types/account';
 
 type AccountStatus = 'pending' | 'active';
 
@@ -16,6 +16,7 @@ type AccountPayload = Partial<AccountRecord> & {
   displayName?: unknown;
   firstName?: unknown;
   lastName?: unknown;
+  interviewerRole?: unknown;
 };
 
 const isRole = (value: unknown): value is AccountRole =>
@@ -51,6 +52,14 @@ const normalizeAccount = (payload: unknown): AccountRecord | null => {
   const role = isRole(record.role) ? record.role : null;
   const status = isStatus(record.status) ? record.status : null;
   const invitationToken = typeof record.invitationToken === 'string' ? record.invitationToken : null;
+  let interviewerRole: InterviewerSeniority | null = null;
+  if (typeof record.interviewerRole === 'string') {
+    const normalized = record.interviewerRole.trim().toUpperCase();
+    const allowed: InterviewerSeniority[] = ['MD', 'SD', 'D', 'SM', 'M', 'SA', 'A'];
+    interviewerRole = allowed.includes(normalized as InterviewerSeniority)
+      ? (normalized as InterviewerSeniority)
+      : null;
+  }
 
   if (!id || !email || !role || !status || !invitationToken) {
     return null;
@@ -85,6 +94,7 @@ const normalizeAccount = (payload: unknown): AccountRecord | null => {
     name,
     firstName: firstNameRaw || undefined,
     lastName: lastNameRaw || undefined,
+    interviewerRole,
     invitedAt: invitedAt ?? new Date(0).toISOString(),
     activatedAt,
     invitationToken
@@ -110,11 +120,17 @@ const ensureAccountList = (value: unknown): AccountRecord[] => {
 
 export const accountsApi = {
   list: async () => ensureAccountList(await apiRequest<unknown>('/accounts')),
-  invite: async (email: string, role: AccountRole, firstName: string, lastName: string) =>
+  invite: async (
+    email: string,
+    role: AccountRole,
+    firstName: string,
+    lastName: string,
+    interviewerRole: InterviewerSeniority | null
+  ) =>
     ensureAccount(
       await apiRequest<unknown>('/accounts/invite', {
         method: 'POST',
-        body: { email, role, firstName, lastName }
+        body: { email, role, firstName, lastName, interviewerRole }
       })
     ),
   activate: async (id: string) =>
