@@ -12,7 +12,8 @@ import {
   InvitationDeliveryFailure
 } from './evaluations.types.js';
 import { computeInvitationState } from './evaluationAssignments.utils.js';
-import type { AccountRecord, AccountsService } from '../accounts/accounts.service.js';
+import type { AccountRecord } from '../accounts/accounts.types.js';
+import type { AccountsService } from '../accounts/accounts.service.js';
 import type { CandidatesService } from '../candidates/candidates.service.js';
 import type { CasesService } from '../cases/cases.service.js';
 import type { QuestionsService } from '../questions/questions.service.js';
