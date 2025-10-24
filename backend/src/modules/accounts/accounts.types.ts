@@ -1,5 +1,6 @@
 export type AccountRole = 'super-admin' | 'admin' | 'user';
 export type AccountStatus = 'pending' | 'active';
+
 export type InterviewerSeniority = 'MD' | 'SD' | 'D' | 'SM' | 'M' | 'SA' | 'A';
 
 export interface AccountRecord {
@@ -11,7 +12,7 @@ export interface AccountRecord {
   name?: string;
   firstName?: string;
   lastName?: string;
-  invitedAt: string;
-  activatedAt?: string;
   invitationToken: string;
+  createdAt: Date;
+  activatedAt?: Date;
 }
