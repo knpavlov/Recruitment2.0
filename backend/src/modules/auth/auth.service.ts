@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
-import type { AccountRecord, AccountsService } from '../accounts/accounts.service.js';
+import type { AccountRecord } from '../accounts/accounts.types.js';
+import type { AccountsService } from '../accounts/accounts.service.js';
 import { MailerDeliveryError, MailerService, MAILER_NOT_CONFIGURED } from '../../shared/mailer.service.js';
 import { OtpService } from '../../shared/otp.service.js';
 import { AccessCodesRepository } from './accessCodes.repository.js';

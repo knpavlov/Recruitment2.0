@@ -31,6 +31,11 @@ const createTables = async () => {
   `);
 
   await postgresPool.query(`
+    ALTER TABLE accounts
+      ADD COLUMN IF NOT EXISTS interviewer_role TEXT;
+  `);
+
+  await postgresPool.query(`
     UPDATE accounts
        SET display_name = COALESCE(display_name, NULLIF(trim(concat_ws(' ', last_name, first_name)), ''))
      WHERE display_name IS NULL;
