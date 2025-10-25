@@ -731,7 +731,7 @@ export const InterviewerScreen = () => {
 
   return (
     <div className={styles.wrapper}>
-      <header>
+      <header className={styles.header}>
         <h1>My interviews</h1>
         <p>All interview assignments assigned to you are collected in this workspace.</p>
       </header>

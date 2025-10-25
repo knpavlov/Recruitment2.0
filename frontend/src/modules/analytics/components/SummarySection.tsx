@@ -62,8 +62,8 @@ export const SummarySection = ({
               </button>
             ))}
           </div>
-          <button type="button" className={styles.actionButton} onClick={onDownload}>
-            Download CSV
+          <button type="button" className={styles.exportButton} onClick={onDownload}>
+            Export CSV
           </button>
         </div>
       </header>
