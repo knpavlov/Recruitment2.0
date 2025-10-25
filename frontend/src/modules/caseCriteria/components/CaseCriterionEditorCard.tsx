@@ -43,11 +43,17 @@ export const CaseCriterionEditorCard = ({
 }: CaseCriterionEditorCardProps) => {
   const [draft, setDraft] = useState<CaseCriterion>(criterion);
   const [saving, setSaving] = useState(false);
+  const [isEditingTitle, setIsEditingTitle] = useState(
+    mode === 'new' && !criterion.title.trim()
+  );
+  const [titleBeforeEdit, setTitleBeforeEdit] = useState(criterion.title);
 
   useEffect(() => {
     // Сбрасываем локальное состояние, если пришла новая версия критерия
     setDraft(criterion);
-  }, [criterion]);
+    setTitleBeforeEdit(criterion.title);
+    setIsEditingTitle(mode === 'new' && !criterion.title.trim());
+  }, [criterion, mode]);
 
   const hasChanges = useMemo(() => {
     const sanitized = sanitizeCriterion(draft);
@@ -100,10 +106,90 @@ export const CaseCriterionEditorCard = ({
     onCancelNew?.(criterion.id);
   };
 
+  const displayTitle = draft.title.trim() || 'Untitled criterion';
+
+  const handleConfirmTitle = () => {
+    setTitleBeforeEdit(draft.title);
+    setIsEditingTitle(false);
+  };
+
+  const handleCancelTitleEdit = () => {
+    onInteraction?.();
+    setDraft((prev) => ({ ...prev, title: titleBeforeEdit }));
+    setIsEditingTitle(false);
+  };
+
+  const handleTitleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      handleConfirmTitle();
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      handleCancelTitleEdit();
+    }
+  };
+
   return (
     <div className={styles.card}>
       <header className={styles.header}>
-        <h3>{mode === 'existing' ? 'Case criterion' : 'New case criterion'}</h3>
+        <div className={styles.titleArea}>
+          {isEditingTitle ? (
+            <div className={styles.titleEditor}>
+              <input
+                value={draft.title}
+                onChange={(event) => handleTitleChange(event.target.value)}
+                placeholder="Enter criterion title"
+                onKeyDown={handleTitleKeyDown}
+                autoFocus
+                aria-label="Criterion title"
+              />
+              <div className={styles.titleInlineActions}>
+                <button
+                  className={styles.primaryButton}
+                  onClick={handleConfirmTitle}
+                  type="button"
+                >
+                  Done
+                </button>
+                <button
+                  className={styles.secondaryButton}
+                  onClick={handleCancelTitleEdit}
+                  type="button"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className={styles.titleDisplay}>
+              <h3 title={displayTitle}>{displayTitle}</h3>
+              <button
+                className={styles.iconButton}
+                onClick={() => {
+                  onInteraction?.();
+                  setTitleBeforeEdit(draft.title);
+                  setIsEditingTitle(true);
+                }}
+                type="button"
+                aria-label="Edit criterion title"
+              >
+                <svg
+                  className={styles.pencilIcon}
+                  viewBox="0 0 20 20"
+                  role="img"
+                  aria-hidden="true"
+                  focusable="false"
+                >
+                  <path
+                    d="M12.586 3.172a2 2 0 0 1 2.828 0l1.414 1.414a2 2 0 0 1 0 2.828l-8.95 8.95a1 1 0 0 1-.5.27l-3.536.707a.5.5 0 0 1-.586-.586l.707-3.536a1 1 0 0 1 .27-.5z"
+                    fill="currentColor"
+                  />
+                </svg>
+              </button>
+            </div>
+          )}
+        </div>
         <div className={styles.headerActions}>
           {mode === 'existing' ? (
             <button
@@ -126,16 +212,6 @@ export const CaseCriterionEditorCard = ({
           )}
         </div>
       </header>
-
-      <label className={styles.fieldGroup}>
-        <span>Criterion title</span>
-        <input
-          type="text"
-          value={draft.title}
-          onChange={(event) => handleTitleChange(event.target.value)}
-          placeholder="Enter criterion title"
-        />
-      </label>
 
       <div className={styles.ratingsGrid}>
         {[1, 2, 3, 4, 5].map((score) => (

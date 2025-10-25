@@ -24,6 +24,7 @@ interface InterviewerGraphSectionProps {
   data: InterviewerStatsResponse | null;
   loading: boolean;
   error: string | null;
+  onDownload: () => void;
 }
 
 const WIDTH = 960;
@@ -214,7 +215,8 @@ export const InterviewerGraphSection = ({
   onRoleChange,
   data,
   loading,
-  error
+  error,
+  onDownload
 }: InterviewerGraphSectionProps) => {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const points = useMemo<ChartPoint[]>(() => {
@@ -351,6 +353,11 @@ export const InterviewerGraphSection = ({
         <div>
           <h2 className={styles.sectionTitle}>Interviewer performance graph</h2>
           <p className={styles.metricDetails}>{rangeDescription}</p>
+        </div>
+        <div className={styles.sectionActions}>
+          <button type="button" className={styles.exportButton} onClick={onDownload}>
+            Export CSV
+          </button>
         </div>
       </header>
 

@@ -16,15 +16,80 @@
   gap: 16px;
 }
 
-.header h3 {
-  margin: 0;
-  font-size: 20px;
-  color: #0f172a;
-}
-
 .headerActions {
   display: flex;
   gap: 12px;
+}
+
+.titleArea {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.titleDisplay {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.titleDisplay h3 {
+  margin: 0;
+  font-size: 20px;
+  color: #0f172a;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  background: rgba(248, 250, 252, 0.9);
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.iconButton:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(148, 163, 184, 0.25);
+}
+
+.pencilIcon {
+  width: 16px;
+  height: 16px;
+}
+
+.titleEditor {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.titleEditor input {
+  flex: 1;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  padding: 12px;
+  font-size: 14px;
+  background: white;
+  font-family: inherit;
+}
+
+.titleInlineActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .fieldGroup {
@@ -40,22 +105,24 @@
   padding: 12px;
   font-size: 14px;
   background: white;
+  font-family: inherit;
 }
 
 .ratingsGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
 .ratingBlock {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  background: rgba(248, 250, 252, 0.8);
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: rgba(248, 250, 252, 0.9);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
 }
 
 .ratingLabel {
@@ -66,11 +133,13 @@
 .ratingBlock textarea {
   border-radius: 10px;
   border: 1px solid rgba(148, 163, 184, 0.35);
-  padding: 10px;
+  padding: 12px;
   font-size: 14px;
   resize: vertical;
   min-height: 96px;
-  background: white;
+  background: #ffffff;
+  font-family: inherit;
+  line-height: 1.45;
 }
 
 .footer {

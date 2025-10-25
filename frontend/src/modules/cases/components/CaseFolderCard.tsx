@@ -9,13 +9,31 @@ interface CaseFolderCardProps {
   onDelete: () => Promise<void>;
   onUpload: (files: File[]) => Promise<void>;
   onRemoveFile: (fileId: string) => Promise<void>;
+  uploadState?: { progress: number; status: 'reading' | 'saving' };
 }
 
-export const CaseFolderCard = ({ folder, onRename, onDelete, onUpload, onRemoveFile }: CaseFolderCardProps) => {
+export const CaseFolderCard = ({
+  folder,
+  onRename,
+  onDelete,
+  onUpload,
+  onRemoveFile,
+  uploadState
+}: CaseFolderCardProps) => {
   const [isEditingName, setIsEditingName] = useState(false);
   const [draftName, setDraftName] = useState(folder.name);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  // Счётчик нужен, чтобы корректно отслеживать вложенные события dragenter/leave
+  const dragCounterRef = useRef(0);
+  const [isDragActive, setIsDragActive] = useState(false);
+  const isUploading = Boolean(uploadState);
+  const progressValue = Math.round(Math.min(Math.max(uploadState?.progress ?? 0, 0), 1) * 100);
+  const uploadLabel = uploadState
+    ? uploadState.status === 'saving'
+      ? 'Finalizing upload…'
+      : `Uploading ${Math.max(progressValue, 1)}%`
+    : '';
 
   useEffect(() => {
     setDraftName(folder.name);
@@ -23,6 +41,11 @@ export const CaseFolderCard = ({ folder, onRename, onDelete, onUpload, onRemoveF
 
   const handleDrop = async (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
+    dragCounterRef.current = 0;
+    setIsDragActive(false);
+    if (isUploading) {
+      return;
+    }
     const files = Array.from(event.dataTransfer.files || []);
     if (!files.length) {
       return;
@@ -35,7 +58,31 @@ export const CaseFolderCard = ({ folder, onRename, onDelete, onUpload, onRemoveF
     }
   };
 
+  const handleDragEnter = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    if (isUploading) {
+      return;
+    }
+    if (!event.dataTransfer.types?.includes('Files')) {
+      return;
+    }
+    dragCounterRef.current += 1;
+    setIsDragActive(true);
+  };
+
+  const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
+    if (dragCounterRef.current === 0) {
+      setIsDragActive(false);
+    }
+  };
+
   const handleManualUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (isUploading) {
+      event.target.value = '';
+      return;
+    }
     const files = event.target.files ? Array.from(event.target.files) : [];
     if (!files.length) {
       return;
@@ -156,23 +203,52 @@ export const CaseFolderCard = ({ folder, onRename, onDelete, onUpload, onRemoveF
       </div>
 
       <div
-        className={styles.dropZone}
+        className={`${styles.dropZone} ${isDragActive ? styles.dropZoneActive : ''} ${
+          isUploading ? styles.dropZoneBusy : ''
+        }`}
         onDragOver={(event) => {
           event.preventDefault();
+          if (isUploading) {
+            event.dataTransfer.dropEffect = 'none';
+            return;
+          }
+          event.dataTransfer.dropEffect = 'copy';
         }}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
         onDrop={handleDrop}
+        aria-busy={isUploading}
       >
-        <p>Drag files here or upload manually</p>
-        <button className={styles.secondaryButton} onClick={() => fileInputRef.current?.click()}>
-          Select files
-        </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          className={styles.hiddenInput}
-          onChange={handleManualUpload}
-        />
+        <div className={styles.dropZoneContent}>
+          <p>{isDragActive ? 'Release files to upload' : 'Drag files here or upload manually'}</p>
+          <button
+            className={styles.secondaryButton}
+            onClick={() => fileInputRef.current?.click()}
+            type="button"
+            disabled={isUploading}
+          >
+            Select files
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            className={styles.hiddenInput}
+            onChange={handleManualUpload}
+            disabled={isUploading}
+          />
+        </div>
+        {isUploading ? (
+          <div className={styles.uploadProgress} role="status">
+            <div className={styles.progressBar} aria-hidden="true">
+              <div
+                className={styles.progressFill}
+                style={{ width: `${progressValue}%` }}
+              />
+            </div>
+            <span className={styles.progressLabel}>{uploadLabel}</span>
+          </div>
+        ) : null}
       </div>
 
       {folder.files.length === 0 ? (

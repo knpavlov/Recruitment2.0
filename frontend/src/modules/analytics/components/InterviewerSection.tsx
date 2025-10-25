@@ -83,7 +83,7 @@ export const InterviewerSection = ({
               </button>
             ))}
           </div>
-          <button type="button" className={styles.secondaryButton} onClick={onDownload}>
+          <button type="button" className={styles.exportButton} onClick={onDownload}>
             Export CSV
           </button>
         </div>

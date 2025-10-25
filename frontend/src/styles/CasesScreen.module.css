@@ -182,6 +182,70 @@
   gap: 12px;
   color: #334155;
   background: rgba(148, 163, 184, 0.08);
+  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.dropZoneActive {
+  border-color: rgba(59, 130, 246, 0.85);
+  background: rgba(59, 130, 246, 0.12);
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.08);
+}
+
+.dropZoneBusy {
+  border-style: solid;
+}
+
+.dropZoneContent {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s ease;
+}
+
+.dropZoneBusy .dropZoneContent {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.dropZone button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.uploadProgress {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: rgba(15, 23, 42, 0.35);
+  color: #ffffff;
+  padding: 20px;
+}
+
+.progressBar {
+  width: min(320px, 100%);
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: linear-gradient(135deg, #38bdf8, #818cf8);
+  transition: width 0.2s ease;
+}
+
+.progressLabel {
+  font-weight: 600;
+  letter-spacing: 0.3px;
 }
 
 .hiddenInput {
@@ -240,7 +304,7 @@
 .fileActionsInline {
   display: flex;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .folderMetaRow {
