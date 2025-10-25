@@ -7,7 +7,7 @@
 .header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: 24px;
 }
 
@@ -22,11 +22,42 @@
   max-width: 480px;
 }
 
-.inviteBlock {
+.inviteCard {
   display: flex;
-  gap: 12px;
-  align-items: center;
+  flex-direction: column;
+  gap: 20px;
+  padding: 28px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  box-shadow: 0 20px 32px rgba(15, 23, 42, 0.06);
+}
+
+.inviteCardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
   flex-wrap: wrap;
+}
+
+.inviteCardTitle {
+  margin: 0;
+  font-size: 22px;
+  color: #0f172a;
+}
+
+.inviteDescription {
+  margin: 6px 0 0 0;
+  color: #475569;
+  max-width: 560px;
+}
+
+.inviteBlock {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
 }
 
 .firstNameInput,
@@ -35,7 +66,7 @@
   padding: 12px 16px;
   border-radius: 12px;
   border: 1px solid rgba(148, 163, 184, 0.4);
-  min-width: 260px;
+  width: 100%;
 }
 
 .roleSelect {
@@ -44,6 +75,21 @@
   border: 1px solid rgba(148, 163, 184, 0.4);
   background: #ffffff;
   color: #0f172a;
+  width: 100%;
+}
+
+.roleSelectors {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.roleSelectLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+  color: #475569;
 }
 
 .primaryButton {
@@ -58,6 +104,12 @@
 
 .primaryButton:hover {
   transform: translateY(-1px);
+}
+
+.primaryButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .tableWrapper {
@@ -127,6 +179,12 @@
   cursor: pointer;
 }
 
+.dangerButton:disabled {
+  background: rgba(248, 113, 113, 0.12);
+  color: rgba(185, 28, 28, 0.6);
+  cursor: not-allowed;
+}
+
 .secondaryButton {
   padding: 10px 16px;
   border-radius: 12px;
@@ -139,6 +197,7 @@
 .actionsCell {
   display: flex;
   gap: 12px;
+  align-items: center;
 }
 
 .tokenCell {

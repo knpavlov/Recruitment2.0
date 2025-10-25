@@ -67,7 +67,7 @@ const normalizeScore = (value: unknown): number | undefined => {
 const normalizeDecision = (
   value: unknown
 ): EvaluationConfig['decision'] | undefined => {
-  if (value === 'offer' || value === 'reject' || value === 'progress') {
+  if (value === 'offer' || value === 'accepted-offer' || value === 'reject' || value === 'progress') {
     return value;
   }
   if (value === null) {
@@ -516,7 +516,11 @@ export const evaluationsApi = {
         method: 'POST'
       })
     ),
-  setDecision: async (id: string, decision: 'offer' | 'reject' | null, expectedVersion: number) =>
+  setDecision: async (
+    id: string,
+    decision: 'offer' | 'accepted-offer' | 'reject' | null,
+    expectedVersion: number
+  ) =>
     ensureEvaluation(
       await apiRequest<unknown>(`/evaluations/${id}/decision`, {
         method: 'POST',

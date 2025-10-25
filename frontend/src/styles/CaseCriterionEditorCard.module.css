@@ -43,8 +43,8 @@
 }
 
 .ratingsGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 16px;
 }
 
@@ -54,8 +54,9 @@
   gap: 8px;
   padding: 12px;
   border-radius: 12px;
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  background: rgba(248, 250, 252, 0.8);
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(248, 250, 252, 0.92);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
 .ratingLabel {
@@ -71,6 +72,16 @@
   resize: vertical;
   min-height: 96px;
   background: white;
+}
+
+@media (min-width: 960px) {
+  .ratingsGrid {
+    gap: 18px;
+  }
+
+  .ratingBlock {
+    padding: 16px;
+  }
 }
 
 .footer {
