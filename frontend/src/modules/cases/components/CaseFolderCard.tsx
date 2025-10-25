@@ -16,6 +16,9 @@ export const CaseFolderCard = ({ folder, onRename, onDelete, onUpload, onRemoveF
   const [draftName, setDraftName] = useState(folder.name);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  // Счётчик нужен, чтобы корректно отслеживать вложенные события dragenter/leave
+  const dragCounterRef = useRef(0);
+  const [isDragActive, setIsDragActive] = useState(false);
 
   useEffect(() => {
     setDraftName(folder.name);
@@ -23,6 +26,8 @@ export const CaseFolderCard = ({ folder, onRename, onDelete, onUpload, onRemoveF
 
   const handleDrop = async (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
+    dragCounterRef.current = 0;
+    setIsDragActive(false);
     const files = Array.from(event.dataTransfer.files || []);
     if (!files.length) {
       return;
@@ -32,6 +37,23 @@ export const CaseFolderCard = ({ folder, onRename, onDelete, onUpload, onRemoveF
       setError(null);
     } catch (uploadError) {
       setError((uploadError as Error).message);
+    }
+  };
+
+  const handleDragEnter = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    if (!event.dataTransfer.types?.includes('Files')) {
+      return;
+    }
+    dragCounterRef.current += 1;
+    setIsDragActive(true);
+  };
+
+  const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
+    if (dragCounterRef.current === 0) {
+      setIsDragActive(false);
     }
   };
 
@@ -156,13 +178,16 @@ export const CaseFolderCard = ({ folder, onRename, onDelete, onUpload, onRemoveF
       </div>
 
       <div
-        className={styles.dropZone}
+        className={`${styles.dropZone} ${isDragActive ? styles.dropZoneActive : ''}`}
         onDragOver={(event) => {
           event.preventDefault();
+          event.dataTransfer.dropEffect = 'copy';
         }}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
-        <p>Drag files here or upload manually</p>
+        <p>{isDragActive ? 'Release files to upload' : 'Drag files here or upload manually'}</p>
         <button className={styles.secondaryButton} onClick={() => fileInputRef.current?.click()}>
           Select files
         </button>

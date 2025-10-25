@@ -181,7 +181,18 @@ export const AccountsScreen = () => {
             Invite admins and users, track activation, and remove accounts.
           </p>
         </div>
-        <div className={styles.inviteBlock}>
+      </header>
+
+      {banner && (
+        <div className={banner.type === 'info' ? styles.infoBanner : styles.errorBanner}>{banner.text}</div>
+      )}
+
+      <section className={styles.invitePanel} aria-labelledby="invite-heading">
+        <div className={styles.invitePanelHeader}>
+          <h2 id="invite-heading">Invite a new account</h2>
+          <p>Fill in the personal details, pick access level, and send an invitation email.</p>
+        </div>
+        <div className={styles.inviteForm}>
           <input
             className={styles.firstNameInput}
             placeholder="First name"
@@ -211,7 +222,7 @@ export const AccountsScreen = () => {
           <select
             className={styles.roleSelect}
             value={interviewerRole}
-            aria-label="Interviewer seniority"
+            aria-label="A&M role"
             onChange={(event) => setInterviewerRole(event.target.value as InterviewerSeniority)}
           >
             {INTERVIEWER_ROLES.map((code) => (
@@ -220,15 +231,11 @@ export const AccountsScreen = () => {
               </option>
             ))}
           </select>
-          <button className={styles.primaryButton} onClick={() => void handleInvite()}>
+          <button className={styles.primaryButton} onClick={() => void handleInvite()} type="button">
             Send invitation
           </button>
         </div>
-      </header>
-
-      {banner && (
-        <div className={banner.type === 'info' ? styles.infoBanner : styles.errorBanner}>{banner.text}</div>
-      )}
+      </section>
 
       <div className={styles.tableWrapper}>
         <table className={styles.table}>
@@ -282,7 +289,7 @@ export const AccountsScreen = () => {
                   )}
                 </button>
               </th>
-              <th>Interviewer role</th>
+              <th>A&amp;M role</th>
               <th>
                 <button
                   type="button"
@@ -321,6 +328,7 @@ export const AccountsScreen = () => {
                       <button
                         className={styles.secondaryButton}
                         onClick={() => void handleCopyToken(account.invitationToken)}
+                        type="button"
                       >
                         Copy
                       </button>
@@ -334,18 +342,19 @@ export const AccountsScreen = () => {
                     <button
                       className={styles.secondaryButton}
                       onClick={() => void handleActivate(account.id)}
+                      type="button"
                     >
                       Activate
                     </button>
                   )}
-                  {account.role !== 'super-admin' && (
-                    <button
-                      className={styles.dangerButton}
-                      onClick={() => void handleRemove(account.id)}
-                    >
-                      Delete
-                    </button>
-                  )}
+                  <button
+                    className={styles.dangerButton}
+                    onClick={() => void handleRemove(account.id)}
+                    disabled={account.role === 'super-admin'}
+                    type="button"
+                  >
+                    Delete
+                  </button>
                 </td>
               </tr>
             ))}
