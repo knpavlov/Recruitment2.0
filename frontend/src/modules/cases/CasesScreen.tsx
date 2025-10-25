@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import styles from '../../styles/CasesScreen.module.css';
 import { useCasesState } from '../../app/state/AppStateContext';
 import { CaseFolderCard } from './components/CaseFolderCard';
-import { convertFilesToRecords } from './services/fileAdapter';
+import type { CaseFileUploadDto } from '../../shared/types/caseLibrary';
 
 export const CasesScreen = () => {
   const { folders, createFolder, renameFolder, deleteFolder, registerFiles, removeFile } = useCasesState();
@@ -67,8 +67,11 @@ export const CasesScreen = () => {
     setErrorMessage(null);
   };
 
-  const handleUpload = async (folderId: string, folderVersion: number, files: File[]) => {
-    const records = await convertFilesToRecords(files);
+  const handleUpload = async (
+    folderId: string,
+    folderVersion: number,
+    records: CaseFileUploadDto[]
+  ) => {
     const result = await registerFiles(folderId, records, folderVersion);
     if (!result.ok) {
       if (result.error === 'version-conflict') {
