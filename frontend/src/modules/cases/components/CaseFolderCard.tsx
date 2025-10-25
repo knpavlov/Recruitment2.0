@@ -1,37 +1,113 @@
 import { useEffect, useRef, useState } from 'react';
-import { CaseFolder, CaseFileRecord } from '../../../shared/types/caseLibrary';
+import { CaseFolder, CaseFileRecord, CaseFileUploadDto } from '../../../shared/types/caseLibrary';
 import styles from '../../../styles/CasesScreen.module.css';
 import { formatDate } from '../../../shared/utils/date';
+import { convertFilesToRecords } from '../services/fileAdapter';
 
 interface CaseFolderCardProps {
   folder: CaseFolder;
   onRename: (name: string) => Promise<void>;
   onDelete: () => Promise<void>;
-  onUpload: (files: File[]) => Promise<void>;
+  onUpload: (files: CaseFileUploadDto[]) => Promise<void>;
   onRemoveFile: (fileId: string) => Promise<void>;
 }
+
+type UploadState = { status: 'idle' | 'processing' | 'uploading' | 'done'; progress: number };
 
 export const CaseFolderCard = ({ folder, onRename, onDelete, onUpload, onRemoveFile }: CaseFolderCardProps) => {
   const [isEditingName, setIsEditingName] = useState(false);
   const [draftName, setDraftName] = useState(folder.name);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  // Счётчик нужен, чтобы корректно отслеживать вложенные события dragenter/leave
+  const dragCounterRef = useRef(0);
+  const [isDragActive, setIsDragActive] = useState(false);
+  const [uploadState, setUploadState] = useState<UploadState>({ status: 'idle', progress: 0 });
+  const hideProgressTimeout = useRef<number | null>(null);
 
   useEffect(() => {
     setDraftName(folder.name);
   }, [folder.name]);
 
-  const handleDrop = async (event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    const files = Array.from(event.dataTransfer.files || []);
+  useEffect(() => {
+    // При размонтировании очищаем таймер скрытия индикатора загрузки
+    return () => {
+      if (hideProgressTimeout.current) {
+        window.clearTimeout(hideProgressTimeout.current);
+        hideProgressTimeout.current = null;
+      }
+    };
+  }, []);
+
+  const scheduleHideProgress = () => {
+    if (hideProgressTimeout.current) {
+      window.clearTimeout(hideProgressTimeout.current);
+    }
+    hideProgressTimeout.current = window.setTimeout(() => {
+      setUploadState({ status: 'idle', progress: 0 });
+      hideProgressTimeout.current = null;
+    }, 1200);
+  };
+
+  const performUpload = async (files: File[]) => {
     if (!files.length) {
       return;
     }
+
+    if (hideProgressTimeout.current) {
+      window.clearTimeout(hideProgressTimeout.current);
+      hideProgressTimeout.current = null;
+    }
+
+    setUploadState({ status: 'processing', progress: 0 });
+
     try {
-      await onUpload(files);
+      const records = await convertFilesToRecords(files, (percentage) => {
+        setUploadState((previous) => {
+          const nextProgress = Math.max(previous.progress, percentage * 0.82);
+          return previous.status === 'processing'
+            ? { status: 'processing', progress: nextProgress }
+            : previous;
+        });
+      });
+
+      setUploadState((previous) => ({
+        status: 'uploading',
+        progress: Math.max(previous.progress, 0.86)
+      }));
+
+      await onUpload(records);
       setError(null);
+      setUploadState({ status: 'done', progress: 1 });
+      scheduleHideProgress();
     } catch (uploadError) {
+      setUploadState({ status: 'idle', progress: 0 });
       setError((uploadError as Error).message);
+    }
+  };
+
+  const handleDrop = async (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    dragCounterRef.current = 0;
+    setIsDragActive(false);
+    const files = Array.from(event.dataTransfer.files || []);
+    await performUpload(files);
+  };
+
+  const handleDragEnter = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    if (!event.dataTransfer.types?.includes('Files')) {
+      return;
+    }
+    dragCounterRef.current += 1;
+    setIsDragActive(true);
+  };
+
+  const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
+    if (dragCounterRef.current === 0) {
+      setIsDragActive(false);
     }
   };
 
@@ -40,13 +116,8 @@ export const CaseFolderCard = ({ folder, onRename, onDelete, onUpload, onRemoveF
     if (!files.length) {
       return;
     }
-    try {
-      await onUpload(files);
-      event.target.value = '';
-      setError(null);
-    } catch (uploadError) {
-      setError((uploadError as Error).message);
-    }
+    await performUpload(files);
+    event.target.value = '';
   };
 
   const submitRename = async () => {
@@ -91,6 +162,8 @@ export const CaseFolderCard = ({ folder, onRename, onDelete, onUpload, onRemoveF
       </div>
     </li>
   );
+
+  const uploadPercent = Math.round(Math.min(Math.max(uploadState.progress, 0), 1) * 100);
 
   return (
     <div className={styles.folderCard}>
@@ -156,13 +229,16 @@ export const CaseFolderCard = ({ folder, onRename, onDelete, onUpload, onRemoveF
       </div>
 
       <div
-        className={styles.dropZone}
+        className={`${styles.dropZone} ${isDragActive ? styles.dropZoneActive : ''}`}
         onDragOver={(event) => {
           event.preventDefault();
+          event.dataTransfer.dropEffect = 'copy';
         }}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
-        <p>Drag files here or upload manually</p>
+        <p>{isDragActive ? 'Release files to upload' : 'Drag files here or upload manually'}</p>
         <button className={styles.secondaryButton} onClick={() => fileInputRef.current?.click()}>
           Select files
         </button>
@@ -173,6 +249,26 @@ export const CaseFolderCard = ({ folder, onRename, onDelete, onUpload, onRemoveF
           className={styles.hiddenInput}
           onChange={handleManualUpload}
         />
+        {uploadState.status !== 'idle' ? (
+          <div className={styles.uploadStatus} aria-live="polite">
+            <div className={styles.uploadStatusRow}>
+              <span className={styles.uploadStatusLabel}>
+                {uploadState.status === 'processing'
+                  ? 'Preparing files…'
+                  : uploadState.status === 'uploading'
+                    ? 'Uploading files…'
+                    : 'Upload complete'}
+              </span>
+              <span className={styles.uploadStatusValue}>{uploadPercent}%</span>
+            </div>
+            <div className={styles.uploadProgressTrack}>
+              <div
+                className={styles.uploadProgressValue}
+                style={{ width: `${uploadPercent}%` }}
+              />
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {folder.files.length === 0 ? (

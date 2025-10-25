@@ -70,7 +70,7 @@ interface AppStateContextValue {
     advanceRound: (id: string) => Promise<DomainResult<EvaluationConfig>>;
     setDecision: (
       id: string,
-      decision: 'offer' | 'reject' | null,
+      decision: 'offer' | 'accepted-offer' | 'reject' | null,
       expectedVersion: number
     ) => Promise<DomainResult<EvaluationConfig>>;
   };
@@ -646,7 +646,12 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
         }
       },
       setDecision: async (id, decision, expectedVersion) => {
-        if (decision !== 'offer' && decision !== 'reject' && decision !== null) {
+        if (
+          decision !== 'offer' &&
+          decision !== 'accepted-offer' &&
+          decision !== 'reject' &&
+          decision !== null
+        ) {
           return { ok: false, error: 'invalid-input' };
         }
         try {
