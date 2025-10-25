@@ -175,13 +175,18 @@ export const AccountsScreen = () => {
   return (
     <section className={styles.wrapper}>
       <header className={styles.header}>
-        <div>
-          <h1>Account management</h1>
-          <p className={styles.subtitle}>
-            Invite admins and users, track activation, and remove accounts.
-          </p>
+        <h1>Account management</h1>
+        <p className={styles.subtitle}>
+          Invite admins and users, track activation, and remove accounts.
+        </p>
+      </header>
+
+      <div className={styles.invitePanel} aria-labelledby="invite-panel-heading">
+        <div className={styles.invitePanelHeader}>
+          <h2 id="invite-panel-heading">Invite new account</h2>
+          <p>Provide basic details to send an invitation and assign initial roles.</p>
         </div>
-        <div className={styles.inviteBlock}>
+        <div className={styles.inviteFormGrid}>
           <input
             className={styles.firstNameInput}
             placeholder="First name"
@@ -224,7 +229,7 @@ export const AccountsScreen = () => {
             Send invitation
           </button>
         </div>
-      </header>
+      </div>
 
       {banner && (
         <div className={banner.type === 'info' ? styles.infoBanner : styles.errorBanner}>{banner.text}</div>
@@ -282,7 +287,7 @@ export const AccountsScreen = () => {
                   )}
                 </button>
               </th>
-              <th>Interviewer role</th>
+              <th>A&amp;M role</th>
               <th>
                 <button
                   type="button"
@@ -338,11 +343,15 @@ export const AccountsScreen = () => {
                       Activate
                     </button>
                   )}
-                  {account.role !== 'super-admin' && (
+                  {account.role !== 'super-admin' ? (
                     <button
                       className={styles.dangerButton}
                       onClick={() => void handleRemove(account.id)}
                     >
+                      Delete
+                    </button>
+                  ) : (
+                    <button className={styles.dangerButton} disabled type="button">
                       Delete
                     </button>
                   )}

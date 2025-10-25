@@ -182,6 +182,13 @@
   gap: 12px;
   color: #334155;
   background: rgba(148, 163, 184, 0.08);
+  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.dropZoneActive {
+  border-color: rgba(59, 130, 246, 0.9);
+  background: rgba(191, 219, 254, 0.35);
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
 }
 
 .hiddenInput {
@@ -240,7 +247,12 @@
 .fileActionsInline {
   display: flex;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  align-items: center;
+}
+
+.fileActionsInline > * {
+  flex-shrink: 0;
 }
 
 .folderMetaRow {
