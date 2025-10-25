@@ -16,6 +16,8 @@ export const CaseFolderCard = ({ folder, onRename, onDelete, onUpload, onRemoveF
   const [draftName, setDraftName] = useState(folder.name);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [isDragActive, setIsDragActive] = useState(false);
+  const dragCounterRef = useRef(0);
 
   useEffect(() => {
     setDraftName(folder.name);
@@ -23,6 +25,8 @@ export const CaseFolderCard = ({ folder, onRename, onDelete, onUpload, onRemoveF
 
   const handleDrop = async (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
+    dragCounterRef.current = 0;
+    setIsDragActive(false);
     const files = Array.from(event.dataTransfer.files || []);
     if (!files.length) {
       return;
@@ -156,9 +160,24 @@ export const CaseFolderCard = ({ folder, onRename, onDelete, onUpload, onRemoveF
       </div>
 
       <div
-        className={styles.dropZone}
+        className={isDragActive ? `${styles.dropZone} ${styles.dropZoneActive}` : styles.dropZone}
         onDragOver={(event) => {
           event.preventDefault();
+        }}
+        onDragEnter={(event) => {
+          event.preventDefault();
+          dragCounterRef.current += 1;
+          setIsDragActive(true);
+        }}
+        onDragLeave={(event) => {
+          const nextTarget = event.relatedTarget as Node | null;
+          if (nextTarget && event.currentTarget.contains(nextTarget)) {
+            return;
+          }
+          dragCounterRef.current = Math.max(dragCounterRef.current - 1, 0);
+          if (dragCounterRef.current === 0) {
+            setIsDragActive(false);
+          }
         }}
         onDrop={handleDrop}
       >

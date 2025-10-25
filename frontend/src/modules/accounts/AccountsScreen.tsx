@@ -181,6 +181,24 @@ export const AccountsScreen = () => {
             Invite admins and users, track activation, and remove accounts.
           </p>
         </div>
+      </header>
+
+      {banner && (
+        <div className={banner.type === 'info' ? styles.infoBanner : styles.errorBanner}>{banner.text}</div>
+      )}
+
+      <section className={styles.inviteCard}>
+        <div className={styles.inviteCardHeader}>
+          <div>
+            <h2 className={styles.inviteCardTitle}>Invite new account</h2>
+            <p className={styles.inviteDescription}>
+              Fill in the account details to send an activation email immediately.
+            </p>
+          </div>
+          <button className={styles.primaryButton} onClick={() => void handleInvite()}>
+            Send invitation
+          </button>
+        </div>
         <div className={styles.inviteBlock}>
           <input
             className={styles.firstNameInput}
@@ -200,35 +218,36 @@ export const AccountsScreen = () => {
             value={email}
             onChange={(event) => setEmail(event.target.value)}
           />
-          <select
-            className={styles.roleSelect}
-            value={targetRole}
-            onChange={(event) => setTargetRole(event.target.value as 'admin' | 'user')}
-          >
-            <option value="admin">Admin</option>
-            <option value="user">User</option>
-          </select>
-          <select
-            className={styles.roleSelect}
-            value={interviewerRole}
-            aria-label="Interviewer seniority"
-            onChange={(event) => setInterviewerRole(event.target.value as InterviewerSeniority)}
-          >
-            {INTERVIEWER_ROLES.map((code) => (
-              <option key={code} value={code}>
-                {code}
-              </option>
-            ))}
-          </select>
-          <button className={styles.primaryButton} onClick={() => void handleInvite()}>
-            Send invitation
-          </button>
+          <div className={styles.roleSelectors}>
+            <label className={styles.roleSelectLabel}>
+              <span>Portal role</span>
+              <select
+                className={styles.roleSelect}
+                value={targetRole}
+                onChange={(event) => setTargetRole(event.target.value as 'admin' | 'user')}
+              >
+                <option value="admin">Admin</option>
+                <option value="user">User</option>
+              </select>
+            </label>
+            <label className={styles.roleSelectLabel}>
+              <span>A&amp;M role</span>
+              <select
+                className={styles.roleSelect}
+                value={interviewerRole}
+                aria-label="Interviewer seniority"
+                onChange={(event) => setInterviewerRole(event.target.value as InterviewerSeniority)}
+              >
+                {INTERVIEWER_ROLES.map((code) => (
+                  <option key={code} value={code}>
+                    {code}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
         </div>
-      </header>
-
-      {banner && (
-        <div className={banner.type === 'info' ? styles.infoBanner : styles.errorBanner}>{banner.text}</div>
-      )}
+      </section>
 
       <div className={styles.tableWrapper}>
         <table className={styles.table}>
@@ -282,7 +301,7 @@ export const AccountsScreen = () => {
                   )}
                 </button>
               </th>
-              <th>Interviewer role</th>
+              <th>A&amp;M role</th>
               <th>
                 <button
                   type="button"
@@ -338,11 +357,15 @@ export const AccountsScreen = () => {
                       Activate
                     </button>
                   )}
-                  {account.role !== 'super-admin' && (
+                  {account.role !== 'super-admin' ? (
                     <button
                       className={styles.dangerButton}
                       onClick={() => void handleRemove(account.id)}
                     >
+                      Delete
+                    </button>
+                  ) : (
+                    <button className={styles.dangerButton} disabled type="button" title="Super admin cannot be deleted">
                       Delete
                     </button>
                   )}
