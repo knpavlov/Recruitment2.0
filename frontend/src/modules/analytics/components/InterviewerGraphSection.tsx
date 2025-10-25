@@ -3,6 +3,11 @@ import styles from '../../../styles/AnalyticsScreen.module.css';
 import type { InterviewerStatsResponse, TimelineGrouping } from '../types/analytics';
 import type { InterviewerSeniority } from '../../../shared/types/account';
 import { InterviewerFilters } from './InterviewerFilters';
+import {
+  buildGraphPoints,
+  formatBucketLabel,
+  formatRangeDescription
+} from '../utils/interviewerGraph';
 
 const GROUPING_LABELS: Record<TimelineGrouping, string> = {
   week: 'Weekly',
@@ -24,6 +29,7 @@ interface InterviewerGraphSectionProps {
   data: InterviewerStatsResponse | null;
   loading: boolean;
   error: string | null;
+  onDownload: () => void;
 }
 
 const WIDTH = 960;
@@ -61,14 +67,7 @@ const SERIES = [
 
 type SeriesKey = (typeof SERIES)[number]['key'];
 
-type ChartPoint = {
-  bucket: string;
-  label: string;
-  interviews: number;
-  hireShare: number;
-  caseScore: number;
-  fitScore: number;
-};
+type ChartPoint = ReturnType<typeof buildGraphPoints>[number] & { label: string };
 
 const valueAccessors: Record<SeriesKey, (point: ChartPoint) => number> = {
   interviews: (point) => point.interviews,
@@ -92,115 +91,6 @@ const normalizeValue = (point: ChartPoint, key: SeriesKey, maxCount: number) => 
   }
 };
 
-const formatBucketLabel = (bucket: string, groupBy: TimelineGrouping) => {
-  const date = new Date(bucket);
-  if (Number.isNaN(date.getTime())) {
-    return bucket;
-  }
-  if (groupBy === 'quarter') {
-    const quarter = Math.floor(date.getUTCMonth() / 3) + 1;
-    return `Q${quarter} ${date.getUTCFullYear()}`;
-  }
-  if (groupBy === 'week') {
-    return new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric' }).format(date);
-  }
-  return new Intl.DateTimeFormat('en', { month: 'short', year: 'numeric' }).format(date);
-};
-
-const RANGE_LABEL_FORMATTER = new Intl.DateTimeFormat('en', {
-  month: 'short',
-  day: 'numeric',
-  year: 'numeric'
-});
-
-const formatRangeDescription = (
-  start: string | undefined,
-  end: string | undefined,
-  groupingLabel: string
-) => {
-  // Формируем читабельную подпись в зависимости от выбранного диапазона
-  const safeStart = start ? new Date(start) : null;
-  const safeEnd = end ? new Date(end) : null;
-
-  const hasValidStart = safeStart && !Number.isNaN(safeStart.getTime());
-  const hasValidEnd = safeEnd && !Number.isNaN(safeEnd.getTime());
-
-  if (hasValidStart && hasValidEnd) {
-    return `${groupingLabel} averages from ${RANGE_LABEL_FORMATTER.format(safeStart!)} to ${RANGE_LABEL_FORMATTER.format(safeEnd!)}`;
-  }
-
-  if (hasValidStart) {
-    return `${groupingLabel} averages since ${RANGE_LABEL_FORMATTER.format(safeStart!)}`;
-  }
-
-  if (hasValidEnd) {
-    return `${groupingLabel} averages until ${RANGE_LABEL_FORMATTER.format(safeEnd!)}`;
-  }
-
-  return `${groupingLabel} averages for the available data range`;
-};
-
-const alignToBucketStart = (value: Date, groupBy: TimelineGrouping) => {
-  const aligned = new Date(value.getTime());
-  if (Number.isNaN(aligned.getTime())) {
-    return aligned;
-  }
-  switch (groupBy) {
-    case 'week': {
-      const day = aligned.getUTCDay();
-      const diff = (day + 6) % 7;
-      aligned.setUTCDate(aligned.getUTCDate() - diff);
-      aligned.setUTCHours(0, 0, 0, 0);
-      return aligned;
-    }
-    case 'quarter': {
-      const month = aligned.getUTCMonth();
-      const quarterStart = month - (month % 3);
-      aligned.setUTCMonth(quarterStart, 1);
-      aligned.setUTCHours(0, 0, 0, 0);
-      return aligned;
-    }
-    case 'month':
-    default: {
-      aligned.setUTCDate(1);
-      aligned.setUTCHours(0, 0, 0, 0);
-      return aligned;
-    }
-  }
-};
-
-const advanceBucket = (value: Date, groupBy: TimelineGrouping) => {
-  const next = new Date(value.getTime());
-  switch (groupBy) {
-    case 'week':
-      next.setUTCDate(next.getUTCDate() + 7);
-      return next;
-    case 'quarter':
-      next.setUTCMonth(next.getUTCMonth() + 3);
-      return next;
-    case 'month':
-    default:
-      next.setUTCMonth(next.getUTCMonth() + 1);
-      return next;
-  }
-};
-
-const buildBucketSequence = (startIso: string, endIso: string, groupBy: TimelineGrouping) => {
-  const startDate = new Date(startIso);
-  const endDate = new Date(endIso);
-  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
-    return [];
-  }
-  const buckets: string[] = [];
-  let cursor = alignToBucketStart(startDate, groupBy);
-  const alignedEnd = alignToBucketStart(endDate, groupBy);
-  while (cursor.getTime() <= alignedEnd.getTime()) {
-    buckets.push(cursor.toISOString());
-    cursor = advanceBucket(cursor, groupBy);
-  }
-  return buckets;
-};
-
 export const InterviewerGraphSection = ({
   grouping,
   onGroupingChange,
@@ -214,66 +104,18 @@ export const InterviewerGraphSection = ({
   onRoleChange,
   data,
   loading,
-  error
+  error,
+  onDownload
 }: InterviewerGraphSectionProps) => {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const points = useMemo<ChartPoint[]>(() => {
     if (!data) {
       return [];
     }
-
-    const byBucket = new Map<string, typeof data.buckets>();
-    data.buckets.forEach((bucket) => {
-      const existing = byBucket.get(bucket.bucket) ?? [];
-      existing.push(bucket);
-      byBucket.set(bucket.bucket, existing);
-    });
-
-    const sequence = buildBucketSequence(data.range.start, data.range.end, data.groupBy);
-
-    return sequence.map((bucketKey) => {
-      const bucketEntries = byBucket.get(bucketKey) ?? [];
-      const interviewerCount = bucketEntries.length;
-
-      let interviewSum = 0;
-      let hireShareSum = 0;
-      let hireShareCount = 0;
-      let caseScoreWeighted = 0;
-      let caseScoreCount = 0;
-      let fitScoreWeighted = 0;
-      let fitScoreCount = 0;
-
-      bucketEntries.forEach((entry) => {
-        interviewSum += entry.interviewCount;
-        const decisions = entry.hireRecommendations + entry.rejectRecommendations;
-        if (decisions > 0) {
-          hireShareSum += entry.hireRecommendations / decisions;
-          hireShareCount += 1;
-        }
-        if (entry.avgCaseScore != null && entry.caseScoreCount > 0) {
-          caseScoreWeighted += entry.avgCaseScore * entry.caseScoreCount;
-          caseScoreCount += entry.caseScoreCount;
-        }
-        if (entry.avgFitScore != null && entry.fitScoreCount > 0) {
-          fitScoreWeighted += entry.avgFitScore * entry.fitScoreCount;
-          fitScoreCount += entry.fitScoreCount;
-        }
-      });
-
-      const averageInterviews = interviewerCount ? interviewSum / interviewerCount : 0;
-      const averageHireShare = hireShareCount ? hireShareSum / hireShareCount : 0;
-      const averageCaseScore = caseScoreCount ? caseScoreWeighted / caseScoreCount : 0;
-      const averageFitScore = fitScoreCount ? fitScoreWeighted / fitScoreCount : 0;
-
-      return {
-        bucket: bucketKey,
-        label: formatBucketLabel(bucketKey, data.groupBy),
-        interviews: averageInterviews,
-        hireShare: averageHireShare,
-        caseScore: averageCaseScore,
-        fitScore: averageFitScore
-      };
-    });
+    return buildGraphPoints(data).map((point) => ({
+      ...point,
+      label: formatBucketLabel(point.bucket, data.groupBy)
+    }));
   }, [data]);
 
   const [selectedSeries, setSelectedSeries] = useState<SeriesKey[]>(() => SERIES.map((item) => item.key));
@@ -351,6 +193,11 @@ export const InterviewerGraphSection = ({
         <div>
           <h2 className={styles.sectionTitle}>Interviewer performance graph</h2>
           <p className={styles.metricDetails}>{rangeDescription}</p>
+        </div>
+        <div className={styles.sectionActions}>
+          <button type="button" className={styles.actionButton} onClick={onDownload}>
+            Download CSV
+          </button>
         </div>
       </header>
 

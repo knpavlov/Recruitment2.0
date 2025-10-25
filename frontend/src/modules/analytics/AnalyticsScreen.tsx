@@ -8,6 +8,7 @@ import { useAnalyticsSummary } from './hooks/useAnalyticsSummary';
 import { useAnalyticsTimeline } from './hooks/useAnalyticsTimeline';
 import { useAnalyticsInterviewers } from './hooks/useAnalyticsInterviewers';
 import { analyticsApi } from './services/analyticsApi';
+import { downloadGraphCsv } from './utils/interviewerGraph';
 import type { InterviewerPeriod, SummaryPeriod, TimelineGrouping } from './types/analytics';
 import type { InterviewerSeniority } from '../../shared/types/account';
 
@@ -74,6 +75,19 @@ export const AnalyticsScreen = () => {
     }
   }, [interviewerPeriod, selectedInterviewers, selectedRoles]);
 
+  const downloadInterviewerGraph = useCallback(() => {
+    if (!interviewerGraphState.data) {
+      window.alert('No graph data is available yet. Adjust filters or wait for the metrics to load.');
+      return;
+    }
+    try {
+      downloadGraphCsv(interviewerGraphState.data);
+    } catch (error) {
+      console.error('Unable to prepare interviewer graph CSV:', error);
+      window.alert('Unable to download the file. Please try again.');
+    }
+  }, [interviewerGraphState.data]);
+
   return (
     <div className={styles.screen}>
       <SummarySection
@@ -125,6 +139,7 @@ export const AnalyticsScreen = () => {
         data={interviewerGraphState.data}
         loading={interviewerGraphState.loading}
         error={interviewerGraphState.error}
+        onDownload={downloadInterviewerGraph}
       />
     </div>
   );
