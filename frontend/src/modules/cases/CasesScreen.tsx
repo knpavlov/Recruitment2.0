@@ -2,13 +2,55 @@ import { useMemo, useState } from 'react';
 import styles from '../../styles/CasesScreen.module.css';
 import { useCasesState } from '../../app/state/AppStateContext';
 import { CaseFolderCard } from './components/CaseFolderCard';
-import { convertFilesToRecords } from './services/fileAdapter';
+import { convertFilesToRecordsWithProgress } from './services/fileAdapter';
 
 export const CasesScreen = () => {
   const { folders, createFolder, renameFolder, deleteFolder, registerFiles, removeFile } = useCasesState();
   const [newFolderName, setNewFolderName] = useState('');
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [uploadStates, setUploadStates] = useState<
+    Record<string, { progress: number; status: 'reading' | 'saving' }>
+  >({});
+
+  const beginUpload = (folderId: string) => {
+    setUploadStates((current) => ({
+      ...current,
+      [folderId]: { progress: 0, status: 'reading' }
+    }));
+  };
+
+  const updateUploadProgress = (folderId: string, progress: number) => {
+    setUploadStates((current) => {
+      const previous = current[folderId];
+      const safeProgress = Math.min(Math.max(progress, 0), 1);
+      return {
+        ...current,
+        [folderId]: {
+          progress: safeProgress,
+          status: previous?.status === 'saving' ? 'saving' : 'reading'
+        }
+      };
+    });
+  };
+
+  const markUploadSaving = (folderId: string) => {
+    setUploadStates((current) => ({
+      ...current,
+      [folderId]: { progress: 1, status: 'saving' }
+    }));
+  };
+
+  const finishUpload = (folderId: string) => {
+    setUploadStates((current) => {
+      if (!(folderId in current)) {
+        return current;
+      }
+      const next = { ...current };
+      delete next[folderId];
+      return next;
+    });
+  };
 
   const sortedFolders = useMemo(
     () => [...folders].sort((a, b) => a.name.localeCompare(b.name, 'en-US')),
@@ -68,22 +110,30 @@ export const CasesScreen = () => {
   };
 
   const handleUpload = async (folderId: string, folderVersion: number, files: File[]) => {
-    const records = await convertFilesToRecords(files);
-    const result = await registerFiles(folderId, records, folderVersion);
-    if (!result.ok) {
-      if (result.error === 'version-conflict') {
-        throw new Error('Files were not saved: the folder was updated by another user.');
+    beginUpload(folderId);
+    try {
+      const records = await convertFilesToRecordsWithProgress(files, (ratio) =>
+        updateUploadProgress(folderId, ratio)
+      );
+      markUploadSaving(folderId);
+      const result = await registerFiles(folderId, records, folderVersion);
+      if (!result.ok) {
+        if (result.error === 'version-conflict') {
+          throw new Error('Files were not saved: the folder was updated by another user.');
+        }
+        if (result.error === 'invalid-input') {
+          throw new Error('Select at least one file to upload.');
+        }
+        if (result.error === 'not-found') {
+          throw new Error('Folder not found. Refresh the page.');
+        }
+        throw new Error('Failed to upload files.');
       }
-      if (result.error === 'invalid-input') {
-        throw new Error('Select at least one file to upload.');
-      }
-      if (result.error === 'not-found') {
-        throw new Error('Folder not found. Refresh the page.');
-      }
-      throw new Error('Failed to upload files.');
+      setInfoMessage(`Files uploaded: ${records.length}.`);
+      setErrorMessage(null);
+    } finally {
+      finishUpload(folderId);
     }
-    setInfoMessage(`Files uploaded: ${records.length}.`);
-    setErrorMessage(null);
   };
 
   const handleRemoveFile = async (folderId: string, folderVersion: number, fileId: string) => {
@@ -142,6 +192,7 @@ export const CasesScreen = () => {
                 onDelete={() => handleDelete(folder.id)}
                 onUpload={(files) => handleUpload(folder.id, folder.version, files)}
                 onRemoveFile={(fileId) => handleRemoveFile(folder.id, folder.version, fileId)}
+                uploadState={uploadStates[folder.id]}
               />
             ))}
           </div>

@@ -74,6 +74,28 @@ export const AnalyticsScreen = () => {
     }
   }, [interviewerPeriod, selectedInterviewers, selectedRoles]);
 
+  const downloadInterviewerGraph = useCallback(async () => {
+    try {
+      await analyticsApi.downloadDataset('interviewers', {
+        period: INTERVIEWER_GRAPH_PERIOD,
+        interviewers: selectedInterviewers.length ? selectedInterviewers.join(',') : undefined,
+        roles: selectedRoles.length ? selectedRoles.join(',') : undefined,
+        groupBy: interviewerGraphGrouping,
+        from: interviewerGraphFrom,
+        to: interviewerGraphTo
+      });
+    } catch (error) {
+      console.error('Unable to download interviewer timeline report:', error);
+      window.alert('Unable to download the file. Please try again.');
+    }
+  }, [
+    interviewerGraphFrom,
+    interviewerGraphGrouping,
+    interviewerGraphTo,
+    selectedInterviewers,
+    selectedRoles
+  ]);
+
   return (
     <div className={styles.screen}>
       <SummarySection
@@ -125,6 +147,7 @@ export const AnalyticsScreen = () => {
         data={interviewerGraphState.data}
         loading={interviewerGraphState.loading}
         error={interviewerGraphState.error}
+        onDownload={downloadInterviewerGraph}
       />
     </div>
   );
