@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { accountsService } from './accounts.module.js';
+import type { InterviewerSeniority } from './accounts.types.js';
 
 const router = Router();
 
@@ -8,15 +9,34 @@ router.get('/', async (_req, res) => {
   res.json(accounts);
 });
 
+const allowedInterviewerRoles: InterviewerSeniority[] = ['MD', 'SD', 'D', 'SM', 'M', 'SA', 'A'];
+
+const parseInterviewerRole = (value: unknown): InterviewerSeniority | null => {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const normalized = value.trim().toUpperCase();
+  return allowedInterviewerRoles.includes(normalized as InterviewerSeniority)
+    ? (normalized as InterviewerSeniority)
+    : null;
+};
+
 router.post('/invite', async (req, res) => {
-  const { email, role = 'admin', firstName, lastName } = req.body as {
+  const { email, role = 'admin', firstName, lastName, interviewerRole } = req.body as {
     email?: string;
     role?: 'admin' | 'user';
     firstName?: string;
     lastName?: string;
+    interviewerRole?: string | null;
   };
   try {
-    const account = await accountsService.inviteAccount(email ?? '', role, firstName, lastName);
+    const account = await accountsService.inviteAccount(
+      email ?? '',
+      role,
+      firstName,
+      lastName,
+      parseInterviewerRole(interviewerRole)
+    );
     res.status(201).json(account);
   } catch (error) {
     if (error instanceof Error && error.message === 'ALREADY_EXISTS') {
