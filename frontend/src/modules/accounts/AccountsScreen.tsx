@@ -3,10 +3,13 @@ import styles from '../../styles/AccountsScreen.module.css';
 import { useAccountsState } from '../../app/state/AppStateContext';
 import { useAuth } from '../auth/AuthContext';
 import { resolveAccountName } from '../../shared/utils/accountName';
+import type { InterviewerSeniority } from '../../shared/types/account';
 
 type Banner = { type: 'info' | 'error'; text: string } | null;
 
 type SortKey = 'name' | 'email' | 'status' | 'role' | 'invitation';
+
+const INTERVIEWER_ROLES: InterviewerSeniority[] = ['MD', 'SD', 'D', 'SM', 'M', 'SA', 'A'];
 
 export const AccountsScreen = () => {
   const { session } = useAuth();
@@ -16,6 +19,7 @@ export const AccountsScreen = () => {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [targetRole, setTargetRole] = useState<'admin' | 'user'>('admin');
+  const [interviewerRole, setInterviewerRole] = useState<InterviewerSeniority>('MD');
   const [banner, setBanner] = useState<Banner>(null);
   const [sortKey, setSortKey] = useState<SortKey>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -108,13 +112,13 @@ export const AccountsScreen = () => {
   }
 
   const handleInvite = async () => {
-    const result = await inviteAccount(email, targetRole, firstName, lastName);
+    const result = await inviteAccount(email, targetRole, firstName, lastName, interviewerRole);
     if (!result.ok) {
       const message =
         result.error === 'duplicate'
           ? 'This user has already been invited.'
           : result.error === 'invalid-input'
-            ? 'Enter a valid name and email.'
+            ? 'Enter a valid name, email, and interviewer role.'
             : result.error === 'mailer-unavailable'
               ? 'Email delivery is not configured. Fix the settings and try again.'
               : 'Failed to send the invitation. Try again later.';
@@ -122,9 +126,10 @@ export const AccountsScreen = () => {
       return;
     }
     setBanner({ type: 'info', text: `Invitation email sent to ${result.data.email}.` });
-    setEmail('');
-    setFirstName('');
-    setLastName('');
+      setEmail('');
+      setFirstName('');
+      setLastName('');
+      setInterviewerRole('MD');
   };
 
   const handleCopyToken = async (token: string) => {
@@ -203,6 +208,18 @@ export const AccountsScreen = () => {
             <option value="admin">Admin</option>
             <option value="user">User</option>
           </select>
+          <select
+            className={styles.roleSelect}
+            value={interviewerRole}
+            aria-label="Interviewer seniority"
+            onChange={(event) => setInterviewerRole(event.target.value as InterviewerSeniority)}
+          >
+            {INTERVIEWER_ROLES.map((code) => (
+              <option key={code} value={code}>
+                {code}
+              </option>
+            ))}
+          </select>
           <button className={styles.primaryButton} onClick={() => void handleInvite()}>
             Send invitation
           </button>
@@ -265,6 +282,7 @@ export const AccountsScreen = () => {
                   )}
                 </button>
               </th>
+              <th>Interviewer role</th>
               <th>
                 <button
                   type="button"
@@ -295,6 +313,7 @@ export const AccountsScreen = () => {
                   </span>
                 </td>
                 <td>{account.role === 'super-admin' ? 'Super admin' : account.role === 'admin' ? 'Admin' : 'User'}</td>
+                <td>{account.interviewerRole ?? '—'}</td>
                 <td>
                   {account.status === 'pending' ? (
                     <div className={styles.tokenCell}>
