@@ -1,6 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { CaseCriterion } from '../../../shared/types/caseCriteria';
 import styles from '../../../styles/CaseCriterionEditorCard.module.css';
+import { EditIcon } from '../../../components/icons/EditIcon';
+import { CheckIcon } from '../../../components/icons/CheckIcon';
+import { CloseIcon } from '../../../components/icons/CloseIcon';
 
 interface CaseCriterionEditorCardProps {
   criterion: CaseCriterion;
@@ -43,10 +46,14 @@ export const CaseCriterionEditorCard = ({
 }: CaseCriterionEditorCardProps) => {
   const [draft, setDraft] = useState<CaseCriterion>(criterion);
   const [saving, setSaving] = useState(false);
+  const [isEditingTitle, setIsEditingTitle] = useState(mode === 'new' && !criterion.title.trim());
+  const titleBackupRef = useRef(criterion.title);
 
   useEffect(() => {
     // Сбрасываем локальное состояние, если пришла новая версия критерия
     setDraft(criterion);
+    titleBackupRef.current = criterion.title;
+    setIsEditingTitle(mode === 'new' && !criterion.title.trim());
   }, [criterion]);
 
   const hasChanges = useMemo(() => {
@@ -58,6 +65,24 @@ export const CaseCriterionEditorCard = ({
   const handleTitleChange = (value: string) => {
     onInteraction?.();
     setDraft((prev) => ({ ...prev, title: value }));
+  };
+
+  const startTitleEditing = () => {
+    titleBackupRef.current = draft.title;
+    setIsEditingTitle(true);
+  };
+
+  const confirmTitleEditing = () => {
+    onInteraction?.();
+    titleBackupRef.current = draft.title.trim();
+    setDraft((prev) => ({ ...prev, title: prev.title.trim() }));
+    setIsEditingTitle(false);
+  };
+
+  const cancelTitleEditing = () => {
+    onInteraction?.();
+    setDraft((prev) => ({ ...prev, title: titleBackupRef.current }));
+    setIsEditingTitle(false);
   };
 
   const handleRatingChange = (score: 1 | 2 | 3 | 4 | 5, value: string) => {
@@ -100,10 +125,70 @@ export const CaseCriterionEditorCard = ({
     onCancelNew?.(criterion.id);
   };
 
+  const trimmedTitle = draft.title.trim();
+  const titleToDisplay = trimmedTitle || 'Untitled criterion';
+  const hasTitle = Boolean(trimmedTitle);
+
   return (
     <div className={styles.card}>
       <header className={styles.header}>
-        <h3>{mode === 'existing' ? 'Case criterion' : 'New case criterion'}</h3>
+        <div className={styles.titleColumn}>
+          {isEditingTitle ? (
+            <div className={styles.titleEditor}>
+              <input
+                className={styles.titleInput}
+                value={draft.title}
+                onChange={(event) => handleTitleChange(event.target.value)}
+                placeholder="Enter criterion title"
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    confirmTitleEditing();
+                  }
+                  if (event.key === 'Escape') {
+                    event.preventDefault();
+                    cancelTitleEditing();
+                  }
+                }}
+              />
+              <div className={styles.titleEditorActions}>
+                <button
+                  type="button"
+                  className={styles.iconButtonPositive}
+                  onClick={confirmTitleEditing}
+                  aria-label="Save title"
+                  disabled={saving}
+                >
+                  <CheckIcon width={16} height={16} />
+                </button>
+                <button
+                  type="button"
+                  className={styles.iconButton}
+                  onClick={cancelTitleEditing}
+                  aria-label="Cancel title editing"
+                  disabled={saving}
+                >
+                  <CloseIcon width={16} height={16} />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className={styles.titleDisplay}>
+              <h3 className={`${styles.titleText} ${hasTitle ? '' : styles.titlePlaceholder}`}>
+                {titleToDisplay}
+              </h3>
+              <button
+                type="button"
+                className={styles.iconButton}
+                onClick={startTitleEditing}
+                aria-label="Edit title"
+                disabled={saving}
+              >
+                <EditIcon width={18} height={18} />
+              </button>
+            </div>
+          )}
+        </div>
         <div className={styles.headerActions}>
           {mode === 'existing' ? (
             <button
@@ -126,16 +211,6 @@ export const CaseCriterionEditorCard = ({
           )}
         </div>
       </header>
-
-      <label className={styles.fieldGroup}>
-        <span>Criterion title</span>
-        <input
-          type="text"
-          value={draft.title}
-          onChange={(event) => handleTitleChange(event.target.value)}
-          placeholder="Enter criterion title"
-        />
-      </label>
 
       <div className={styles.ratingsGrid}>
         {[1, 2, 3, 4, 5].map((score) => (
