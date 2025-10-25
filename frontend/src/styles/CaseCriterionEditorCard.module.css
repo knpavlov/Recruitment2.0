@@ -12,14 +12,81 @@
 .header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: 16px;
 }
 
-.header h3 {
+.titleColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.titleDisplay {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.titleText {
   margin: 0;
   font-size: 20px;
   color: #0f172a;
+}
+
+.titlePlaceholder {
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.iconButton {
+  border: none;
+  background: rgba(148, 163, 184, 0.2);
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #1e293b;
+  cursor: pointer;
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.iconButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.iconButton:not(:disabled):hover {
+  transform: translateY(-1px);
+  background: rgba(59, 130, 246, 0.2);
+}
+
+.titleEditor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.titleInput {
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  padding: 12px;
+  font-size: 16px;
+  font-family: inherit;
+  background: #ffffff;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.titleEditorActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .headerActions {
@@ -27,35 +94,21 @@
   gap: 12px;
 }
 
-.fieldGroup {
+.ratingsGrid {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  color: #475569;
-}
-
-.fieldGroup input {
-  border-radius: 12px;
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  padding: 12px;
-  font-size: 14px;
-  background: white;
-}
-
-.ratingsGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 16px;
+  gap: 14px;
 }
 
 .ratingBlock {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  background: rgba(248, 250, 252, 0.8);
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: rgba(248, 250, 252, 0.9);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
 }
 
 .ratingLabel {
@@ -66,11 +119,13 @@
 .ratingBlock textarea {
   border-radius: 10px;
   border: 1px solid rgba(148, 163, 184, 0.35);
-  padding: 10px;
+  padding: 12px;
   font-size: 14px;
+  font-family: inherit;
+  line-height: 1.5;
   resize: vertical;
   min-height: 96px;
-  background: white;
+  background: #ffffff;
 }
 
 .footer {

@@ -67,8 +67,13 @@ export const CasesScreen = () => {
     setErrorMessage(null);
   };
 
-  const handleUpload = async (folderId: string, folderVersion: number, files: File[]) => {
-    const records = await convertFilesToRecords(files);
+  const handleUpload = async (
+    folderId: string,
+    folderVersion: number,
+    files: File[],
+    onProgress?: (value: number) => void
+  ) => {
+    const records = await convertFilesToRecords(files, onProgress);
     const result = await registerFiles(folderId, records, folderVersion);
     if (!result.ok) {
       if (result.error === 'version-conflict') {
@@ -140,7 +145,9 @@ export const CasesScreen = () => {
                 folder={folder}
                 onRename={(name) => handleRename(folder.id, folder.version, name)}
                 onDelete={() => handleDelete(folder.id)}
-                onUpload={(files) => handleUpload(folder.id, folder.version, files)}
+                onUpload={(files, options) =>
+                  handleUpload(folder.id, folder.version, files, options?.onProgress)
+                }
                 onRemoveFile={(fileId) => handleRemoveFile(folder.id, folder.version, fileId)}
               />
             ))}

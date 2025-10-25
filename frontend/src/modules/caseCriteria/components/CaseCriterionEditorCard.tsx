@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { CaseCriterion } from '../../../shared/types/caseCriteria';
 import styles from '../../../styles/CaseCriterionEditorCard.module.css';
 
@@ -43,11 +43,23 @@ export const CaseCriterionEditorCard = ({
 }: CaseCriterionEditorCardProps) => {
   const [draft, setDraft] = useState<CaseCriterion>(criterion);
   const [saving, setSaving] = useState(false);
+  const [isEditingTitle, setIsEditingTitle] = useState(mode === 'new' && !criterion.title);
+  const [titleBeforeEdit, setTitleBeforeEdit] = useState(criterion.title);
+  const titleInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     // Сбрасываем локальное состояние, если пришла новая версия критерия
     setDraft(criterion);
-  }, [criterion]);
+    setIsEditingTitle(mode === 'new' && !criterion.title);
+    setTitleBeforeEdit(criterion.title);
+  }, [criterion, mode]);
+
+  useEffect(() => {
+    if (isEditingTitle) {
+      titleInputRef.current?.focus();
+      titleInputRef.current?.select();
+    }
+  }, [isEditingTitle]);
 
   const hasChanges = useMemo(() => {
     const sanitized = sanitizeCriterion(draft);
@@ -100,10 +112,79 @@ export const CaseCriterionEditorCard = ({
     onCancelNew?.(criterion.id);
   };
 
+  const handleStartEditTitle = () => {
+    onInteraction?.();
+    setTitleBeforeEdit(draft.title);
+    setIsEditingTitle(true);
+  };
+
+  const handleCancelEditTitle = () => {
+    onInteraction?.();
+    setDraft((prev) => ({ ...prev, title: titleBeforeEdit }));
+    setIsEditingTitle(false);
+  };
+
+  const handleConfirmEditTitle = () => {
+    setIsEditingTitle(false);
+  };
+
+  const displayTitle = draft.title.trim() ? draft.title : 'Untitled criterion';
+
   return (
     <div className={styles.card}>
       <header className={styles.header}>
-        <h3>{mode === 'existing' ? 'Case criterion' : 'New case criterion'}</h3>
+        <div className={styles.titleColumn}>
+          {isEditingTitle ? (
+            <div className={styles.titleEditor}>
+              <input
+                ref={titleInputRef}
+                className={styles.titleInput}
+                type="text"
+                value={draft.title}
+                onChange={(event) => handleTitleChange(event.target.value)}
+                placeholder="Enter criterion title"
+                aria-label="Criterion title"
+              />
+              <div className={styles.titleEditorActions}>
+                <button
+                  className={styles.primaryButton}
+                  type="button"
+                  onClick={handleConfirmEditTitle}
+                  disabled={!draft.title.trim() || saving}
+                >
+                  Done
+                </button>
+                <button
+                  className={styles.secondaryButton}
+                  type="button"
+                  onClick={handleCancelEditTitle}
+                  disabled={saving}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className={styles.titleDisplay}>
+              <h3
+                className={`${styles.titleText} ${
+                  draft.title.trim() ? '' : styles.titlePlaceholder
+                }`}
+              >
+                {displayTitle}
+              </h3>
+              <button
+                type="button"
+                className={styles.iconButton}
+                onClick={handleStartEditTitle}
+                disabled={saving}
+                aria-label="Edit criterion title"
+              >
+                <PencilIcon />
+              </button>
+            </div>
+          )}
+        </div>
         <div className={styles.headerActions}>
           {mode === 'existing' ? (
             <button
@@ -126,16 +207,6 @@ export const CaseCriterionEditorCard = ({
           )}
         </div>
       </header>
-
-      <label className={styles.fieldGroup}>
-        <span>Criterion title</span>
-        <input
-          type="text"
-          value={draft.title}
-          onChange={(event) => handleTitleChange(event.target.value)}
-          placeholder="Enter criterion title"
-        />
-      </label>
 
       <div className={styles.ratingsGrid}>
         {[1, 2, 3, 4, 5].map((score) => (
@@ -177,3 +248,21 @@ export const CaseCriterionEditorCard = ({
     </div>
   );
 };
+
+const PencilIcon = () => (
+  <svg
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden="true"
+    focusable="false"
+  >
+    <path
+      d="M4 15.5V20h4.5L19.29 9.21a1 1 0 0 0 0-1.42l-3.08-3.08a1 1 0 0 0-1.42 0L4 15.5Z"
+      fill="currentColor"
+    />
+    <path d="M20 21H4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+  </svg>
+);

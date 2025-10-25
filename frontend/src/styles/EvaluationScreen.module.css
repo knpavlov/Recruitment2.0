@@ -257,6 +257,11 @@
   background: linear-gradient(135deg, #15803d, #22c55e);
 }
 
+.decisionAcceptedOffer {
+  background: linear-gradient(135deg, #b45309, #fbbf24);
+  color: #1f2937;
+}
+
 .decisionReject {
   background: linear-gradient(135deg, #b91c1c, #f97316);
 }

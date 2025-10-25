@@ -78,7 +78,7 @@ export const TimelineSection = ({
           <p className={styles.metricDetails}>Conversion and activity across the selected aggregation step</p>
         </div>
         <div className={styles.sectionActions}>
-          <button type="button" className={styles.secondaryButton} onClick={onDownload}>
+          <button type="button" className={styles.exportButton} onClick={onDownload}>
             Export CSV
           </button>
         </div>
