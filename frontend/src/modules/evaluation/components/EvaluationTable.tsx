@@ -1,7 +1,7 @@
 import { ChangeEvent, useState } from 'react';
 import styles from '../../../styles/EvaluationScreen.module.css';
 
-type DecisionOption = 'offer' | 'progress' | 'reject';
+type DecisionOption = 'offer' | 'accepted-offer' | 'progress' | 'reject';
 
 type SortableColumnKey = 'name' | 'position' | 'created' | 'round' | 'avgFit' | 'avgCase';
 
@@ -58,8 +58,9 @@ const getSortLabel = (direction: 'asc' | 'desc') => (direction === 'asc' ? '▲'
 
 const DECISION_OPTIONS: Array<{ option: DecisionOption; label: string }> = [
   { option: 'offer', label: 'Offer' },
-  { option: 'progress', label: 'Progress to next round' },
-  { option: 'reject', label: 'Reject' }
+  { option: 'accepted-offer', label: 'Accepted Offer' },
+  { option: 'reject', label: 'Reject' },
+  { option: 'progress', label: 'Next round' }
 ];
 
 export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: EvaluationTableProps) => {
@@ -128,14 +129,14 @@ export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: 
             const roundLabel = selectedRoundOption?.label ?? `Round ${row.selectedRound}`;
             const isInvitesMenuOpen = openInvitesId === row.id;
             const isDecisionMenuOpen = openDecisionId === row.id;
+            const decisionToneMap: Record<DecisionOption, string> = {
+              offer: styles.decisionOffer,
+              'accepted-offer': styles.decisionAcceptedOffer,
+              reject: styles.decisionReject,
+              progress: styles.decisionProgress
+            };
             const decisionButtonClassName = `${styles.actionButton} ${styles.decisionButton} ${
-              row.decisionState === 'offer'
-                ? styles.decisionOffer
-                : row.decisionState === 'reject'
-                  ? styles.decisionReject
-                  : row.decisionState === 'progress'
-                    ? styles.decisionProgress
-                    : styles.decisionNeutral
+              row.decisionState ? decisionToneMap[row.decisionState] : styles.decisionNeutral
             }`;
 
             const handleRoundChange = (event: ChangeEvent<HTMLSelectElement>) => {

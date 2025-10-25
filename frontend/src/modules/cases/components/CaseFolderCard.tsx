@@ -16,13 +16,21 @@ export const CaseFolderCard = ({ folder, onRename, onDelete, onUpload, onRemoveF
   const [draftName, setDraftName] = useState(folder.name);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const dragDepthRef = useRef(0);
+  const [isDragActive, setIsDragActive] = useState(false);
 
   useEffect(() => {
     setDraftName(folder.name);
   }, [folder.name]);
 
+  const resetDragState = () => {
+    dragDepthRef.current = 0;
+    setIsDragActive(false);
+  };
+
   const handleDrop = async (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
+    resetDragState();
     const files = Array.from(event.dataTransfer.files || []);
     if (!files.length) {
       return;
@@ -156,11 +164,27 @@ export const CaseFolderCard = ({ folder, onRename, onDelete, onUpload, onRemoveF
       </div>
 
       <div
-        className={styles.dropZone}
+        className={`${styles.dropZone} ${isDragActive ? styles.dropZoneActive : ''}`}
         onDragOver={(event) => {
           event.preventDefault();
+          event.dataTransfer.dropEffect = 'copy';
+        }}
+        onDragEnter={(event) => {
+          event.preventDefault();
+          dragDepthRef.current += 1;
+          if (event.dataTransfer.types.includes('Files')) {
+            setIsDragActive(true);
+          }
+        }}
+        onDragLeave={(event) => {
+          event.preventDefault();
+          dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+          if (dragDepthRef.current === 0) {
+            setIsDragActive(false);
+          }
         }}
         onDrop={handleDrop}
+        onDragEnd={resetDragState}
       >
         <p>Drag files here or upload manually</p>
         <button className={styles.secondaryButton} onClick={() => fileInputRef.current?.click()}>

@@ -6,9 +6,9 @@
 
 .header {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  gap: 24px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
 }
 
 .header h1 {
@@ -22,11 +22,43 @@
   max-width: 480px;
 }
 
-.inviteBlock {
+.invitePanel {
   display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 24px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.1);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.invitePanelHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.invitePanelHeader h2 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.invitePanelHeader p {
+  margin: 0;
+  color: #475569;
+}
+
+.inviteFormGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 12px;
-  align-items: center;
-  flex-wrap: wrap;
+  align-items: end;
+}
+
+.inviteFormGrid button {
+  justify-self: flex-start;
+  min-width: 180px;
 }
 
 .firstNameInput,
@@ -127,6 +159,11 @@
   cursor: pointer;
 }
 
+.dangerButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .secondaryButton {
   padding: 10px 16px;
   border-radius: 12px;
@@ -139,6 +176,8 @@
 .actionsCell {
   display: flex;
   gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .tokenCell {
@@ -184,4 +223,10 @@
   background: rgba(255, 255, 255, 0.8);
   text-align: center;
   color: #475569;
+}
+
+@media (max-width: 960px) {
+  .inviteFormGrid button {
+    width: 100%;
+  }
 }
