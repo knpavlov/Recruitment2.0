@@ -52,7 +52,7 @@ export interface EvaluationConfig {
   processStartedAt?: string;
   roundHistory: EvaluationRoundSnapshot[];
   invitationState: EvaluationInvitationState;
-  decision?: 'offer' | 'reject' | 'progress' | null;
+  decision?: 'offer' | 'accepted-offer' | 'reject' | 'progress' | null;
 }
 
 export interface EvaluationRoundSnapshot {
@@ -65,7 +65,7 @@ export interface EvaluationRoundSnapshot {
   processStartedAt?: string;
   completedAt?: string;
   createdAt: string;
-  decision?: 'offer' | 'reject' | 'progress' | null;
+  decision?: 'offer' | 'accepted-offer' | 'reject' | 'progress' | null;
 }
 
 export interface EvaluationInvitationState {
