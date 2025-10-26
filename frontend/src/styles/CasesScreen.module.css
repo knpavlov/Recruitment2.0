@@ -131,27 +131,46 @@
   display: flex;
   justify-content: space-between;
   gap: 16px;
-  align-items: center;
+  align-items: flex-start;
 }
 
 .folderHeader h3 {
   margin: 0;
 }
 
-.titleEdit {
+.folderTitleColumn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.titleEditor {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 12px;
-  width: 100%;
 }
 
-.titleEdit input {
+.titleInput {
   border-radius: 12px;
   border: 1px solid rgba(148, 163, 184, 0.4);
   padding: 8px 12px;
   font-size: 14px;
   flex: 1 1 220px;
+  min-width: 200px;
+}
+
+.titleEditorActions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.titleDisplay {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .folderTitle {
@@ -166,10 +185,37 @@
   flex-wrap: wrap;
 }
 
-.titleActions {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
+.iconButton,
+.iconButtonPositive {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.6);
+  background: #ffffff;
+  color: #0f172a;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.iconButtonPositive {
+  border-color: rgba(34, 197, 94, 0.5);
+  background: rgba(34, 197, 94, 0.12);
+  color: #047857;
+}
+
+.iconButton:disabled,
+.iconButtonPositive:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.iconButton:not(:disabled):hover,
+.iconButtonPositive:not(:disabled):hover {
+  transform: translateY(-1px);
+  background: rgba(226, 232, 240, 0.35);
 }
 
 .dropZone {
@@ -182,10 +228,55 @@
   gap: 12px;
   color: #334155;
   background: rgba(148, 163, 184, 0.08);
+  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.dropZoneActive {
+  border-color: rgba(59, 130, 246, 0.85);
+  background: rgba(59, 130, 246, 0.12);
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.08);
 }
 
 .hiddenInput {
   display: none;
+}
+
+.uploadStatus {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+  text-align: left;
+}
+
+.uploadStatusRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.uploadStatusLabel {
+  font-weight: 600;
+}
+
+.uploadStatusValue {
+  font-variant-numeric: tabular-nums;
+}
+
+.uploadProgressTrack {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.35);
+  overflow: hidden;
+}
+
+.uploadProgressValue {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #38bdf8, #6366f1);
+  transition: width 0.2s ease;
 }
 
 .emptyFiles {
@@ -240,7 +331,7 @@
 .fileActionsInline {
   display: flex;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .folderMetaRow {
