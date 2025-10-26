@@ -88,6 +88,41 @@
   color: #475569;
 }
 
+.outcomePill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+
+.outcomePillPositive {
+  background: #dcfce7;
+  color: #166534;
+  border-color: #bbf7d0;
+}
+
+.outcomePillProgress {
+  background: #ede9fe;
+  color: #5b21b6;
+  border-color: #ddd6fe;
+}
+
+.outcomePillNegative {
+  background: #fee2e2;
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+
+.outcomePillPending {
+  background: #f1f5f9;
+  color: #475569;
+  border-color: #e2e8f0;
+}
+
 .roundBadge {
   display: inline-block;
   font-size: 13px;
@@ -158,6 +193,42 @@
   justify-content: space-between;
   align-items: flex-start;
   gap: 16px;
+}
+
+.tabBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: -8px;
+  margin-bottom: 8px;
+}
+
+.tabButton {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid #cbd5f5;
+  background: #f8fafc;
+  color: #1e293b;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.tabButton:hover:not(:disabled) {
+  background: #eef2ff;
+  border-color: #6366f1;
+  color: #312e81;
+}
+
+.tabButtonActive {
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  border-color: #4338ca;
+  color: #ffffff;
+}
+
+.tabButtonDisabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .detailTitle {

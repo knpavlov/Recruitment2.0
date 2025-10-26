@@ -27,6 +27,15 @@ export interface InterviewStatusModel {
   offerRecommendation?: OfferRecommendationValue;
 }
 
+export interface InterviewPeerFormView {
+  slotId: string;
+  interviewerName: string;
+  interviewerEmail: string;
+  submitted: boolean;
+  submittedAt?: string;
+  form: InterviewStatusModel | null;
+}
+
 export interface EvaluationCriterionScore {
   criterionId: string;
   score?: number;
@@ -158,4 +167,6 @@ export interface InterviewerAssignmentView {
   caseFolder?: CaseFolder;
   fitQuestion?: FitQuestionRecord;
   form: InterviewStatusModel | null;
+  peerForms: InterviewPeerFormView[];
+  decision?: EvaluationDecision | null;
 }

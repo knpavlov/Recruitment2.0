@@ -717,6 +717,35 @@ export class EvaluationWorkflowService {
           ? evaluation?.processStatus ?? 'draft'
           : snapshot?.processStatus ?? 'completed';
       const evaluationUpdatedAt = snapshot?.completedAt ?? evaluation?.updatedAt ?? assignment.createdAt;
+      const interviews = snapshot?.interviews ?? evaluation?.interviews ?? [];
+      const formsSource = snapshot?.forms ?? evaluation?.forms ?? [];
+      const peerForms = interviews.map((interview) => {
+        const peerForm = formsSource.find((item) => item.slotId === interview.id) ?? null;
+        const submitted = peerForm?.submitted ?? false;
+        return {
+          slotId: interview.id,
+          interviewerName: interview.interviewerName,
+          interviewerEmail: interview.interviewerEmail,
+          submitted,
+          submittedAt: peerForm?.submittedAt,
+          form: submitted ? peerForm : null
+        } satisfies InterviewerAssignmentView['peerForms'][number];
+      });
+      if (!peerForms.some((peer) => peer.slotId === assignment.slotId)) {
+        const submitted = form?.submitted ?? false;
+        peerForms.push({
+          slotId: assignment.slotId,
+          interviewerName: assignment.interviewerName,
+          interviewerEmail: assignment.interviewerEmail,
+          submitted,
+          submittedAt: form?.submittedAt,
+          form: submitted ? form : null
+        });
+      }
+      const decision =
+        assignment.roundNumber === (evaluation?.roundNumber ?? assignment.roundNumber)
+          ? evaluation?.decision ?? null
+          : snapshot?.decision ?? null;
       return {
         evaluationId: assignment.evaluationId,
         slotId: assignment.slotId,
@@ -729,7 +758,9 @@ export class EvaluationWorkflowService {
         candidate: candidate ?? undefined,
         caseFolder: caseMap.get(assignment.caseFolderId) ?? undefined,
         fitQuestion: questionMap.get(assignment.fitQuestionId) ?? undefined,
-        form
+        form,
+        peerForms,
+        decision: decision ?? undefined
       } satisfies InterviewerAssignmentView;
     });
   }
