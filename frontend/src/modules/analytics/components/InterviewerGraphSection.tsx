@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
 import styles from '../../../styles/AnalyticsScreen.module.css';
 import type { InterviewerStatsResponse, TimelineGrouping } from '../types/analytics';
 import { buildInterviewerGraphPoints, type InterviewerGraphPoint } from '../utils/interviewerGraph';
 import type { InterviewerSeniority } from '../../../shared/types/account';
 import { InterviewerFilters } from './InterviewerFilters';
+import { CheckIcon } from '../../../components/icons/CheckIcon';
 
 const GROUPING_LABELS: Record<TimelineGrouping, string> = {
   week: 'Weekly',
@@ -201,12 +202,93 @@ export const InterviewerGraphSection = ({
 
   const defaultFrom = data ? data.range.start.slice(0, 10) : '';
   const defaultTo = data ? data.range.end.slice(0, 10) : '';
-  const fromValue = from ?? defaultFrom;
-  const toValue = to ?? defaultTo;
+  const controlledFrom = from ?? defaultFrom;
+  const controlledTo = to ?? defaultTo;
+  const [fromDraft, setFromDraft] = useState(controlledFrom);
+  const [toDraft, setToDraft] = useState(controlledTo);
+  const [fromDirty, setFromDirty] = useState(false);
+  const [toDirty, setToDirty] = useState(false);
+
+  useEffect(() => {
+    setFromDraft(controlledFrom);
+    setFromDirty(false);
+  }, [controlledFrom]);
+
+  useEffect(() => {
+    setToDraft(controlledTo);
+    setToDirty(false);
+  }, [controlledTo]);
+
+  const handleFromChange = (value: string) => {
+    setFromDraft(value);
+    setFromDirty(true);
+  };
+
+  const handleFromBlur = () => {
+    if (!fromDraft) {
+      return;
+    }
+    if (fromDraft.length !== 10) {
+      setFromDraft(controlledFrom);
+      setFromDirty(false);
+    }
+  };
+
+  const handleToChange = (value: string) => {
+    setToDraft(value);
+    setToDirty(true);
+  };
+
+  const handleToBlur = () => {
+    if (!toDraft) {
+      return;
+    }
+    if (toDraft.length !== 10) {
+      setToDraft(controlledTo);
+      setToDirty(false);
+    }
+  };
+
+  const isDraftValid = (!fromDraft || fromDraft.length === 10) && (!toDraft || toDraft.length === 10);
+  const hasDraftChanges = fromDirty || toDirty;
+
+  const applyDateRange = () => {
+    if (!isDraftValid || !hasDraftChanges) {
+      return;
+    }
+    const nextFrom = fromDraft ? fromDraft : undefined;
+    const nextTo = toDraft ? toDraft : undefined;
+    if (fromDirty) {
+      if (nextFrom !== from) {
+        onFromChange(nextFrom);
+      }
+      setFromDirty(false);
+    }
+    if (toDirty) {
+      if (nextTo !== to) {
+        onToChange(nextTo);
+      }
+      setToDirty(false);
+    }
+  };
+
+  const handleDateKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      applyDateRange();
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      setFromDraft(controlledFrom);
+      setFromDirty(false);
+      setToDraft(controlledTo);
+      setToDirty(false);
+    }
+  };
   const groupingLabel = GROUPING_LABELS[data?.groupBy ?? grouping];
   const rangeDescription = formatRangeDescription(
-    fromValue || undefined,
-    toValue || undefined,
+    controlledFrom || undefined,
+    controlledTo || undefined,
     groupingLabel
   );
 
@@ -267,29 +349,44 @@ export const InterviewerGraphSection = ({
             ))}
           </select>
         </div>
-        <div className={styles.inputGroup}>
-          <label className={styles.inputLabel} htmlFor="interviewer-from">
-            Start date
-          </label>
-          <input
-            id="interviewer-from"
-            type="date"
-            className={styles.dateInput}
-            value={fromValue}
-            onChange={(event) => onFromChange(event.target.value || undefined)}
-          />
-        </div>
-        <div className={styles.inputGroup}>
-          <label className={styles.inputLabel} htmlFor="interviewer-to">
-            End date
-          </label>
-          <input
-            id="interviewer-to"
-            type="date"
-            className={styles.dateInput}
-            value={toValue}
-            onChange={(event) => onToChange(event.target.value || undefined)}
-          />
+        <div className={styles.dateRangeGroup}>
+          <div className={styles.inputGroup}>
+            <label className={styles.inputLabel} htmlFor="interviewer-from">
+              Start date
+            </label>
+            <input
+              id="interviewer-from"
+              type="date"
+              className={styles.dateInput}
+              value={fromDraft}
+              onChange={(event) => handleFromChange(event.target.value)}
+              onBlur={handleFromBlur}
+              onKeyDown={handleDateKeyDown}
+            />
+          </div>
+          <div className={styles.inputGroup}>
+            <label className={styles.inputLabel} htmlFor="interviewer-to">
+              End date
+            </label>
+            <input
+              id="interviewer-to"
+              type="date"
+              className={styles.dateInput}
+              value={toDraft}
+              onChange={(event) => handleToChange(event.target.value)}
+              onBlur={handleToBlur}
+              onKeyDown={handleDateKeyDown}
+            />
+          </div>
+          <button
+            type="button"
+            className={styles.dateApplyButton}
+            onClick={applyDateRange}
+            disabled={!isDraftValid || !hasDraftChanges}
+            aria-label="Apply date range"
+          >
+            <CheckIcon width={18} height={18} />
+          </button>
         </div>
       </div>
 
