@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import styles from '../../../styles/AnalyticsScreen.module.css';
 import type { TimelineGrouping, TimelineResponse } from '../types/analytics';
 import { TimelineChart, SeriesConfig } from './TimelineChart';
+import { useDateInputControl } from '../hooks/useDateInputControl';
 
 const TIMELINE_SERIES: SeriesConfig[] = [
   { key: 'resumes', label: 'Resumes received', color: '#0ea5e9', type: 'count' },
@@ -67,6 +68,8 @@ export const TimelineSection = ({
 
   const defaultFrom = data ? data.range.start.slice(0, 10) : '';
   const defaultTo = data ? data.range.end.slice(0, 10) : '';
+  const fromControl = useDateInputControl(from, defaultFrom, onFromChange);
+  const toControl = useDateInputControl(to, defaultTo, onToChange);
 
   const points = data?.points ?? [];
 
@@ -110,8 +113,8 @@ export const TimelineSection = ({
             id="timeline-from"
             type="date"
             className={styles.dateInput}
-            value={from ?? defaultFrom}
-            onChange={(event) => onFromChange(event.target.value || undefined)}
+            value={fromControl.draft}
+            onChange={(event) => fromControl.handleChange(event.target.value)}
           />
         </div>
         <div className={styles.inputGroup}>
@@ -122,8 +125,8 @@ export const TimelineSection = ({
             id="timeline-to"
             type="date"
             className={styles.dateInput}
-            value={to ?? defaultTo}
-            onChange={(event) => onToChange(event.target.value || undefined)}
+            value={toControl.draft}
+            onChange={(event) => toControl.handleChange(event.target.value)}
           />
         </div>
       </div>

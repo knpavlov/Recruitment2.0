@@ -9,7 +9,10 @@ import {
   EvaluationCriterionScore,
   OfferRecommendationValue,
   InvitationDeliveryReport,
-  InvitationDeliveryFailure
+  InvitationDeliveryFailure,
+  InterviewPeerFormView,
+  EvaluationRoundSnapshot,
+  InterviewStatusModel
 } from './evaluations.types.js';
 import { computeInvitationState } from './evaluationAssignments.utils.js';
 import type { AccountRecord } from '../accounts/accounts.types.js';
@@ -69,6 +72,129 @@ const deriveFirstNameFromEmail = (email: string | undefined): string | undefined
     return undefined;
   }
   return extractFirstName(normalized);
+};
+
+const cloneCriteriaList = (
+  list: EvaluationCriterionScore[] | undefined
+): EvaluationCriterionScore[] | undefined => {
+  if (!list?.length) {
+    return list?.length === 0 ? [] : undefined;
+  }
+  return list.map((item) => ({ ...item }));
+};
+
+const cloneFormRecord = (form: InterviewStatusModel): InterviewStatusModel => ({
+  ...form,
+  fitCriteria: cloneCriteriaList(form.fitCriteria),
+  caseCriteria: cloneCriteriaList(form.caseCriteria)
+});
+
+const preferScore = (primary: number | undefined, fallback: number | undefined): number | undefined => {
+  return typeof primary === 'number' && Number.isFinite(primary) ? primary : fallback;
+};
+
+const preferText = (primary: string | undefined, fallback: string | undefined): string | undefined => {
+  if (typeof primary === 'string') {
+    const trimmed = primary.trim();
+    if (trimmed) {
+      return primary;
+    }
+  }
+  return fallback;
+};
+
+const preferCriteria = (
+  primary: EvaluationCriterionScore[] | undefined,
+  fallback: EvaluationCriterionScore[] | undefined
+): EvaluationCriterionScore[] | undefined => {
+  const primaryLength = primary?.length ?? 0;
+  const fallbackLength = fallback?.length ?? 0;
+  if (primaryLength === 0 && fallbackLength === 0) {
+    return primaryLength === 0 ? [] : undefined;
+  }
+  if (primaryLength >= fallbackLength && primaryLength > 0) {
+    return cloneCriteriaList(primary);
+  }
+  if (fallbackLength > 0) {
+    return cloneCriteriaList(fallback);
+  }
+  return undefined;
+};
+
+const mergeFormRecords = (
+  current: InterviewStatusModel,
+  incoming: InterviewStatusModel
+): InterviewStatusModel => {
+  const nextClone = cloneFormRecord(incoming);
+  const interviewerName = incoming.interviewerName?.trim()
+    ? incoming.interviewerName
+    : current.interviewerName;
+  return {
+    ...current,
+    ...nextClone,
+    interviewerName,
+    submitted: current.submitted || nextClone.submitted,
+    submittedAt: nextClone.submittedAt ?? current.submittedAt,
+    notes: preferText(nextClone.notes, current.notes),
+    fitScore: preferScore(nextClone.fitScore, current.fitScore),
+    caseScore: preferScore(nextClone.caseScore, current.caseScore),
+    fitNotes: preferText(nextClone.fitNotes, current.fitNotes),
+    caseNotes: preferText(nextClone.caseNotes, current.caseNotes),
+    interestNotes: preferText(nextClone.interestNotes, current.interestNotes),
+    issuesToTest: preferText(nextClone.issuesToTest, current.issuesToTest),
+    offerRecommendation: nextClone.offerRecommendation ?? current.offerRecommendation,
+    fitCriteria: preferCriteria(nextClone.fitCriteria, current.fitCriteria),
+    caseCriteria: preferCriteria(nextClone.caseCriteria, current.caseCriteria)
+  };
+};
+
+const collectFormsBySlot = (
+  evaluation: EvaluationRecord | undefined,
+  snapshot: EvaluationRoundSnapshot | undefined
+): Map<string, InterviewStatusModel> => {
+  const formMap = new Map<string, InterviewStatusModel>();
+  const applyForm = (form: InterviewStatusModel | undefined) => {
+    if (!form) {
+      return;
+    }
+    const existing = formMap.get(form.slotId);
+    if (!existing) {
+      formMap.set(form.slotId, cloneFormRecord(form));
+      return;
+    }
+    formMap.set(form.slotId, mergeFormRecords(existing, form));
+  };
+  if (snapshot?.forms?.length) {
+    snapshot.forms.forEach(applyForm);
+  }
+  if (evaluation?.forms?.length) {
+    evaluation.forms.forEach(applyForm);
+  }
+  return formMap;
+};
+
+const buildPeerForms = (
+  evaluation: EvaluationRecord | undefined,
+  snapshot: EvaluationRoundSnapshot | undefined
+): InterviewPeerFormView[] => {
+  if (!evaluation) {
+    return [];
+  }
+  const interviews = snapshot?.interviews ?? evaluation.interviews ?? [];
+  if (!interviews.length) {
+    return [];
+  }
+  const formMap = collectFormsBySlot(evaluation, snapshot);
+  return interviews.map((slot) => {
+    const form = formMap.get(slot.id) ?? null;
+    return {
+      slotId: slot.id,
+      interviewerName: slot.interviewerName || 'Interviewer',
+      interviewerEmail: slot.interviewerEmail,
+      submitted: Boolean(form?.submitted),
+      form
+    } satisfies InterviewPeerFormView;
+  });
 };
 
 const buildWriteModelFromRecord = (record: EvaluationRecord): EvaluationWriteModel => ({
@@ -711,6 +837,7 @@ export class EvaluationWorkflowService {
       );
       const historicalForm = snapshot?.forms.find((item) => item.slotId === assignment.slotId) ?? null;
       const form = currentForm ?? historicalForm;
+      const peerForms = buildPeerForms(evaluation, snapshot);
       const candidate = evaluation?.candidateId ? candidateMap.get(evaluation.candidateId) ?? undefined : undefined;
       const processStatus =
         assignment.roundNumber === (evaluation?.roundNumber ?? assignment.roundNumber)
@@ -729,7 +856,9 @@ export class EvaluationWorkflowService {
         candidate: candidate ?? undefined,
         caseFolder: caseMap.get(assignment.caseFolderId) ?? undefined,
         fitQuestion: questionMap.get(assignment.fitQuestionId) ?? undefined,
-        form
+        form,
+        peerForms,
+        decision: snapshot?.decision ?? evaluation?.decision ?? null
       } satisfies InterviewerAssignmentView;
     });
   }
