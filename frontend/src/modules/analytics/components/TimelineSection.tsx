@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
 import styles from '../../../styles/AnalyticsScreen.module.css';
 import type { TimelineGrouping, TimelineResponse } from '../types/analytics';
 import { TimelineChart, SeriesConfig } from './TimelineChart';
@@ -67,6 +67,63 @@ export const TimelineSection = ({
 
   const defaultFrom = data ? data.range.start.slice(0, 10) : '';
   const defaultTo = data ? data.range.end.slice(0, 10) : '';
+  const controlledFrom = from ?? defaultFrom;
+  const controlledTo = to ?? defaultTo;
+
+  const [fromDraft, setFromDraft] = useState(controlledFrom);
+  const [toDraft, setToDraft] = useState(controlledTo);
+
+  useEffect(() => {
+    setFromDraft(controlledFrom);
+  }, [controlledFrom]);
+
+  useEffect(() => {
+    setToDraft(controlledTo);
+  }, [controlledTo]);
+
+  const handleFromInputChange = (value: string) => {
+    setFromDraft(value);
+  };
+
+  const handleFromBlur = () => {
+    if (fromDraft && fromDraft.length !== 10) {
+      setFromDraft(controlledFrom);
+    }
+  };
+
+  const handleToInputChange = (value: string) => {
+    setToDraft(value);
+  };
+
+  const handleToBlur = () => {
+    if (toDraft && toDraft.length !== 10) {
+      setToDraft(controlledTo);
+    }
+  };
+
+  const fromDraftValid = !fromDraft || fromDraft.length === 10;
+  const toDraftValid = !toDraft || toDraft.length === 10;
+  const draftsChanged = fromDraft !== controlledFrom || toDraft !== controlledTo;
+  const canApplyRange = fromDraftValid && toDraftValid && draftsChanged;
+
+  const applyDraftRange = () => {
+    if (!fromDraftValid || !toDraftValid) {
+      setFromDraft(controlledFrom);
+      setToDraft(controlledTo);
+      return;
+    }
+    onFromChange(fromDraft || undefined);
+    onToChange(toDraft || undefined);
+  };
+
+  const handleRangeKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      if (canApplyRange) {
+        applyDraftRange();
+      }
+    }
+  };
 
   const points = data?.points ?? [];
 
@@ -110,8 +167,10 @@ export const TimelineSection = ({
             id="timeline-from"
             type="date"
             className={styles.dateInput}
-            value={from ?? defaultFrom}
-            onChange={(event) => onFromChange(event.target.value || undefined)}
+            value={fromDraft}
+            onChange={(event) => handleFromInputChange(event.target.value)}
+            onBlur={handleFromBlur}
+            onKeyDown={handleRangeKeyDown}
           />
         </div>
         <div className={styles.inputGroup}>
@@ -122,10 +181,21 @@ export const TimelineSection = ({
             id="timeline-to"
             type="date"
             className={styles.dateInput}
-            value={to ?? defaultTo}
-            onChange={(event) => onToChange(event.target.value || undefined)}
+            value={toDraft}
+            onChange={(event) => handleToInputChange(event.target.value)}
+            onBlur={handleToBlur}
+            onKeyDown={handleRangeKeyDown}
           />
         </div>
+        <button
+          type="button"
+          className={styles.dateConfirmButton}
+          onClick={applyDraftRange}
+          disabled={!canApplyRange}
+          aria-label="Применить выбранный диапазон"
+        >
+          <span aria-hidden="true">✓</span>
+        </button>
       </div>
 
       <div className={styles.checkboxGroup}>
