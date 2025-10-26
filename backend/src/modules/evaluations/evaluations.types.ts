@@ -145,6 +145,13 @@ export interface EvaluationWriteModel {
   decision?: EvaluationDecision | null;
 }
 
+export interface InterviewerPeerFormView {
+  slotId: string;
+  interviewerName: string;
+  submitted: boolean;
+  form: InterviewStatusModel | null;
+}
+
 export interface InterviewerAssignmentView {
   evaluationId: string;
   slotId: string;
@@ -158,4 +165,6 @@ export interface InterviewerAssignmentView {
   caseFolder?: CaseFolder;
   fitQuestion?: FitQuestionRecord;
   form: InterviewStatusModel | null;
+  peerForms: InterviewerPeerFormView[];
+  decision?: EvaluationDecision | null;
 }

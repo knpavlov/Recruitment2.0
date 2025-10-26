@@ -88,6 +88,38 @@
   color: #475569;
 }
 
+.outcomeTag {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 12px;
+  border: 1px solid transparent;
+}
+
+.outcomeTagOffer {
+  background: #ede9fe;
+  border-color: #ddd6fe;
+  color: #5b21b6;
+}
+
+.outcomeTagProgress {
+  background: #dcfce7;
+  border-color: #bbf7d0;
+  color: #166534;
+}
+
+.outcomeTagReject {
+  background: #fee2e2;
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
+.outcomeTagPending {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #475569;
+}
+
 .roundBadge {
   display: inline-block;
   font-size: 13px;
@@ -151,6 +183,51 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.formTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.formTab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid #cbd5f5;
+  background: #f8fafc;
+  color: #1e293b;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.formTab:hover:not(:disabled) {
+  border-color: #818cf8;
+}
+
+.formTabActive {
+  background: #4338ca;
+  color: #ffffff;
+  border-color: #4338ca;
+}
+
+.formTabDisabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.formTabBadge {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #fee2e2;
+  color: #b91c1c;
 }
 
 .detailHeader {

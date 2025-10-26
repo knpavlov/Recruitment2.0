@@ -711,12 +711,25 @@ export class EvaluationWorkflowService {
       );
       const historicalForm = snapshot?.forms.find((item) => item.slotId === assignment.slotId) ?? null;
       const form = currentForm ?? historicalForm;
+      const currentForms = evaluation?.forms ?? [];
+      const snapshotForms = snapshot?.forms ?? [];
+      const formsIncludeCurrentSlot = currentForms.some((item) => item.slotId === assignment.slotId);
+      const formsForTabs = formsIncludeCurrentSlot ? currentForms : snapshotForms;
+      const peerForms = formsForTabs
+        .filter((item) => item.slotId !== assignment.slotId)
+        .map((item) => ({
+          slotId: item.slotId,
+          interviewerName: item.interviewerName?.trim() || 'Interviewer',
+          submitted: Boolean(item.submitted),
+          form: item
+        }));
       const candidate = evaluation?.candidateId ? candidateMap.get(evaluation.candidateId) ?? undefined : undefined;
       const processStatus =
         assignment.roundNumber === (evaluation?.roundNumber ?? assignment.roundNumber)
           ? evaluation?.processStatus ?? 'draft'
           : snapshot?.processStatus ?? 'completed';
       const evaluationUpdatedAt = snapshot?.completedAt ?? evaluation?.updatedAt ?? assignment.createdAt;
+      const decision = formsIncludeCurrentSlot ? evaluation?.decision ?? null : snapshot?.decision ?? null;
       return {
         evaluationId: assignment.evaluationId,
         slotId: assignment.slotId,
@@ -729,7 +742,9 @@ export class EvaluationWorkflowService {
         candidate: candidate ?? undefined,
         caseFolder: caseMap.get(assignment.caseFolderId) ?? undefined,
         fitQuestion: questionMap.get(assignment.fitQuestionId) ?? undefined,
-        form
+        form,
+        peerForms,
+        decision: decision ?? undefined
       } satisfies InterviewerAssignmentView;
     });
   }
