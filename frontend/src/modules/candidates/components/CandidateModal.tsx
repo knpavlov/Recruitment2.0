@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type DragEvent } from 'react';
 import {
   CandidateProfile,
   CandidateResume,
@@ -66,6 +66,23 @@ export const CandidateModal = ({
   const [resume, setResume] = useState<CandidateResume | undefined>(undefined);
   const [aiStatus, setAiStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const dragCounterRef = useRef(0);
+  const hideProgressTimeoutRef = useRef<number | null>(null);
+  const [isDragActive, setIsDragActive] = useState(false);
+  const [uploadState, setUploadState] = useState<{ status: 'idle' | 'processing' | 'done'; progress: number }>({
+    status: 'idle',
+    progress: 0
+  });
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (hideProgressTimeoutRef.current) {
+        window.clearTimeout(hideProgressTimeoutRef.current);
+        hideProgressTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (initialProfile) {
@@ -85,17 +102,56 @@ export const CandidateModal = ({
     setProfile((prev) => ({ ...prev, [field]: value }));
   };
 
+  const clearHideProgressTimeout = () => {
+    if (hideProgressTimeoutRef.current) {
+      window.clearTimeout(hideProgressTimeoutRef.current);
+      hideProgressTimeoutRef.current = null;
+    }
+  };
+
+  const resetUploadState = () => {
+    clearHideProgressTimeout();
+    setUploadState({ status: 'idle', progress: 0 });
+  };
+
+  const scheduleHideProgress = () => {
+    clearHideProgressTimeout();
+    hideProgressTimeoutRef.current = window.setTimeout(() => {
+      resetUploadState();
+    }, 1200);
+  };
+
+  const updateUploadProgress = (value: number) => {
+    const bounded = Math.max(0, Math.min(1, value));
+    setUploadState((previous) => {
+      if (previous.status === 'done') {
+        return previous;
+      }
+      return { status: 'processing', progress: Math.max(previous.progress, bounded) };
+    });
+  };
+
   const handleResumeSelection = async (files: FileList | File[]) => {
     const list = Array.from(files);
     if (!list.length) {
       return;
     }
     const file = list[0];
-    const converted = await convertFileToResume(file);
-    setResume(converted);
-    setProfile((prev) => ({ ...prev, resume: converted }));
-    setAiStatus('idle');
-    onFeedbackClear();
+    clearHideProgressTimeout();
+    setUploadError(null);
+    setUploadState({ status: 'processing', progress: 0 });
+    try {
+      const converted = await convertFileToResume(file, updateUploadProgress);
+      setResume(converted);
+      setProfile((prev) => ({ ...prev, resume: converted }));
+      setUploadState({ status: 'done', progress: 1 });
+      scheduleHideProgress();
+      setAiStatus('idle');
+      onFeedbackClear();
+    } catch {
+      resetUploadState();
+      setUploadError('Failed to process the selected file. Please try again.');
+    }
   };
 
   const handleResumeRemoval = () => {
@@ -106,6 +162,8 @@ export const CandidateModal = ({
     }
     setAiStatus('idle');
     onFeedbackClear();
+    resetUploadState();
+    setUploadError(null);
   };
 
   const handleAiFill = async () => {
@@ -143,6 +201,35 @@ export const CandidateModal = ({
     void onDelete(initialProfile.id);
   };
 
+  const handleDragEnter = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    if (!event.dataTransfer.types?.includes('Files')) {
+      return;
+    }
+    dragCounterRef.current += 1;
+    setIsDragActive(true);
+  };
+
+  const handleDragLeave = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
+    if (dragCounterRef.current === 0) {
+      setIsDragActive(false);
+    }
+  };
+
+  const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+  };
+
+  const handleDrop = async (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    dragCounterRef.current = 0;
+    setIsDragActive(false);
+    await handleResumeSelection(event.dataTransfer.files);
+  };
+
   return (
     <div className={styles.overlay}>
       <div className={styles.modal}>
@@ -162,17 +249,14 @@ export const CandidateModal = ({
           </div>
         )}
 
-        <section
-          className={styles.uploadSection}
-          onDragOver={(event) => {
-            event.preventDefault();
-          }}
-          onDrop={(event) => {
-            event.preventDefault();
-            handleResumeSelection(event.dataTransfer.files);
-          }}
-        >
-          <div className={styles.uploadZone}>
+        <section className={styles.uploadSection}>
+          <div
+            className={`${styles.uploadZone} ${isDragActive ? styles.uploadZoneActive : ''}`}
+            onDragEnter={handleDragEnter}
+            onDragLeave={handleDragLeave}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+          >
             {resume ? (
               <>
                 <a
@@ -187,9 +271,25 @@ export const CandidateModal = ({
                   Uploaded {formatDate(resume.uploadedAt)} · {(resume.size / 1024).toFixed(1)} KB
                 </p>
               </>
-            ) : (
-              <p>Drag a resume here or pick a file</p>
-            )}
+              ) : (
+                <p>Drag a resume here or pick a file</p>
+              )}
+            {uploadState.status !== 'idle' ? (
+              <div className={styles.uploadProgress}>
+                <div className={styles.uploadProgressTrack}>
+                  <div
+                    className={styles.uploadProgressBar}
+                    style={{ width: `${Math.round(Math.min(Math.max(uploadState.progress, 0), 1) * 100)}%` }}
+                  />
+                </div>
+                <span className={styles.uploadProgressLabel}>
+                  {uploadState.status === 'done'
+                    ? 'Upload complete'
+                    : `Reading file… ${Math.max(5, Math.round(uploadState.progress * 100))}%`}
+                </span>
+              </div>
+            ) : null}
+            {uploadError ? <p className={styles.uploadError}>{uploadError}</p> : null}
           </div>
           <div className={styles.uploadActions}>
             <button className={styles.secondaryButton} onClick={() => fileInputRef.current?.click()}>

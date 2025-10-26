@@ -160,7 +160,11 @@ const parseRound = (value: unknown): EvaluationRoundSnapshot | null => {
       ? value.processStatus
       : 'draft';
   const decision =
-    value.decision === 'offer' || value.decision === 'reject' || value.decision === 'progress' || value.decision === null
+    value.decision === 'offer' ||
+    value.decision === 'accepted-offer' ||
+    value.decision === 'reject' ||
+    value.decision === 'progress' ||
+    value.decision === null
       ? value.decision ?? undefined
       : undefined;
   return {
@@ -223,7 +227,10 @@ export class AnalyticsRepository {
       createdAt: row.created_at.toISOString(),
       updatedAt: row.updated_at.toISOString(),
       decision:
-        row.decision === 'offer' || row.decision === 'reject' || row.decision === 'progress'
+        row.decision === 'offer' ||
+        row.decision === 'accepted-offer' ||
+        row.decision === 'reject' ||
+        row.decision === 'progress'
           ? row.decision
           : row.decision === null
           ? null
