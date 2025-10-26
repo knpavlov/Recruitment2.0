@@ -3,7 +3,8 @@ import {
   EvaluationCriterionScore,
   InterviewerAssignmentView,
   InterviewStatusRecord,
-  OfferRecommendationValue
+  OfferRecommendationValue,
+  InterviewPeerFormView
 } from '../../../shared/types/evaluation';
 import {
   CandidateProfile,
@@ -64,6 +65,53 @@ const normalizeNumber = (value: unknown): number | undefined => {
     }
   }
   return undefined;
+};
+
+const DECISION_VALUES = ['offer', 'accepted-offer', 'reject', 'progress'] as const;
+
+const normalizeDecision = (value: unknown): InterviewerAssignmentView['decision'] => {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const normalized = value.trim().toLowerCase();
+  const match = DECISION_VALUES.find((entry) => entry === normalized);
+  return (match ?? null) as InterviewerAssignmentView['decision'];
+};
+
+const normalizePeerForm = (value: unknown): InterviewPeerFormView | undefined => {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+  const payload = value as Partial<InterviewPeerFormView> & {
+    slotId?: unknown;
+    interviewerEmail?: unknown;
+    form?: unknown;
+    submitted?: unknown;
+  };
+  const slotId = normalizeString(payload.slotId)?.trim();
+  if (!slotId) {
+    return undefined;
+  }
+  const interviewerEmail = normalizeString(payload.interviewerEmail)?.trim();
+  if (!interviewerEmail) {
+    return undefined;
+  }
+  return {
+    slotId,
+    interviewerEmail,
+    interviewerName: normalizeString(payload.interviewerName) ?? 'Interviewer',
+    submitted: typeof payload.submitted === 'boolean' ? payload.submitted : Boolean(payload.form && (payload.form as { submitted?: unknown }).submitted),
+    form: normalizeForm(payload.form)
+  };
+};
+
+const normalizePeerForms = (value: unknown): InterviewPeerFormView[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((item) => normalizePeerForm(item))
+    .filter((item): item is InterviewPeerFormView => Boolean(item));
 };
 
 const normalizeCriteriaList = (value: unknown): EvaluationCriterionScore[] => {
@@ -322,6 +370,8 @@ const normalizeAssignment = (value: unknown): InterviewerAssignmentView | null =
     caseFolder?: unknown;
     fitQuestion?: unknown;
     form?: unknown;
+    peerForms?: unknown;
+    decision?: unknown;
   };
 
   const evaluationId = normalizeString(payload.evaluationId)?.trim();
@@ -344,7 +394,9 @@ const normalizeAssignment = (value: unknown): InterviewerAssignmentView | null =
     candidate: normalizeCandidate(payload.candidate),
     caseFolder: normalizeCaseFolder(payload.caseFolder),
     fitQuestion: normalizeFitQuestion(payload.fitQuestion),
-    form: normalizeForm(payload.form)
+    form: normalizeForm(payload.form),
+    peerForms: normalizePeerForms(payload.peerForms),
+    decision: normalizeDecision(payload.decision)
   };
 };
 
