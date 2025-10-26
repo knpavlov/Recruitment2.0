@@ -9,7 +9,10 @@ import {
   EvaluationCriterionScore,
   OfferRecommendationValue,
   InvitationDeliveryReport,
-  InvitationDeliveryFailure
+  InvitationDeliveryFailure,
+  InterviewPeerFormView,
+  EvaluationRoundSnapshot,
+  InterviewStatusModel
 } from './evaluations.types.js';
 import { computeInvitationState } from './evaluationAssignments.utils.js';
 import type { AccountRecord } from '../accounts/accounts.types.js';
@@ -69,6 +72,44 @@ const deriveFirstNameFromEmail = (email: string | undefined): string | undefined
     return undefined;
   }
   return extractFirstName(normalized);
+};
+
+const collectFormsBySlot = (
+  evaluation: EvaluationRecord | undefined,
+  snapshot: EvaluationRoundSnapshot | undefined
+): Map<string, InterviewStatusModel> => {
+  const formEntries: InterviewStatusModel[] = [];
+  if (snapshot?.forms?.length) {
+    formEntries.push(...snapshot.forms);
+  }
+  if (evaluation?.forms?.length) {
+    formEntries.push(...evaluation.forms);
+  }
+  return new Map(formEntries.map((form) => [form.slotId, form]));
+};
+
+const buildPeerForms = (
+  evaluation: EvaluationRecord | undefined,
+  snapshot: EvaluationRoundSnapshot | undefined
+): InterviewPeerFormView[] => {
+  if (!evaluation) {
+    return [];
+  }
+  const interviews = snapshot?.interviews ?? evaluation.interviews ?? [];
+  if (!interviews.length) {
+    return [];
+  }
+  const formMap = collectFormsBySlot(evaluation, snapshot);
+  return interviews.map((slot) => {
+    const form = formMap.get(slot.id) ?? null;
+    return {
+      slotId: slot.id,
+      interviewerName: slot.interviewerName || 'Interviewer',
+      interviewerEmail: slot.interviewerEmail,
+      submitted: Boolean(form?.submitted),
+      form
+    } satisfies InterviewPeerFormView;
+  });
 };
 
 const buildWriteModelFromRecord = (record: EvaluationRecord): EvaluationWriteModel => ({
@@ -711,6 +752,7 @@ export class EvaluationWorkflowService {
       );
       const historicalForm = snapshot?.forms.find((item) => item.slotId === assignment.slotId) ?? null;
       const form = currentForm ?? historicalForm;
+      const peerForms = buildPeerForms(evaluation, snapshot);
       const candidate = evaluation?.candidateId ? candidateMap.get(evaluation.candidateId) ?? undefined : undefined;
       const processStatus =
         assignment.roundNumber === (evaluation?.roundNumber ?? assignment.roundNumber)
@@ -729,7 +771,9 @@ export class EvaluationWorkflowService {
         candidate: candidate ?? undefined,
         caseFolder: caseMap.get(assignment.caseFolderId) ?? undefined,
         fitQuestion: questionMap.get(assignment.fitQuestionId) ?? undefined,
-        form
+        form,
+        peerForms,
+        decision: snapshot?.decision ?? evaluation?.decision ?? null
       } satisfies InterviewerAssignmentView;
     });
   }

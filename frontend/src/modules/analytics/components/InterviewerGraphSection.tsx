@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import styles from '../../../styles/AnalyticsScreen.module.css';
 import type { InterviewerStatsResponse, TimelineGrouping } from '../types/analytics';
 import { buildInterviewerGraphPoints, type InterviewerGraphPoint } from '../utils/interviewerGraph';
 import type { InterviewerSeniority } from '../../../shared/types/account';
 import { InterviewerFilters } from './InterviewerFilters';
+import { isCompleteIsoDate } from '../utils/dateInput';
 
 const GROUPING_LABELS: Record<TimelineGrouping, string> = {
   week: 'Weekly',
@@ -199,14 +200,59 @@ export const InterviewerGraphSection = ({
     return <path key={key} d={path} fill="none" stroke={color} strokeWidth={2.4} strokeLinejoin="round" strokeLinecap="round" />;
   };
 
-  const defaultFrom = data ? data.range.start.slice(0, 10) : '';
-  const defaultTo = data ? data.range.end.slice(0, 10) : '';
-  const fromValue = from ?? defaultFrom;
-  const toValue = to ?? defaultTo;
+  const defaultFrom = useMemo(() => (data ? data.range.start.slice(0, 10) : ''), [data]);
+  const defaultTo = useMemo(() => (data ? data.range.end.slice(0, 10) : ''), [data]);
+  const [fromInput, setFromInput] = useState<string>(from ?? defaultFrom);
+  const [toInput, setToInput] = useState<string>(to ?? defaultTo);
+
+  useEffect(() => {
+    setFromInput(from ?? defaultFrom);
+  }, [from, defaultFrom]);
+
+  useEffect(() => {
+    setToInput(to ?? defaultTo);
+  }, [to, defaultTo]);
+
+  const handleFromChange = (value: string) => {
+    setFromInput(value);
+    if (!value) {
+      onFromChange(undefined);
+      return;
+    }
+    if (isCompleteIsoDate(value)) {
+      onFromChange(value);
+    }
+  };
+
+  const handleToChange = (value: string) => {
+    setToInput(value);
+    if (!value) {
+      onToChange(undefined);
+      return;
+    }
+    if (isCompleteIsoDate(value)) {
+      onToChange(value);
+    }
+  };
+
+  const handleFromBlur = () => {
+    if (fromInput && !isCompleteIsoDate(fromInput)) {
+      setFromInput(from ?? defaultFrom);
+    }
+  };
+
+  const handleToBlur = () => {
+    if (toInput && !isCompleteIsoDate(toInput)) {
+      setToInput(to ?? defaultTo);
+    }
+  };
+
+  const effectiveFrom = from ?? defaultFrom;
+  const effectiveTo = to ?? defaultTo;
   const groupingLabel = GROUPING_LABELS[data?.groupBy ?? grouping];
   const rangeDescription = formatRangeDescription(
-    fromValue || undefined,
-    toValue || undefined,
+    effectiveFrom || undefined,
+    effectiveTo || undefined,
     groupingLabel
   );
 
@@ -275,8 +321,9 @@ export const InterviewerGraphSection = ({
             id="interviewer-from"
             type="date"
             className={styles.dateInput}
-            value={fromValue}
-            onChange={(event) => onFromChange(event.target.value || undefined)}
+            value={fromInput}
+            onChange={(event) => handleFromChange(event.target.value)}
+            onBlur={handleFromBlur}
           />
         </div>
         <div className={styles.inputGroup}>
@@ -287,8 +334,9 @@ export const InterviewerGraphSection = ({
             id="interviewer-to"
             type="date"
             className={styles.dateInput}
-            value={toValue}
-            onChange={(event) => onToChange(event.target.value || undefined)}
+            value={toInput}
+            onChange={(event) => handleToChange(event.target.value)}
+            onBlur={handleToBlur}
           />
         </div>
       </div>

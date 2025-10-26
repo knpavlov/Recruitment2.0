@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import styles from '../../../styles/AnalyticsScreen.module.css';
 import type { TimelineGrouping, TimelineResponse } from '../types/analytics';
 import { TimelineChart, SeriesConfig } from './TimelineChart';
+import { isCompleteIsoDate } from '../utils/dateInput';
 
 const TIMELINE_SERIES: SeriesConfig[] = [
   { key: 'resumes', label: 'Resumes received', color: '#0ea5e9', type: 'count' },
@@ -65,8 +66,52 @@ export const TimelineSection = ({
     );
   };
 
-  const defaultFrom = data ? data.range.start.slice(0, 10) : '';
-  const defaultTo = data ? data.range.end.slice(0, 10) : '';
+  const defaultFrom = useMemo(() => (data ? data.range.start.slice(0, 10) : ''), [data]);
+  const defaultTo = useMemo(() => (data ? data.range.end.slice(0, 10) : ''), [data]);
+  const [fromInput, setFromInput] = useState<string>(from ?? defaultFrom);
+  const [toInput, setToInput] = useState<string>(to ?? defaultTo);
+
+  useEffect(() => {
+    setFromInput(from ?? defaultFrom);
+  }, [from, defaultFrom]);
+
+  useEffect(() => {
+    setToInput(to ?? defaultTo);
+  }, [to, defaultTo]);
+
+  const handleFromChange = (value: string) => {
+    setFromInput(value);
+    if (!value) {
+      onFromChange(undefined);
+      return;
+    }
+    if (isCompleteIsoDate(value)) {
+      onFromChange(value);
+    }
+  };
+
+  const handleToChange = (value: string) => {
+    setToInput(value);
+    if (!value) {
+      onToChange(undefined);
+      return;
+    }
+    if (isCompleteIsoDate(value)) {
+      onToChange(value);
+    }
+  };
+
+  const handleFromBlur = () => {
+    if (fromInput && !isCompleteIsoDate(fromInput)) {
+      setFromInput(from ?? defaultFrom);
+    }
+  };
+
+  const handleToBlur = () => {
+    if (toInput && !isCompleteIsoDate(toInput)) {
+      setToInput(to ?? defaultTo);
+    }
+  };
 
   const points = data?.points ?? [];
 
@@ -110,8 +155,9 @@ export const TimelineSection = ({
             id="timeline-from"
             type="date"
             className={styles.dateInput}
-            value={from ?? defaultFrom}
-            onChange={(event) => onFromChange(event.target.value || undefined)}
+            value={fromInput}
+            onChange={(event) => handleFromChange(event.target.value)}
+            onBlur={handleFromBlur}
           />
         </div>
         <div className={styles.inputGroup}>
@@ -122,8 +168,9 @@ export const TimelineSection = ({
             id="timeline-to"
             type="date"
             className={styles.dateInput}
-            value={to ?? defaultTo}
-            onChange={(event) => onToChange(event.target.value || undefined)}
+            value={toInput}
+            onChange={(event) => handleToChange(event.target.value)}
+            onBlur={handleToBlur}
           />
         </div>
       </div>
