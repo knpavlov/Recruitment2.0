@@ -19,6 +19,19 @@ const HEIGHT = 360;
 const PADDING_X = 72;
 const PADDING_Y = 48;
 
+const formatPointValue = (value: number, type: SeriesConfig['type']) => {
+  if (!Number.isFinite(value)) {
+    return '—';
+  }
+  if (type === 'count') {
+    return `${Math.round(value)}`;
+  }
+  if (type === 'score') {
+    return value.toFixed(1);
+  }
+  return `${(value * 100).toFixed(1)}%`;
+};
+
 const formatMonthLabel = (value: string) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -200,7 +213,12 @@ export const TimelineChart = ({ points, series }: TimelineChartProps) => {
                 : (raw * 100) / 100;
             const x = xPositions[index];
             const y = HEIGHT - PADDING_Y - normalized * availableHeight;
-            return <circle key={`${item.key}-${index}`} cx={x} cy={y} r={3.5} fill={item.color} />;
+            const tooltipValue = formatPointValue(raw, item.type);
+            return (
+              <circle key={`${item.key}-${index}`} cx={x} cy={y} r={3.5} fill={item.color}>
+                <title>{`${item.label}: ${tooltipValue}`}</title>
+              </circle>
+            );
           })
         )}
       </svg>
