@@ -4,6 +4,7 @@ import type { InterviewerStatsResponse, TimelineGrouping } from '../types/analyt
 import { buildInterviewerGraphPoints, type InterviewerGraphPoint } from '../utils/interviewerGraph';
 import type { InterviewerSeniority } from '../../../shared/types/account';
 import { InterviewerFilters } from './InterviewerFilters';
+import { useDateInputControl } from '../hooks/useDateInputControl';
 
 const GROUPING_LABELS: Record<TimelineGrouping, string> = {
   week: 'Weekly',
@@ -201,6 +202,8 @@ export const InterviewerGraphSection = ({
 
   const defaultFrom = data ? data.range.start.slice(0, 10) : '';
   const defaultTo = data ? data.range.end.slice(0, 10) : '';
+  const fromControl = useDateInputControl(from, defaultFrom, onFromChange);
+  const toControl = useDateInputControl(to, defaultTo, onToChange);
   const fromValue = from ?? defaultFrom;
   const toValue = to ?? defaultTo;
   const groupingLabel = GROUPING_LABELS[data?.groupBy ?? grouping];
@@ -275,8 +278,8 @@ export const InterviewerGraphSection = ({
             id="interviewer-from"
             type="date"
             className={styles.dateInput}
-            value={fromValue}
-            onChange={(event) => onFromChange(event.target.value || undefined)}
+            value={fromControl.draft}
+            onChange={(event) => fromControl.handleChange(event.target.value)}
           />
         </div>
         <div className={styles.inputGroup}>
@@ -287,8 +290,8 @@ export const InterviewerGraphSection = ({
             id="interviewer-to"
             type="date"
             className={styles.dateInput}
-            value={toValue}
-            onChange={(event) => onToChange(event.target.value || undefined)}
+            value={toControl.draft}
+            onChange={(event) => toControl.handleChange(event.target.value)}
           />
         </div>
       </div>
