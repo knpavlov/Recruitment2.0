@@ -26,6 +26,16 @@ npm install
 npm run dev
 ```
 
+### Демонстрационное наполнение базы
+
+Скрипт `seedDemoData` не запускается автоматически — его нужно выполнить вручную после настройки соединения с PostgreSQL.
+
+1. Перейдите в каталог бэкенда: `cd backend`.
+2. Убедитесь, что в `.env` указаны параметры подключения к базе (см. раздел «Database configuration»).
+3. Выполните команду `npm run seed:demo`. Скрипт соберёт TypeScript-проект, прогонит миграции и добавит демо-кейсы, fit-вопросы, семь кандидатов и связанные интервью с оценками.
+
+Скрипт использует детерминированные идентификаторы и `ON CONFLICT`, поэтому его можно запускать повторно: данные обновятся без дублирования.
+
 ### Database configuration
 
 The backend uses PostgreSQL. Both the connection string `DATABASE_URL` and individual parameters (`PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE`) are supported.
