@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import styles from '../../../styles/AnalyticsScreen.module.css';
 import type { TimelineGrouping, TimelineResponse } from '../types/analytics';
 import { TimelineChart, SeriesConfig } from './TimelineChart';
@@ -67,6 +67,53 @@ export const TimelineSection = ({
 
   const defaultFrom = data ? data.range.start.slice(0, 10) : '';
   const defaultTo = data ? data.range.end.slice(0, 10) : '';
+  const controlledFrom = from ?? defaultFrom;
+  const controlledTo = to ?? defaultTo;
+
+  const [fromDraft, setFromDraft] = useState(controlledFrom);
+  const [toDraft, setToDraft] = useState(controlledTo);
+
+  useEffect(() => {
+    setFromDraft(controlledFrom);
+  }, [controlledFrom]);
+
+  useEffect(() => {
+    setToDraft(controlledTo);
+  }, [controlledTo]);
+
+  const handleFromInputChange = (value: string) => {
+    setFromDraft(value);
+    if (!value) {
+      onFromChange(undefined);
+      return;
+    }
+    if (value.length === 10) {
+      onFromChange(value);
+    }
+  };
+
+  const handleFromBlur = () => {
+    if (fromDraft && fromDraft.length !== 10) {
+      setFromDraft(controlledFrom);
+    }
+  };
+
+  const handleToInputChange = (value: string) => {
+    setToDraft(value);
+    if (!value) {
+      onToChange(undefined);
+      return;
+    }
+    if (value.length === 10) {
+      onToChange(value);
+    }
+  };
+
+  const handleToBlur = () => {
+    if (toDraft && toDraft.length !== 10) {
+      setToDraft(controlledTo);
+    }
+  };
 
   const points = data?.points ?? [];
 
@@ -110,8 +157,9 @@ export const TimelineSection = ({
             id="timeline-from"
             type="date"
             className={styles.dateInput}
-            value={from ?? defaultFrom}
-            onChange={(event) => onFromChange(event.target.value || undefined)}
+            value={fromDraft}
+            onChange={(event) => handleFromInputChange(event.target.value)}
+            onBlur={handleFromBlur}
           />
         </div>
         <div className={styles.inputGroup}>
@@ -122,8 +170,9 @@ export const TimelineSection = ({
             id="timeline-to"
             type="date"
             className={styles.dateInput}
-            value={to ?? defaultTo}
-            onChange={(event) => onToChange(event.target.value || undefined)}
+            value={toDraft}
+            onChange={(event) => handleToInputChange(event.target.value)}
+            onBlur={handleToBlur}
           />
         </div>
       </div>
