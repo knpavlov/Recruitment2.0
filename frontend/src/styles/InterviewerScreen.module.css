@@ -2,7 +2,8 @@
   display: flex;
   flex-direction: column;
   gap: 24px;
-  padding: 32px;
+  padding: 0 32px 32px;
+  margin-top: -8px;
   height: 100%;
   box-sizing: border-box;
 }
@@ -257,6 +258,8 @@
   border-radius: 8px;
   padding: 10px 12px;
   font-size: 14px;
+  font-family: inherit;
+  line-height: 1.45;
   width: 100%;
   box-sizing: border-box;
 }
@@ -377,8 +380,14 @@
 
 .criteriaGrid {
   display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 900px) {
+  .criteriaGrid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .criterionCard {
@@ -389,6 +398,12 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.criterionCardSubmitted {
+  border-color: rgba(14, 165, 233, 0.5);
+  background: linear-gradient(180deg, rgba(14, 165, 233, 0.08), rgba(14, 165, 233, 0.02));
+  box-shadow: 0 6px 18px rgba(14, 165, 233, 0.18);
 }
 
 .criterionSummary {
@@ -465,20 +480,53 @@
 }
 
 .criterionScale {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 8px;
+  width: 100%;
 }
 
 .criterionOption {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
+  gap: 6px;
   font-weight: 600;
   color: #1e293b;
+  padding: 8px 6px;
+  border: 1px solid #cbd5f5;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.06);
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.criterionOptionSelected {
+  border-color: #4338ca;
+  background: rgba(67, 56, 202, 0.12);
+  box-shadow: 0 4px 12px rgba(67, 56, 202, 0.18);
+}
+
+.criterionOptionDisabled {
+  opacity: 0.92;
+}
+
+.criterionOptionSubmitted {
+  border-color: #0f766e;
+  background: rgba(13, 148, 136, 0.18);
+  box-shadow: 0 6px 16px rgba(13, 148, 136, 0.24);
+  color: #0f172a;
 }
 
 .criterionOption input {
   accent-color: #4338ca;
+}
+
+.criterionOption span {
+  white-space: nowrap;
+  font-size: 13px;
 }
 
 .offerGroup {
@@ -500,4 +548,11 @@
 
 .offerOption input {
   accent-color: #4338ca;
+}
+
+@media (max-width: 768px) {
+  .wrapper {
+    margin-top: 0;
+    padding: 0 20px 24px;
+  }
 }

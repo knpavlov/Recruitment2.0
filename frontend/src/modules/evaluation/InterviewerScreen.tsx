@@ -41,10 +41,11 @@ interface CriterionSelectorProps {
   criterion: CriterionDefinition;
   value: string;
   disabled: boolean;
+  submitted: boolean;
   onChange: (next: CriterionScoreValue) => void;
 }
 
-const CriterionSelector = ({ criterion, value, disabled, onChange }: CriterionSelectorProps) => {
+const CriterionSelector = ({ criterion, value, disabled, submitted, onChange }: CriterionSelectorProps) => {
   const numericScores = ['1', '2', '3', '4', '5'] as const;
   const ratingEntries: Array<{ score: CriterionScoreValue; description?: string }> = [
     ...numericScores.map((score) => ({
@@ -54,8 +55,12 @@ const CriterionSelector = ({ criterion, value, disabled, onChange }: CriterionSe
     { score: 'n/a', description: 'Not applicable' }
   ];
 
+  const cardClassName = submitted
+    ? `${styles.criterionCard} ${styles.criterionCardSubmitted}`
+    : styles.criterionCard;
+
   return (
-    <div className={styles.criterionCard}>
+    <div className={cardClassName}>
       <div className={styles.criterionHeaderRow}>
         <span className={styles.criterionTitle}>{criterion.title}</span>
         <span className={styles.tooltipWrapper}>
@@ -71,19 +76,33 @@ const CriterionSelector = ({ criterion, value, disabled, onChange }: CriterionSe
         </span>
       </div>
       <div className={styles.criterionScale}>
-        {ratingEntries.map(({ score }) => (
-          <label key={score} className={styles.criterionOption}>
-            <input
-              type="radio"
-              name={criterion.id}
-              value={score}
-              checked={value === score}
+        {ratingEntries.map(({ score }) => {
+          const isSelected = value === score;
+          const optionClassNames = [styles.criterionOption];
+          if (isSelected) {
+            optionClassNames.push(styles.criterionOptionSelected);
+          }
+          if (disabled) {
+            optionClassNames.push(styles.criterionOptionDisabled);
+          }
+          if (submitted && isSelected) {
+            optionClassNames.push(styles.criterionOptionSubmitted);
+          }
+
+          return (
+            <label key={score} className={optionClassNames.join(' ')}>
+              <input
+                type="radio"
+                name={criterion.id}
+                value={score}
+                checked={value === score}
               disabled={disabled}
               onChange={(event) => onChange(event.target.value as CriterionScoreValue)}
             />
             <span>{score === 'n/a' ? 'N/A' : score}</span>
           </label>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -550,6 +569,7 @@ export const InterviewerScreen = () => {
                         criterion={criterion}
                         value={formState.fitCriteria[criterion.id] ?? ''}
                         disabled={disableInputs}
+                        submitted={isSubmitted}
                         onChange={(next) =>
                           setFormState((prev) => ({
                             ...prev,
@@ -593,6 +613,7 @@ export const InterviewerScreen = () => {
                         criterion={criterion}
                         value={formState.caseCriteria[criterion.id] ?? ''}
                         disabled={disableInputs}
+                        submitted={isSubmitted}
                         onChange={(next) =>
                           setFormState((prev) => ({
                             ...prev,

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type DragEvent } from 'react';
 import {
   CandidateProfile,
   CandidateResume,
@@ -65,7 +65,16 @@ export const CandidateModal = ({
   const [profile, setProfile] = useState<CandidateProfile>(createEmptyProfile());
   const [resume, setResume] = useState<CandidateResume | undefined>(undefined);
   const [aiStatus, setAiStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [uploadState, setUploadState] = useState<{ status: 'idle' | 'processing' | 'done'; progress: number }>(
+    {
+      status: 'idle',
+      progress: 0
+    }
+  );
+  const [isDragActive, setIsDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const dragCounterRef = useRef(0);
+  const hideProgressTimeout = useRef<number | null>(null);
 
   useEffect(() => {
     if (initialProfile) {
@@ -76,29 +85,111 @@ export const CandidateModal = ({
       setProfile(empty);
       setResume(undefined);
     }
+    setUploadState({ status: 'idle', progress: 0 });
+    setIsDragActive(false);
   }, [initialProfile]);
 
+  useEffect(() => {
+    return () => {
+      if (hideProgressTimeout.current) {
+        window.clearTimeout(hideProgressTimeout.current);
+        hideProgressTimeout.current = null;
+      }
+    };
+  }, []);
+
   const expectedVersion = initialProfile ? initialProfile.version : null;
+
+  const clearProgressTimeout = () => {
+    if (hideProgressTimeout.current) {
+      window.clearTimeout(hideProgressTimeout.current);
+      hideProgressTimeout.current = null;
+    }
+  };
+
+  const scheduleHideProgress = () => {
+    clearProgressTimeout();
+    hideProgressTimeout.current = window.setTimeout(() => {
+      setUploadState({ status: 'idle', progress: 0 });
+      hideProgressTimeout.current = null;
+    }, 1200);
+  };
 
   const handleChange = (field: keyof CandidateProfile, value: string | number | undefined) => {
     onFeedbackClear();
     setProfile((prev) => ({ ...prev, [field]: value }));
   };
 
+  const performUpload = async (file: File) => {
+    clearProgressTimeout();
+    setUploadState({ status: 'processing', progress: 0 });
+    try {
+      const converted = await convertFileToResume(file, (percentage) => {
+        setUploadState((previous) => ({
+          status: 'processing',
+          progress: Math.max(previous.progress, percentage)
+        }));
+      });
+      setResume(converted);
+      setProfile((prev) => ({ ...prev, resume: converted }));
+      setAiStatus('idle');
+      onFeedbackClear();
+      setUploadState({ status: 'done', progress: 1 });
+      scheduleHideProgress();
+    } catch (uploadError) {
+      console.error('Не удалось обработать резюме', uploadError);
+      setUploadState({ status: 'idle', progress: 0 });
+    }
+  };
+
   const handleResumeSelection = async (files: FileList | File[]) => {
-    const list = Array.from(files);
+    const list = Array.from(files ?? []);
     if (!list.length) {
       return;
     }
-    const file = list[0];
-    const converted = await convertFileToResume(file);
-    setResume(converted);
-    setProfile((prev) => ({ ...prev, resume: converted }));
-    setAiStatus('idle');
-    onFeedbackClear();
+    await performUpload(list[0]);
+  };
+
+  const handleDragOver = (event: DragEvent<HTMLElement>) => {
+    event.preventDefault();
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = 'copy';
+    }
+  };
+
+  const handleDragEnter = (event: DragEvent<HTMLElement>) => {
+    event.preventDefault();
+    const hasFiles = Array.from(event.dataTransfer?.types ?? []).includes('Files');
+    if (!hasFiles) {
+      return;
+    }
+    dragCounterRef.current += 1;
+    setIsDragActive(true);
+  };
+
+  const handleDragLeave = (event: DragEvent<HTMLElement>) => {
+    event.preventDefault();
+    dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
+    if (dragCounterRef.current === 0) {
+      setIsDragActive(false);
+    }
+  };
+
+  const handleDrop = (event: DragEvent<HTMLElement>) => {
+    event.preventDefault();
+    dragCounterRef.current = 0;
+    setIsDragActive(false);
+    const files = event.dataTransfer?.files;
+    if (files && files.length) {
+      void handleResumeSelection(files);
+    }
   };
 
   const handleResumeRemoval = () => {
+    clearProgressTimeout();
+    setUploadState({ status: 'idle', progress: 0 });
+    setIsDragActive(false);
+    dragCounterRef.current = 0;
     setResume(undefined);
     setProfile((prev) => ({ ...prev, resume: undefined }));
     if (fileInputRef.current) {
@@ -128,6 +219,8 @@ export const CandidateModal = ({
   };
 
   const isProfileValid = Boolean(trimmedProfile.firstName && trimmedProfile.lastName);
+
+  const uploadPercent = Math.round(uploadState.progress * 100);
 
   const submitSave = (closeAfterSave: boolean) => {
     setProfile(trimmedProfile);
@@ -164,15 +257,14 @@ export const CandidateModal = ({
 
         <section
           className={styles.uploadSection}
-          onDragOver={(event) => {
-            event.preventDefault();
-          }}
-          onDrop={(event) => {
-            event.preventDefault();
-            handleResumeSelection(event.dataTransfer.files);
-          }}
+          onDragEnter={handleDragEnter}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
         >
-          <div className={styles.uploadZone}>
+          <div
+            className={`${styles.uploadZone} ${isDragActive ? styles.uploadZoneActive : ''}`}
+          >
             {resume ? (
               <>
                 <a
@@ -190,6 +282,21 @@ export const CandidateModal = ({
             ) : (
               <p>Drag a resume here or pick a file</p>
             )}
+            {uploadState.status !== 'idle' ? (
+              <div className={styles.uploadProgress}>
+                <div className={styles.uploadProgressTrack}>
+                  <div
+                    className={styles.uploadProgressBar}
+                    style={{ width: `${uploadPercent}%` }}
+                  />
+                </div>
+                <span className={styles.uploadProgressLabel}>
+                  {uploadState.status === 'processing'
+                    ? `Reading resume… ${uploadPercent}%`
+                    : 'Resume ready'}
+                </span>
+              </div>
+            ) : null}
           </div>
           <div className={styles.uploadActions}>
             <button className={styles.secondaryButton} onClick={() => fileInputRef.current?.click()}>
@@ -209,7 +316,11 @@ export const CandidateModal = ({
               ref={fileInputRef}
               type="file"
               className={styles.hiddenInput}
-              onChange={(event) => event.target.files && handleResumeSelection(event.target.files)}
+              onChange={(event) => {
+                if (event.target.files) {
+                  void handleResumeSelection(event.target.files);
+                }
+              }}
             />
           </div>
           {aiStatus === 'success' && <p className={styles.aiSuccess}>Fields populated automatically.</p>}
