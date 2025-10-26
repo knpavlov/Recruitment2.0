@@ -37,6 +37,8 @@ export type OfferRecommendationValue =
   | 'yes_keep_warm'
   | 'no_offer';
 
+export type EvaluationDecision = 'offer' | 'accepted-offer' | 'reject' | 'progress';
+
 export interface EvaluationConfig {
   id: string;
   candidateId?: string;
@@ -112,5 +114,15 @@ export interface InterviewerAssignmentView {
   candidate?: import('./candidate').CandidateProfile;
   caseFolder?: import('./caseLibrary').CaseFolder;
   fitQuestion?: import('./fitQuestion').FitQuestion;
+  form: InterviewStatusRecord | null;
+  peerForms: InterviewPeerFormView[];
+  decision?: EvaluationDecision | null;
+}
+
+export interface InterviewPeerFormView {
+  slotId: string;
+  interviewerName: string;
+  interviewerEmail: string;
+  submitted: boolean;
   form: InterviewStatusRecord | null;
 }
