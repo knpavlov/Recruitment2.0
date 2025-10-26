@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import styles from '../../../styles/AnalyticsScreen.module.css';
 import type { InterviewerStatsResponse, TimelineGrouping } from '../types/analytics';
+import { buildInterviewerGraphPoints, type InterviewerGraphPoint } from '../utils/interviewerGraph';
 import type { InterviewerSeniority } from '../../../shared/types/account';
 import { InterviewerFilters } from './InterviewerFilters';
 
@@ -24,6 +25,7 @@ interface InterviewerGraphSectionProps {
   data: InterviewerStatsResponse | null;
   loading: boolean;
   error: string | null;
+  onDownload: () => void;
 }
 
 const WIDTH = 960;
@@ -61,14 +63,7 @@ const SERIES = [
 
 type SeriesKey = (typeof SERIES)[number]['key'];
 
-type ChartPoint = {
-  bucket: string;
-  label: string;
-  interviews: number;
-  hireShare: number;
-  caseScore: number;
-  fitScore: number;
-};
+type ChartPoint = InterviewerGraphPoint;
 
 const valueAccessors: Record<SeriesKey, (point: ChartPoint) => number> = {
   interviews: (point) => point.interviews,
@@ -92,19 +87,17 @@ const normalizeValue = (point: ChartPoint, key: SeriesKey, maxCount: number) => 
   }
 };
 
-const formatBucketLabel = (bucket: string, groupBy: TimelineGrouping) => {
-  const date = new Date(bucket);
-  if (Number.isNaN(date.getTime())) {
-    return bucket;
+const formatPointValue = (value: number, domain: (typeof SERIES)[number]['domain']) => {
+  if (!Number.isFinite(value)) {
+    return '';
   }
-  if (groupBy === 'quarter') {
-    const quarter = Math.floor(date.getUTCMonth() / 3) + 1;
-    return `Q${quarter} ${date.getUTCFullYear()}`;
+  if (domain === 'count') {
+    return value >= 10 ? Math.round(value).toString() : value.toFixed(1);
   }
-  if (groupBy === 'week') {
-    return new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric' }).format(date);
+  if (domain === 'score') {
+    return value.toFixed(1);
   }
-  return new Intl.DateTimeFormat('en', { month: 'short', year: 'numeric' }).format(date);
+  return `${Math.round(value * 1000) / 10}%`;
 };
 
 const RANGE_LABEL_FORMATTER = new Intl.DateTimeFormat('en', {
@@ -140,67 +133,6 @@ const formatRangeDescription = (
   return `${groupingLabel} averages for the available data range`;
 };
 
-const alignToBucketStart = (value: Date, groupBy: TimelineGrouping) => {
-  const aligned = new Date(value.getTime());
-  if (Number.isNaN(aligned.getTime())) {
-    return aligned;
-  }
-  switch (groupBy) {
-    case 'week': {
-      const day = aligned.getUTCDay();
-      const diff = (day + 6) % 7;
-      aligned.setUTCDate(aligned.getUTCDate() - diff);
-      aligned.setUTCHours(0, 0, 0, 0);
-      return aligned;
-    }
-    case 'quarter': {
-      const month = aligned.getUTCMonth();
-      const quarterStart = month - (month % 3);
-      aligned.setUTCMonth(quarterStart, 1);
-      aligned.setUTCHours(0, 0, 0, 0);
-      return aligned;
-    }
-    case 'month':
-    default: {
-      aligned.setUTCDate(1);
-      aligned.setUTCHours(0, 0, 0, 0);
-      return aligned;
-    }
-  }
-};
-
-const advanceBucket = (value: Date, groupBy: TimelineGrouping) => {
-  const next = new Date(value.getTime());
-  switch (groupBy) {
-    case 'week':
-      next.setUTCDate(next.getUTCDate() + 7);
-      return next;
-    case 'quarter':
-      next.setUTCMonth(next.getUTCMonth() + 3);
-      return next;
-    case 'month':
-    default:
-      next.setUTCMonth(next.getUTCMonth() + 1);
-      return next;
-  }
-};
-
-const buildBucketSequence = (startIso: string, endIso: string, groupBy: TimelineGrouping) => {
-  const startDate = new Date(startIso);
-  const endDate = new Date(endIso);
-  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
-    return [];
-  }
-  const buckets: string[] = [];
-  let cursor = alignToBucketStart(startDate, groupBy);
-  const alignedEnd = alignToBucketStart(endDate, groupBy);
-  while (cursor.getTime() <= alignedEnd.getTime()) {
-    buckets.push(cursor.toISOString());
-    cursor = advanceBucket(cursor, groupBy);
-  }
-  return buckets;
-};
-
 export const InterviewerGraphSection = ({
   grouping,
   onGroupingChange,
@@ -214,67 +146,11 @@ export const InterviewerGraphSection = ({
   onRoleChange,
   data,
   loading,
-  error
+  error,
+  onDownload
 }: InterviewerGraphSectionProps) => {
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const points = useMemo<ChartPoint[]>(() => {
-    if (!data) {
-      return [];
-    }
-
-    const byBucket = new Map<string, typeof data.buckets>();
-    data.buckets.forEach((bucket) => {
-      const existing = byBucket.get(bucket.bucket) ?? [];
-      existing.push(bucket);
-      byBucket.set(bucket.bucket, existing);
-    });
-
-    const sequence = buildBucketSequence(data.range.start, data.range.end, data.groupBy);
-
-    return sequence.map((bucketKey) => {
-      const bucketEntries = byBucket.get(bucketKey) ?? [];
-      const interviewerCount = bucketEntries.length;
-
-      let interviewSum = 0;
-      let hireShareSum = 0;
-      let hireShareCount = 0;
-      let caseScoreWeighted = 0;
-      let caseScoreCount = 0;
-      let fitScoreWeighted = 0;
-      let fitScoreCount = 0;
-
-      bucketEntries.forEach((entry) => {
-        interviewSum += entry.interviewCount;
-        const decisions = entry.hireRecommendations + entry.rejectRecommendations;
-        if (decisions > 0) {
-          hireShareSum += entry.hireRecommendations / decisions;
-          hireShareCount += 1;
-        }
-        if (entry.avgCaseScore != null && entry.caseScoreCount > 0) {
-          caseScoreWeighted += entry.avgCaseScore * entry.caseScoreCount;
-          caseScoreCount += entry.caseScoreCount;
-        }
-        if (entry.avgFitScore != null && entry.fitScoreCount > 0) {
-          fitScoreWeighted += entry.avgFitScore * entry.fitScoreCount;
-          fitScoreCount += entry.fitScoreCount;
-        }
-      });
-
-      const averageInterviews = interviewerCount ? interviewSum / interviewerCount : 0;
-      const averageHireShare = hireShareCount ? hireShareSum / hireShareCount : 0;
-      const averageCaseScore = caseScoreCount ? caseScoreWeighted / caseScoreCount : 0;
-      const averageFitScore = fitScoreCount ? fitScoreWeighted / fitScoreCount : 0;
-
-      return {
-        bucket: bucketKey,
-        label: formatBucketLabel(bucketKey, data.groupBy),
-        interviews: averageInterviews,
-        hireShare: averageHireShare,
-        caseScore: averageCaseScore,
-        fitScore: averageFitScore
-      };
-    });
-  }, [data]);
+  const points = useMemo<ChartPoint[]>(() => (data ? buildInterviewerGraphPoints(data) : []), [data]);
 
   const [selectedSeries, setSelectedSeries] = useState<SeriesKey[]>(() => SERIES.map((item) => item.key));
 
@@ -351,6 +227,11 @@ export const InterviewerGraphSection = ({
         <div>
           <h2 className={styles.sectionTitle}>Interviewer performance graph</h2>
           <p className={styles.metricDetails}>{rangeDescription}</p>
+        </div>
+        <div className={styles.sectionActions}>
+          <button type="button" className={styles.actionButton} onClick={onDownload}>
+            Download CSV
+          </button>
         </div>
       </header>
 
@@ -497,13 +378,31 @@ export const InterviewerGraphSection = ({
 
               {SERIES.filter((series) => selectedSeries.includes(series.key)).flatMap((series) =>
                 points.map((point, index) => {
-                  const value = normalizeValue(point, series.key, maxInterviews);
+                  const normalized = normalizeValue(point, series.key, maxInterviews);
                   const x = xPositions[index];
-                  const y = HEIGHT - PADDING_Y - value * (HEIGHT - PADDING_Y * 2);
+                  const y = HEIGHT - PADDING_Y - normalized * (HEIGHT - PADDING_Y * 2);
                   if (!Number.isFinite(y)) {
                     return null;
                   }
-                  return <circle key={`${series.key}-${point.bucket}`} cx={x} cy={y} r={3.5} fill={series.color} />;
+                  const rawValue = valueAccessors[series.key](point);
+                  const label = formatPointValue(rawValue, series.domain);
+                  return (
+                    <g key={`${series.key}-${point.bucket}`}>
+                      <circle cx={x} cy={y} r={3.5} fill={series.color} />
+                      {label ? (
+                        <text
+                          x={x}
+                          y={y - 8}
+                          textAnchor="middle"
+                          fontSize={11}
+                          fontWeight={600}
+                          fill={series.color}
+                        >
+                          {label}
+                        </text>
+                      ) : null}
+                    </g>
+                  );
                 })
               )}
             </svg>

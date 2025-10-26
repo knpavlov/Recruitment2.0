@@ -8,6 +8,7 @@ import { useAnalyticsSummary } from './hooks/useAnalyticsSummary';
 import { useAnalyticsTimeline } from './hooks/useAnalyticsTimeline';
 import { useAnalyticsInterviewers } from './hooks/useAnalyticsInterviewers';
 import { analyticsApi } from './services/analyticsApi';
+import { downloadInterviewerGraphCsv } from './utils/interviewerGraph';
 import type { InterviewerPeriod, SummaryPeriod, TimelineGrouping } from './types/analytics';
 import type { InterviewerSeniority } from '../../shared/types/account';
 
@@ -38,6 +39,8 @@ export const AnalyticsScreen = () => {
     from: interviewerGraphFrom,
     to: interviewerGraphTo
   });
+  const interviewerGraphData = interviewerGraphState.data;
+
 
   const downloadSummary = useCallback(async () => {
     try {
@@ -73,6 +76,20 @@ export const AnalyticsScreen = () => {
       window.alert('Unable to download the file. Please try again.');
     }
   }, [interviewerPeriod, selectedInterviewers, selectedRoles]);
+
+  const downloadInterviewerGraph = useCallback(() => {
+    if (!interviewerGraphData) {
+      window.alert('No data is available for the current filters. Please adjust the range and try again.');
+      return;
+    }
+
+    try {
+      downloadInterviewerGraphCsv(interviewerGraphData);
+    } catch (error) {
+      console.error('Unable to download interviewer graph report:', error);
+      window.alert('Unable to download the file. Please try again.');
+    }
+  }, [interviewerGraphData]);
 
   return (
     <div className={styles.screen}>
@@ -125,6 +142,7 @@ export const AnalyticsScreen = () => {
         data={interviewerGraphState.data}
         loading={interviewerGraphState.loading}
         error={interviewerGraphState.error}
+        onDownload={downloadInterviewerGraph}
       />
     </div>
   );
