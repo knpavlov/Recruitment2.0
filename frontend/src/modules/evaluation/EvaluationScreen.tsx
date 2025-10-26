@@ -26,11 +26,12 @@ type StatusContext = {
   roundLabel: string;
 };
 
-type DecisionOption = 'offer' | 'progress' | 'reject';
+type DecisionOption = 'offer' | 'accepted-offer' | 'progress' | 'reject';
 
 const DECISION_LABELS: Record<DecisionOption, string> = {
   offer: 'Offer',
-  progress: 'Progress to next round',
+  'accepted-offer': 'Accepted offer',
+  progress: 'Next round',
   reject: 'Reject'
 };
 
@@ -361,7 +362,7 @@ export const EvaluationScreen = () => {
         void handleSendInvites(evaluation, slotIds);
       };
 
-      const updateDecision = async (target: 'offer' | 'reject') => {
+      const updateDecision = async (target: 'offer' | 'accepted-offer' | 'reject') => {
         setDecisionSelections((prev) => ({ ...prev, [evaluation.id]: target }));
         const result = await setDecision(evaluation.id, target, evaluation.version);
         if (!result.ok) {

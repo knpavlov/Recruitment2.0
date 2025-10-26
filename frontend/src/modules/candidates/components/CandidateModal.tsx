@@ -10,6 +10,8 @@ import { convertFileToResume } from '../services/resumeAdapter';
 import { parseResumeText } from '../services/resumeParser';
 import { formatDate } from '../../../shared/utils/date';
 
+type UploadState = { status: 'idle' | 'processing' | 'done'; progress: number };
+
 interface CandidateModalProps {
   initialProfile: CandidateProfile | null;
   onSave: (
@@ -66,6 +68,10 @@ export const CandidateModal = ({
   const [resume, setResume] = useState<CandidateResume | undefined>(undefined);
   const [aiStatus, setAiStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const dragCounterRef = useRef(0);
+  const [isDragActive, setIsDragActive] = useState(false);
+  const [uploadState, setUploadState] = useState<UploadState>({ status: 'idle', progress: 0 });
+  const hideProgressTimeout = useRef<number | null>(null);
 
   useEffect(() => {
     if (initialProfile) {
@@ -78,7 +84,26 @@ export const CandidateModal = ({
     }
   }, [initialProfile]);
 
+  useEffect(() => {
+    return () => {
+      if (hideProgressTimeout.current) {
+        window.clearTimeout(hideProgressTimeout.current);
+        hideProgressTimeout.current = null;
+      }
+    };
+  }, []);
+
   const expectedVersion = initialProfile ? initialProfile.version : null;
+
+  const scheduleHideProgress = () => {
+    if (hideProgressTimeout.current) {
+      window.clearTimeout(hideProgressTimeout.current);
+    }
+    hideProgressTimeout.current = window.setTimeout(() => {
+      setUploadState({ status: 'idle', progress: 0 });
+      hideProgressTimeout.current = null;
+    }, 1200);
+  };
 
   const handleChange = (field: keyof CandidateProfile, value: string | number | undefined) => {
     onFeedbackClear();
@@ -91,11 +116,29 @@ export const CandidateModal = ({
       return;
     }
     const file = list[0];
-    const converted = await convertFileToResume(file);
-    setResume(converted);
-    setProfile((prev) => ({ ...prev, resume: converted }));
-    setAiStatus('idle');
+    if (hideProgressTimeout.current) {
+      window.clearTimeout(hideProgressTimeout.current);
+      hideProgressTimeout.current = null;
+    }
+    setUploadState({ status: 'processing', progress: 0 });
+    setIsDragActive(false);
     onFeedbackClear();
+    setAiStatus('idle');
+    try {
+      const converted = await convertFileToResume(file, (value) => {
+        setUploadState((previous) => ({
+          status: 'processing',
+          progress: Math.max(previous.progress, value)
+        }));
+      });
+      setResume(converted);
+      setProfile((prev) => ({ ...prev, resume: converted }));
+      setUploadState({ status: 'done', progress: 1 });
+      scheduleHideProgress();
+    } catch (error) {
+      setUploadState({ status: 'idle', progress: 0 });
+      setAiStatus('idle');
+    }
   };
 
   const handleResumeRemoval = () => {
@@ -106,6 +149,7 @@ export const CandidateModal = ({
     }
     setAiStatus('idle');
     onFeedbackClear();
+    setUploadState({ status: 'idle', progress: 0 });
   };
 
   const handleAiFill = async () => {
@@ -166,13 +210,31 @@ export const CandidateModal = ({
           className={styles.uploadSection}
           onDragOver={(event) => {
             event.preventDefault();
+            event.dataTransfer.dropEffect = 'copy';
+          }}
+          onDragEnter={(event) => {
+            event.preventDefault();
+            if (!event.dataTransfer.types?.includes('Files')) {
+              return;
+            }
+            dragCounterRef.current += 1;
+            setIsDragActive(true);
+          }}
+          onDragLeave={(event) => {
+            event.preventDefault();
+            dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
+            if (dragCounterRef.current === 0) {
+              setIsDragActive(false);
+            }
           }}
           onDrop={(event) => {
             event.preventDefault();
-            handleResumeSelection(event.dataTransfer.files);
+            dragCounterRef.current = 0;
+            setIsDragActive(false);
+            void handleResumeSelection(event.dataTransfer.files);
           }}
         >
-          <div className={styles.uploadZone}>
+          <div className={`${styles.uploadZone} ${isDragActive ? styles.uploadZoneActive : ''}`}>
             {resume ? (
               <>
                 <a
@@ -191,6 +253,22 @@ export const CandidateModal = ({
               <p>Drag a resume here or pick a file</p>
             )}
           </div>
+          {uploadState.status !== 'idle' ? (
+            <div className={styles.uploadStatus}>
+              <div className={styles.uploadStatusRow}>
+                <span className={styles.uploadStatusLabel}>
+                  {uploadState.status === 'processing' ? 'Processing file' : 'File ready'}
+                </span>
+                <span className={styles.uploadStatusValue}>{Math.round(uploadState.progress * 100)}%</span>
+              </div>
+              <div className={styles.uploadProgressTrack}>
+                <div
+                  className={styles.uploadProgressValue}
+                  style={{ width: `${Math.round(uploadState.progress * 100)}%` }}
+                />
+              </div>
+            </div>
+          ) : null}
           <div className={styles.uploadActions}>
             <button className={styles.secondaryButton} onClick={() => fileInputRef.current?.click()}>
               Choose file
@@ -209,7 +287,15 @@ export const CandidateModal = ({
               ref={fileInputRef}
               type="file"
               className={styles.hiddenInput}
-              onChange={(event) => event.target.files && handleResumeSelection(event.target.files)}
+              onChange={(event) => {
+                const input = event.target;
+                if (!input.files) {
+                  return;
+                }
+                void handleResumeSelection(input.files).finally(() => {
+                  input.value = '';
+                });
+              }}
             />
           </div>
           {aiStatus === 'success' && <p className={styles.aiSuccess}>Fields populated automatically.</p>}
