@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import styles from '../../../styles/AnalyticsScreen.module.css';
 import type { InterviewerStatsResponse, TimelineGrouping } from '../types/analytics';
 import { buildInterviewerGraphPoints, type InterviewerGraphPoint } from '../utils/interviewerGraph';
@@ -201,12 +201,56 @@ export const InterviewerGraphSection = ({
 
   const defaultFrom = data ? data.range.start.slice(0, 10) : '';
   const defaultTo = data ? data.range.end.slice(0, 10) : '';
-  const fromValue = from ?? defaultFrom;
-  const toValue = to ?? defaultTo;
+  const controlledFrom = from ?? defaultFrom;
+  const controlledTo = to ?? defaultTo;
+  const [fromDraft, setFromDraft] = useState(controlledFrom);
+  const [toDraft, setToDraft] = useState(controlledTo);
+
+  useEffect(() => {
+    setFromDraft(controlledFrom);
+  }, [controlledFrom]);
+
+  useEffect(() => {
+    setToDraft(controlledTo);
+  }, [controlledTo]);
+
+  const handleFromChange = (value: string) => {
+    setFromDraft(value);
+    if (!value) {
+      onFromChange(undefined);
+      return;
+    }
+    if (value.length === 10) {
+      onFromChange(value);
+    }
+  };
+
+  const handleFromBlur = () => {
+    if (fromDraft && fromDraft.length !== 10) {
+      setFromDraft(controlledFrom);
+    }
+  };
+
+  const handleToChange = (value: string) => {
+    setToDraft(value);
+    if (!value) {
+      onToChange(undefined);
+      return;
+    }
+    if (value.length === 10) {
+      onToChange(value);
+    }
+  };
+
+  const handleToBlur = () => {
+    if (toDraft && toDraft.length !== 10) {
+      setToDraft(controlledTo);
+    }
+  };
   const groupingLabel = GROUPING_LABELS[data?.groupBy ?? grouping];
   const rangeDescription = formatRangeDescription(
-    fromValue || undefined,
-    toValue || undefined,
+    controlledFrom || undefined,
+    controlledTo || undefined,
     groupingLabel
   );
 
@@ -275,8 +319,9 @@ export const InterviewerGraphSection = ({
             id="interviewer-from"
             type="date"
             className={styles.dateInput}
-            value={fromValue}
-            onChange={(event) => onFromChange(event.target.value || undefined)}
+            value={fromDraft}
+            onChange={(event) => handleFromChange(event.target.value)}
+            onBlur={handleFromBlur}
           />
         </div>
         <div className={styles.inputGroup}>
@@ -287,8 +332,9 @@ export const InterviewerGraphSection = ({
             id="interviewer-to"
             type="date"
             className={styles.dateInput}
-            value={toValue}
-            onChange={(event) => onToChange(event.target.value || undefined)}
+            value={toDraft}
+            onChange={(event) => handleToChange(event.target.value)}
+            onBlur={handleToBlur}
           />
         </div>
       </div>

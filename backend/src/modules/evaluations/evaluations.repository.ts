@@ -75,12 +75,33 @@ const mapCriterionScore = (value: unknown): EvaluationCriterionScore | null => {
 };
 
 const mapCriteriaList = (value: unknown): EvaluationCriterionScore[] => {
-  if (!Array.isArray(value)) {
-    return [];
+  const bucket: EvaluationCriterionScore[] = [];
+  const pushIfValid = (candidate: unknown) => {
+    const mapped = mapCriterionScore(candidate);
+    if (mapped) {
+      bucket.push(mapped);
+    }
+  };
+
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      pushIfValid(entry);
+    }
+    return bucket;
   }
-  return value
-    .map((entry) => mapCriterionScore(entry))
-    .filter((item): item is EvaluationCriterionScore => Boolean(item));
+
+  if (value && typeof value === 'object') {
+    for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+      if (entry && typeof entry === 'object' && 'criterionId' in entry) {
+        pushIfValid(entry);
+        continue;
+      }
+      pushIfValid({ criterionId: key, score: entry });
+    }
+    return bucket;
+  }
+
+  return bucket;
 };
 
 const readOfferRecommendation = (value: unknown): InterviewStatusModel['offerRecommendation'] | undefined => {
