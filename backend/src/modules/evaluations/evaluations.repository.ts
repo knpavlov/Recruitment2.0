@@ -180,7 +180,12 @@ const mapRoundHistory = (value: unknown): EvaluationRoundSnapshot[] => {
         : new Date().toISOString();
 
     let decision: EvaluationRoundSnapshot['decision'];
-    if (item.decision === 'offer' || item.decision === 'reject' || item.decision === 'progress') {
+    if (
+      item.decision === 'offer' ||
+      item.decision === 'accepted-offer' ||
+      item.decision === 'reject' ||
+      item.decision === 'progress'
+    ) {
       decision = item.decision;
     } else if (item.decision === null) {
       decision = null;
@@ -212,7 +217,12 @@ const mapRowToRecord = (row: EvaluationRow): EvaluationRecord => {
       : interviews.length;
 
   let decision: EvaluationRecord['decision'];
-  if (row.decision === 'offer' || row.decision === 'reject' || row.decision === 'progress') {
+  if (
+    row.decision === 'offer' ||
+    row.decision === 'accepted-offer' ||
+    row.decision === 'reject' ||
+    row.decision === 'progress'
+  ) {
     decision = row.decision;
   } else if (row.decision === null) {
     decision = null;

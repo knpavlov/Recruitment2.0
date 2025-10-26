@@ -41,10 +41,17 @@ interface CriterionSelectorProps {
   criterion: CriterionDefinition;
   value: string;
   disabled: boolean;
+  highlightSelection: boolean;
   onChange: (next: CriterionScoreValue) => void;
 }
 
-const CriterionSelector = ({ criterion, value, disabled, onChange }: CriterionSelectorProps) => {
+const CriterionSelector = ({
+  criterion,
+  value,
+  disabled,
+  highlightSelection,
+  onChange
+}: CriterionSelectorProps) => {
   const numericScores = ['1', '2', '3', '4', '5'] as const;
   const ratingEntries: Array<{ score: CriterionScoreValue; description?: string }> = [
     ...numericScores.map((score) => ({
@@ -72,7 +79,17 @@ const CriterionSelector = ({ criterion, value, disabled, onChange }: CriterionSe
       </div>
       <div className={styles.criterionScale}>
         {ratingEntries.map(({ score }) => (
-          <label key={score} className={styles.criterionOption}>
+          <label
+            key={score}
+            className={[
+              styles.criterionOption,
+              value === score ? styles.criterionOptionActive : '',
+              disabled ? styles.criterionOptionDisabled : '',
+              value === score && highlightSelection ? styles.criterionOptionSubmitted : ''
+            ]
+              .filter(Boolean)
+              .join(' ')}
+          >
             <input
               type="radio"
               name={criterion.id}
@@ -550,6 +567,7 @@ export const InterviewerScreen = () => {
                         criterion={criterion}
                         value={formState.fitCriteria[criterion.id] ?? ''}
                         disabled={disableInputs}
+                        highlightSelection={isSubmitted}
                         onChange={(next) =>
                           setFormState((prev) => ({
                             ...prev,
@@ -593,6 +611,7 @@ export const InterviewerScreen = () => {
                         criterion={criterion}
                         value={formState.caseCriteria[criterion.id] ?? ''}
                         disabled={disableInputs}
+                        highlightSelection={isSubmitted}
                         onChange={(next) =>
                           setFormState((prev) => ({
                             ...prev,
