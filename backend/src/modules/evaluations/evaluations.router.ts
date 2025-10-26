@@ -136,11 +136,11 @@ router.post('/:id/decision', async (req, res) => {
       return;
     }
     const normalizedDecision =
-      decision === 'offer' || decision === 'reject'
-        ? (decision as 'offer' | 'reject')
+      decision === 'offer' || decision === 'accepted-offer' || decision === 'reject'
+        ? (decision as 'offer' | 'accepted-offer' | 'reject')
         : decision === null
-          ? null
-          : undefined;
+        ? null
+        : undefined;
     if (normalizedDecision === undefined) {
       res.status(400).json({ code: 'invalid-input', message: 'Provide a valid decision value.' });
       return;

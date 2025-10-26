@@ -39,7 +39,7 @@ export type OfferRecommendationValue =
   | 'yes_keep_warm'
   | 'no_offer';
 
-export type EvaluationDecision = 'offer' | 'reject' | 'progress';
+export type EvaluationDecision = 'offer' | 'accepted-offer' | 'reject' | 'progress';
 
 export type EvaluationProcessStatus = 'draft' | 'in-progress' | 'completed';
 

@@ -177,6 +177,7 @@ interface MonthlyMetricAccumulator {
   start: Date;
   candidateCount: number;
   femaleCount: number;
+  offersIssued: number;
   acceptedOffers: number;
   rejectedOffers: number;
 }
@@ -231,6 +232,7 @@ const buildMonthlyMetrics = (
         start: monthStart,
         candidateCount: 0,
         femaleCount: 0,
+        offersIssued: 0,
         acceptedOffers: 0,
         rejectedOffers: 0
       };
@@ -257,7 +259,10 @@ const buildMonthlyMetrics = (
       continue;
     }
     const bucket = ensureMonth(updatedAt);
-    if (evaluation.decision === 'offer') {
+    if (evaluation.decision === 'offer' || evaluation.decision === 'accepted-offer') {
+      bucket.offersIssued += 1;
+    }
+    if (evaluation.decision === 'accepted-offer') {
       bucket.acceptedOffers += 1;
     } else if (evaluation.decision === 'reject') {
       bucket.rejectedOffers += 1;
@@ -360,6 +365,7 @@ export class AnalyticsService {
 
     let femaleCount = 0;
     let candidateCount = 0;
+    let offersIssued = 0;
     let acceptedOffers = 0;
     let rejectedOffers = 0;
 
@@ -369,11 +375,12 @@ export class AnalyticsService {
       }
       femaleCount += month.femaleCount;
       candidateCount += month.candidateCount;
+      offersIssued += month.offersIssued;
       acceptedOffers += month.acceptedOffers;
       rejectedOffers += month.rejectedOffers;
     }
 
-    const offersMade = acceptedOffers + rejectedOffers;
+    const offersMade = offersIssued;
 
     const buildMetric = (numerator: number, denominator: number): SummaryMetricValue => ({
       value: ratio(numerator, denominator),
@@ -387,7 +394,7 @@ export class AnalyticsService {
       metrics: {
         femaleShare: buildMetric(femaleCount, candidateCount),
         offerAcceptance: buildMetric(acceptedOffers, offersMade),
-        offerRate: buildMetric(acceptedOffers, candidateCount)
+        offerRate: buildMetric(offersIssued, candidateCount)
       }
     };
   }
@@ -450,7 +457,7 @@ export class AnalyticsService {
       const updatedAt = parseDate(evaluation.updatedAt);
       if (updatedAt && isWithinRange(updatedAt, alignedStart, rangeEnd)) {
         const decisionBucket = ensureBucket(updatedAt);
-        if (evaluation.decision === 'offer') {
+        if (evaluation.decision === 'offer' || evaluation.decision === 'accepted-offer') {
           decisionBucket.offers += 1;
         } else if (evaluation.decision === 'reject') {
           decisionBucket.rejects += 1;
@@ -772,7 +779,7 @@ export class AnalyticsService {
 
     for (const row of rows) {
       const periodEnd = addDaysUtc(addMonthsUtc(row.start, 1), -1);
-      const offersMade = row.acceptedOffers + row.rejectedOffers;
+      const offersIssued = row.offersIssued;
       lines.push(
         [
           row.start.toISOString(),
@@ -780,10 +787,10 @@ export class AnalyticsService {
           String(row.candidateCount),
           String(row.femaleCount),
           formatRatio(row.femaleCount, row.candidateCount),
-          String(offersMade),
+          String(offersIssued),
           String(row.acceptedOffers),
-          formatRatio(row.acceptedOffers, offersMade),
-          formatRatio(row.acceptedOffers, row.candidateCount)
+          formatRatio(row.acceptedOffers, offersIssued),
+          formatRatio(row.offersIssued, row.candidateCount)
         ].join(',')
       );
     }
