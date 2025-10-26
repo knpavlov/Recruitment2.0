@@ -72,7 +72,14 @@ const CriterionSelector = ({ criterion, value, disabled, onChange }: CriterionSe
       </div>
       <div className={styles.criterionScale}>
         {ratingEntries.map(({ score }) => (
-          <label key={score} className={styles.criterionOption}>
+          <label
+            key={score}
+            className={`${styles.criterionOption} ${
+              value === score ? styles.criterionOptionSelected : ''
+            } ${disabled ? styles.criterionOptionDisabled : ''} ${
+              disabled && value === score ? styles.criterionOptionSubmitted : ''
+            }`}
+          >
             <input
               type="radio"
               name={criterion.id}

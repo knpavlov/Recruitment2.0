@@ -608,7 +608,7 @@ export class EvaluationWorkflowService {
 
   async updateDecision(
     id: string,
-    decision: 'offer' | 'reject' | null,
+    decision: 'offer' | 'accepted-offer' | 'reject' | null,
     expectedVersion: number
   ): Promise<EvaluationRecord> {
     const trimmed = id.trim();
@@ -616,7 +616,7 @@ export class EvaluationWorkflowService {
       throw new Error('INVALID_INPUT');
     }
 
-    if (decision !== 'offer' && decision !== 'reject' && decision !== null) {
+    if (decision !== 'offer' && decision !== 'accepted-offer' && decision !== 'reject' && decision !== null) {
       throw new Error('INVALID_INPUT');
     }
 
