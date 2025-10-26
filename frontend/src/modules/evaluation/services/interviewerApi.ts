@@ -3,7 +3,8 @@ import {
   EvaluationCriterionScore,
   InterviewerAssignmentView,
   InterviewStatusRecord,
-  OfferRecommendationValue
+  OfferRecommendationValue,
+  InterviewPeerFormView
 } from '../../../shared/types/evaluation';
 import {
   CandidateProfile,
@@ -66,33 +67,115 @@ const normalizeNumber = (value: unknown): number | undefined => {
   return undefined;
 };
 
-const normalizeCriteriaList = (value: unknown): EvaluationCriterionScore[] => {
+const DECISION_VALUES = ['offer', 'accepted-offer', 'reject', 'progress'] as const;
+
+const normalizeDecision = (value: unknown): InterviewerAssignmentView['decision'] => {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const normalized = value.trim().toLowerCase();
+  const match = DECISION_VALUES.find((entry) => entry === normalized);
+  return (match ?? null) as InterviewerAssignmentView['decision'];
+};
+
+const normalizePeerForm = (value: unknown): InterviewPeerFormView | undefined => {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+  const payload = value as Partial<InterviewPeerFormView> & {
+    slotId?: unknown;
+    interviewerEmail?: unknown;
+    form?: unknown;
+    submitted?: unknown;
+  };
+  const slotId = normalizeString(payload.slotId)?.trim();
+  if (!slotId) {
+    return undefined;
+  }
+  const interviewerEmail = normalizeString(payload.interviewerEmail)?.trim();
+  if (!interviewerEmail) {
+    return undefined;
+  }
+  return {
+    slotId,
+    interviewerEmail,
+    interviewerName: normalizeString(payload.interviewerName) ?? 'Interviewer',
+    submitted: typeof payload.submitted === 'boolean' ? payload.submitted : Boolean(payload.form && (payload.form as { submitted?: unknown }).submitted),
+    form: normalizeForm(payload.form)
+  };
+};
+
+const normalizePeerForms = (value: unknown): InterviewPeerFormView[] => {
   if (!Array.isArray(value)) {
     return [];
   }
+  return value
+    .map((item) => normalizePeerForm(item))
+    .filter((item): item is InterviewPeerFormView => Boolean(item));
+};
+
+const normalizeCriteriaList = (value: unknown): EvaluationCriterionScore[] => {
   const result: EvaluationCriterionScore[] = [];
-  for (const entry of value) {
-    if (!entry || typeof entry !== 'object') {
-      continue;
+  const appendEntry = (entry: unknown, fallbackId?: string) => {
+    if (entry && typeof entry === 'object') {
+      const payload = entry as Record<string, unknown>;
+      const explicitId = normalizeString(payload.criterionId)?.trim();
+      const snakeId = !explicitId ? normalizeString(payload.criterion_id)?.trim() : undefined;
+      const camelAlt = !explicitId ? normalizeString(payload.criteriaId)?.trim() : undefined;
+      const legacyId = !explicitId ? normalizeString(payload.id)?.trim() : undefined;
+      const legacyKey = !explicitId ? normalizeString(payload.key)?.trim() : undefined;
+      const criterionId =
+        explicitId || snakeId || camelAlt || legacyId || legacyKey || (fallbackId ?? '');
+      if (!criterionId) {
+        return;
+      }
+      const rawScore =
+        payload.score ?? payload.value ?? payload.rating ?? payload.result ?? payload.points ?? entry;
+      let score: number | undefined;
+      if (typeof rawScore === 'number' && Number.isFinite(rawScore)) {
+        score = rawScore;
+      } else if (typeof rawScore === 'string' && rawScore.trim()) {
+        const parsed = Number(rawScore);
+        if (!Number.isNaN(parsed)) {
+          score = parsed;
+        }
+      }
+      const notApplicable =
+        payload.notApplicable === true ||
+        (typeof payload.notApplicable === 'string' && payload.notApplicable.toLowerCase() === 'true') ||
+        (typeof payload.notApplicable === 'string' && payload.notApplicable.toLowerCase() === 'n/a');
+      result.push({ criterionId, score, notApplicable });
+      return;
     }
-    const payload = entry as Record<string, unknown>;
-    const criterionId = normalizeString(payload.criterionId)?.trim();
-    if (!criterionId) {
-      continue;
+    if (!fallbackId) {
+      return;
     }
-    const rawScore = payload.score;
     let score: number | undefined;
-    if (typeof rawScore === 'number' && Number.isFinite(rawScore)) {
-      score = rawScore;
-    } else if (typeof rawScore === 'string' && rawScore.trim()) {
-      const parsed = Number(rawScore);
+    if (typeof entry === 'number' && Number.isFinite(entry)) {
+      score = entry;
+    } else if (typeof entry === 'string' && entry.trim()) {
+      const parsed = Number(entry);
       if (!Number.isNaN(parsed)) {
         score = parsed;
       }
     }
-    const notApplicable = payload.notApplicable === true;
-    result.push({ criterionId, score, notApplicable });
+    result.push({ criterionId: fallbackId, score });
+  };
+
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      appendEntry(entry);
+    }
+    return result;
   }
+
+  if (value && typeof value === 'object') {
+    for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+      appendEntry(entry, key);
+    }
+    return result;
+  }
+
   return result;
 };
 
@@ -322,6 +405,8 @@ const normalizeAssignment = (value: unknown): InterviewerAssignmentView | null =
     caseFolder?: unknown;
     fitQuestion?: unknown;
     form?: unknown;
+    peerForms?: unknown;
+    decision?: unknown;
   };
 
   const evaluationId = normalizeString(payload.evaluationId)?.trim();
@@ -344,7 +429,9 @@ const normalizeAssignment = (value: unknown): InterviewerAssignmentView | null =
     candidate: normalizeCandidate(payload.candidate),
     caseFolder: normalizeCaseFolder(payload.caseFolder),
     fitQuestion: normalizeFitQuestion(payload.fitQuestion),
-    form: normalizeForm(payload.form)
+    form: normalizeForm(payload.form),
+    peerForms: normalizePeerForms(payload.peerForms),
+    decision: normalizeDecision(payload.decision)
   };
 };
 

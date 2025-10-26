@@ -2,6 +2,9 @@ import { useMemo, useState } from 'react';
 import styles from '../../../styles/AnalyticsScreen.module.css';
 import type { TimelineGrouping, TimelineResponse } from '../types/analytics';
 import { TimelineChart, SeriesConfig } from './TimelineChart';
+import { CheckIcon } from '../../../components/icons/CheckIcon';
+import { CloseIcon } from '../../../components/icons/CloseIcon';
+import { useDateRangeDraft } from '../hooks/useDateRangeDraft';
 
 const TIMELINE_SERIES: SeriesConfig[] = [
   { key: 'resumes', label: 'Resumes received', color: '#0ea5e9', type: 'count' },
@@ -67,6 +70,27 @@ export const TimelineSection = ({
 
   const defaultFrom = data ? data.range.start.slice(0, 10) : '';
   const defaultTo = data ? data.range.end.slice(0, 10) : '';
+  const controlledFrom = from ?? defaultFrom;
+  const controlledTo = to ?? defaultTo;
+
+  const {
+    fromDraft,
+    toDraft,
+    setFromDraft,
+    setToDraft,
+    canApply: canApplyRange,
+    hasChanges: rangeChanged,
+    applyDraft: applyRange,
+    resetDraft: resetRange
+  } = useDateRangeDraft({
+    controlledFrom,
+    controlledTo,
+    onFromChange,
+    onToChange
+  });
+
+  const fromInvalid = Boolean(fromDraft) && fromDraft.length !== 10;
+  const toInvalid = Boolean(toDraft) && toDraft.length !== 10;
 
   const points = data?.points ?? [];
 
@@ -109,9 +133,18 @@ export const TimelineSection = ({
           <input
             id="timeline-from"
             type="date"
-            className={styles.dateInput}
-            value={from ?? defaultFrom}
-            onChange={(event) => onFromChange(event.target.value || undefined)}
+            className={`${styles.dateInput} ${fromInvalid ? styles.dateInputInvalid : ''}`.trim()}
+            value={fromDraft}
+            onChange={(event) => setFromDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                if (canApplyRange) {
+                  applyRange();
+                }
+              }
+            }}
+            aria-invalid={fromInvalid}
           />
         </div>
         <div className={styles.inputGroup}>
@@ -121,10 +154,46 @@ export const TimelineSection = ({
           <input
             id="timeline-to"
             type="date"
-            className={styles.dateInput}
-            value={to ?? defaultTo}
-            onChange={(event) => onToChange(event.target.value || undefined)}
+            className={`${styles.dateInput} ${toInvalid ? styles.dateInputInvalid : ''}`.trim()}
+            value={toDraft}
+            onChange={(event) => setToDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                if (canApplyRange) {
+                  applyRange();
+                }
+              }
+            }}
+            aria-invalid={toInvalid}
           />
+        </div>
+        <div className={`${styles.inputGroup} ${styles.rangeActions}`}>
+          <span className={styles.rangeActionsLabel}>Apply range</span>
+          <div className={styles.rangeActionButtons}>
+            <button
+              type="button"
+              className={`${styles.rangeButton} ${styles.rangeButtonPositive}`}
+              onClick={() => {
+                applyRange();
+              }}
+              aria-label="Подтвердить диапазон дат"
+              disabled={!canApplyRange}
+            >
+              <CheckIcon width={16} height={16} />
+            </button>
+            <button
+              type="button"
+              className={`${styles.rangeButton} ${styles.rangeButtonNeutral}`}
+              onClick={() => {
+                resetRange();
+              }}
+              aria-label="Сбросить изменения диапазона дат"
+              disabled={!rangeChanged}
+            >
+              <CloseIcon width={16} height={16} />
+            </button>
+          </div>
         </div>
       </div>
 

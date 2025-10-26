@@ -9,7 +9,10 @@ import {
   EvaluationCriterionScore,
   OfferRecommendationValue,
   InvitationDeliveryReport,
-  InvitationDeliveryFailure
+  InvitationDeliveryFailure,
+  InterviewPeerFormView,
+  EvaluationRoundSnapshot,
+  InterviewStatusModel
 } from './evaluations.types.js';
 import { computeInvitationState } from './evaluationAssignments.utils.js';
 import type { AccountRecord } from '../accounts/accounts.types.js';
@@ -71,6 +74,44 @@ const deriveFirstNameFromEmail = (email: string | undefined): string | undefined
   return extractFirstName(normalized);
 };
 
+const collectFormsBySlot = (
+  evaluation: EvaluationRecord | undefined,
+  snapshot: EvaluationRoundSnapshot | undefined
+): Map<string, InterviewStatusModel> => {
+  const formEntries: InterviewStatusModel[] = [];
+  if (snapshot?.forms?.length) {
+    formEntries.push(...snapshot.forms);
+  }
+  if (evaluation?.forms?.length) {
+    formEntries.push(...evaluation.forms);
+  }
+  return new Map(formEntries.map((form) => [form.slotId, form]));
+};
+
+const buildPeerForms = (
+  evaluation: EvaluationRecord | undefined,
+  snapshot: EvaluationRoundSnapshot | undefined
+): InterviewPeerFormView[] => {
+  if (!evaluation) {
+    return [];
+  }
+  const interviews = snapshot?.interviews ?? evaluation.interviews ?? [];
+  if (!interviews.length) {
+    return [];
+  }
+  const formMap = collectFormsBySlot(evaluation, snapshot);
+  return interviews.map((slot) => {
+    const form = formMap.get(slot.id) ?? null;
+    return {
+      slotId: slot.id,
+      interviewerName: slot.interviewerName || 'Interviewer',
+      interviewerEmail: slot.interviewerEmail,
+      submitted: Boolean(form?.submitted),
+      form
+    } satisfies InterviewPeerFormView;
+  });
+};
+
 const buildWriteModelFromRecord = (record: EvaluationRecord): EvaluationWriteModel => ({
   id: record.id,
   candidateId: record.candidateId,
@@ -105,23 +146,54 @@ const readScore = (value: unknown): number | undefined => {
 };
 
 const readCriteriaList = (value: unknown): EvaluationCriterionScore[] => {
-  if (!Array.isArray(value)) {
-    return [];
-  }
   const result: EvaluationCriterionScore[] = [];
-  for (const entry of value) {
-    if (!entry || typeof entry !== 'object') {
-      continue;
+  const appendFromPayload = (payload: unknown, fallbackId?: string) => {
+    if (payload && typeof payload === 'object') {
+      const source = payload as Record<string, unknown>;
+      const explicitId = typeof source.criterionId === 'string' ? source.criterionId.trim() : '';
+      const snakeId =
+        !explicitId && typeof source.criterion_id === 'string' ? source.criterion_id.trim() : '';
+      const camelAlt =
+        !explicitId && typeof source.criteriaId === 'string' ? source.criteriaId.trim() : '';
+      const legacyKey = !explicitId && typeof source.id === 'string' ? source.id.trim() : '';
+      const legacyKeyField =
+        !explicitId && typeof source.key === 'string' ? source.key.trim() : '';
+      const criterionId =
+        explicitId || snakeId || camelAlt || legacyKey || legacyKeyField || (fallbackId ?? '');
+      if (!criterionId) {
+        return;
+      }
+      const scoreCandidate =
+        source.score ?? source.value ?? source.rating ?? source.result ?? source.points;
+      const scoreSource = scoreCandidate ?? payload;
+      const scoreValue = readScore(scoreSource);
+      const notApplicable =
+        source.notApplicable === true ||
+        (typeof source.notApplicable === 'string' && source.notApplicable.toLowerCase() === 'true') ||
+        (typeof source.notApplicable === 'string' && source.notApplicable.toLowerCase() === 'n/a');
+      result.push({ criterionId, score: scoreValue, notApplicable });
+      return;
     }
-    const payload = entry as Record<string, unknown>;
-    const criterionId = typeof payload.criterionId === 'string' ? payload.criterionId.trim() : '';
-    if (!criterionId) {
-      continue;
+    if (!fallbackId) {
+      return;
     }
-    const scoreValue = readScore(payload.score);
-    const notApplicable = payload.notApplicable === true;
-    result.push({ criterionId, score: scoreValue, notApplicable });
+    result.push({ criterionId: fallbackId, score: readScore(payload) });
+  };
+
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      appendFromPayload(entry);
+    }
+    return result;
   }
+
+  if (value && typeof value === 'object') {
+    for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+      appendFromPayload(entry, key);
+    }
+    return result;
+  }
+
   return result;
 };
 
@@ -711,6 +783,7 @@ export class EvaluationWorkflowService {
       );
       const historicalForm = snapshot?.forms.find((item) => item.slotId === assignment.slotId) ?? null;
       const form = currentForm ?? historicalForm;
+      const peerForms = buildPeerForms(evaluation, snapshot);
       const candidate = evaluation?.candidateId ? candidateMap.get(evaluation.candidateId) ?? undefined : undefined;
       const processStatus =
         assignment.roundNumber === (evaluation?.roundNumber ?? assignment.roundNumber)
@@ -729,7 +802,9 @@ export class EvaluationWorkflowService {
         candidate: candidate ?? undefined,
         caseFolder: caseMap.get(assignment.caseFolderId) ?? undefined,
         fitQuestion: questionMap.get(assignment.fitQuestionId) ?? undefined,
-        form
+        form,
+        peerForms,
+        decision: snapshot?.decision ?? evaluation?.decision ?? null
       } satisfies InterviewerAssignmentView;
     });
   }

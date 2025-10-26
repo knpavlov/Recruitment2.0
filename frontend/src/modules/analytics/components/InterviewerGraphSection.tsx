@@ -4,6 +4,9 @@ import type { InterviewerStatsResponse, TimelineGrouping } from '../types/analyt
 import { buildInterviewerGraphPoints, type InterviewerGraphPoint } from '../utils/interviewerGraph';
 import type { InterviewerSeniority } from '../../../shared/types/account';
 import { InterviewerFilters } from './InterviewerFilters';
+import { CheckIcon } from '../../../components/icons/CheckIcon';
+import { CloseIcon } from '../../../components/icons/CloseIcon';
+import { useDateRangeDraft } from '../hooks/useDateRangeDraft';
 
 const GROUPING_LABELS: Record<TimelineGrouping, string> = {
   week: 'Weekly',
@@ -201,12 +204,31 @@ export const InterviewerGraphSection = ({
 
   const defaultFrom = data ? data.range.start.slice(0, 10) : '';
   const defaultTo = data ? data.range.end.slice(0, 10) : '';
-  const fromValue = from ?? defaultFrom;
-  const toValue = to ?? defaultTo;
+  const controlledFrom = from ?? defaultFrom;
+  const controlledTo = to ?? defaultTo;
+
+  const {
+    fromDraft,
+    toDraft,
+    setFromDraft,
+    setToDraft,
+    canApply: canApplyRange,
+    hasChanges: rangeChanged,
+    applyDraft: applyRange,
+    resetDraft: resetRange
+  } = useDateRangeDraft({
+    controlledFrom,
+    controlledTo,
+    onFromChange,
+    onToChange
+  });
+
+  const fromInvalid = Boolean(fromDraft) && fromDraft.length !== 10;
+  const toInvalid = Boolean(toDraft) && toDraft.length !== 10;
   const groupingLabel = GROUPING_LABELS[data?.groupBy ?? grouping];
   const rangeDescription = formatRangeDescription(
-    fromValue || undefined,
-    toValue || undefined,
+    controlledFrom || undefined,
+    controlledTo || undefined,
     groupingLabel
   );
 
@@ -274,9 +296,18 @@ export const InterviewerGraphSection = ({
           <input
             id="interviewer-from"
             type="date"
-            className={styles.dateInput}
-            value={fromValue}
-            onChange={(event) => onFromChange(event.target.value || undefined)}
+            className={`${styles.dateInput} ${fromInvalid ? styles.dateInputInvalid : ''}`.trim()}
+            value={fromDraft}
+            onChange={(event) => setFromDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                if (canApplyRange) {
+                  applyRange();
+                }
+              }
+            }}
+            aria-invalid={fromInvalid}
           />
         </div>
         <div className={styles.inputGroup}>
@@ -286,10 +317,46 @@ export const InterviewerGraphSection = ({
           <input
             id="interviewer-to"
             type="date"
-            className={styles.dateInput}
-            value={toValue}
-            onChange={(event) => onToChange(event.target.value || undefined)}
+            className={`${styles.dateInput} ${toInvalid ? styles.dateInputInvalid : ''}`.trim()}
+            value={toDraft}
+            onChange={(event) => setToDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                if (canApplyRange) {
+                  applyRange();
+                }
+              }
+            }}
+            aria-invalid={toInvalid}
           />
+        </div>
+        <div className={`${styles.inputGroup} ${styles.rangeActions}`}>
+          <span className={styles.rangeActionsLabel}>Apply range</span>
+          <div className={styles.rangeActionButtons}>
+            <button
+              type="button"
+              className={`${styles.rangeButton} ${styles.rangeButtonPositive}`}
+              onClick={() => {
+                applyRange();
+              }}
+              aria-label="Подтвердить диапазон дат"
+              disabled={!canApplyRange}
+            >
+              <CheckIcon width={16} height={16} />
+            </button>
+            <button
+              type="button"
+              className={`${styles.rangeButton} ${styles.rangeButtonNeutral}`}
+              onClick={() => {
+                resetRange();
+              }}
+              aria-label="Сбросить изменения диапазона дат"
+              disabled={!rangeChanged}
+            >
+              <CloseIcon width={16} height={16} />
+            </button>
+          </div>
         </div>
       </div>
 
