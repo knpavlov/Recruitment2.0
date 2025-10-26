@@ -1,11 +1,14 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import styles from '../../styles/InterviewerScreen.module.css';
 import { useAuth } from '../auth/AuthContext';
 import { interviewerApi } from './services/interviewerApi';
 import {
+  EvaluationCriterionScore,
+  EvaluationDecision,
+  InterviewStatusRecord,
   InterviewerAssignmentView,
   OfferRecommendationValue,
-  EvaluationCriterionScore
+  PeerInterviewFormView
 } from '../../shared/types/evaluation';
 import { CaseFolder } from '../../shared/types/caseLibrary';
 import { ApiError } from '../../shared/api/httpClient';
@@ -106,8 +109,8 @@ const CriterionSelector = ({
   );
 };
 
-const createFormState = (assignment: InterviewerAssignmentView | null): FormState => {
-  if (!assignment?.form) {
+const buildFormStateFromRecord = (record: InterviewStatusRecord | null | undefined): FormState => {
+  if (!record) {
     return {
       fitNotes: '',
       caseNotes: '',
@@ -136,16 +139,19 @@ const createFormState = (assignment: InterviewerAssignmentView | null): FormStat
     return map;
   };
   return {
-    fitNotes: assignment.form.fitNotes ?? '',
-    caseNotes: assignment.form.caseNotes ?? '',
-    notes: assignment.form.notes ?? '',
-    interestNotes: assignment.form.interestNotes ?? '',
-    issuesToTest: assignment.form.issuesToTest ?? '',
-    offerRecommendation: assignment.form.offerRecommendation ?? '',
-    fitCriteria: toCriteriaMap(assignment.form.fitCriteria),
-    caseCriteria: toCriteriaMap(assignment.form.caseCriteria)
+    fitNotes: record.fitNotes ?? '',
+    caseNotes: record.caseNotes ?? '',
+    notes: record.notes ?? '',
+    interestNotes: record.interestNotes ?? '',
+    issuesToTest: record.issuesToTest ?? '',
+    offerRecommendation: record.offerRecommendation ?? '',
+    fitCriteria: toCriteriaMap(record.fitCriteria),
+    caseCriteria: toCriteriaMap(record.caseCriteria)
   };
 };
+
+const createFormState = (assignment: InterviewerAssignmentView | null): FormState =>
+  buildFormStateFromRecord(assignment?.form ?? null);
 
 const OFFER_OPTIONS: Array<{ value: OfferRecommendationValue; label: string }> = [
   { value: 'yes_priority', label: 'Yes, priority' },
@@ -177,6 +183,24 @@ const formatScoreValue = (value: number | null | undefined): string => {
     return '—';
   }
   return (Math.round(value * 10) / 10).toFixed(1);
+};
+
+type OutcomeTone = 'pending' | 'positive' | 'progress' | 'negative';
+
+const resolveOutcomeDisplay = (decision: EvaluationDecision | null | undefined): {
+  label: string;
+  tone: OutcomeTone;
+} => {
+  if (decision === 'offer' || decision === 'accepted-offer') {
+    return { label: 'Offer', tone: 'positive' };
+  }
+  if (decision === 'progress') {
+    return { label: 'Progress to next round', tone: 'progress' };
+  }
+  if (decision === 'reject') {
+    return { label: 'Reject', tone: 'negative' };
+  }
+  return { label: 'Outcome pending', tone: 'pending' };
 };
 
 const isRatingComplete = (value: string | undefined): boolean => {
@@ -225,6 +249,9 @@ export const InterviewerScreen = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formState, setFormState] = useState<FormState>(createFormState(null));
+  const [activePeerSlotId, setActivePeerSlotId] = useState<string | null>(null);
+  const [draftStates, setDraftStates] = useState<Record<string, FormState>>({});
+  const draftStatesRef = useRef<Record<string, FormState>>({});
 
   const selectedAssignment = useMemo(() => {
     if (!selectedSlot) {
@@ -233,11 +260,30 @@ export const InterviewerScreen = () => {
     return assignments.find((item) => item.slotId === selectedSlot) ?? null;
   }, [assignments, selectedSlot]);
 
-  const isSubmitted = selectedAssignment?.form?.submitted ?? false;
-  const disableInputs = saving || isSubmitted;
+  useEffect(() => {
+    draftStatesRef.current = draftStates;
+  }, [draftStates]);
 
   useEffect(() => {
-    setFormState(createFormState(selectedAssignment));
+    if (!selectedAssignment) {
+      setActivePeerSlotId(null);
+      setFormState(createFormState(null));
+      return;
+    }
+    setActivePeerSlotId((prev) => {
+      if (prev && selectedAssignment.peerForms.some((peer) => peer.slotId === prev)) {
+        return prev;
+      }
+      return selectedAssignment.slotId;
+    });
+    const existingDraft = draftStatesRef.current[selectedAssignment.slotId];
+    if (existingDraft) {
+      setFormState(existingDraft);
+      return;
+    }
+    const nextState = createFormState(selectedAssignment);
+    setFormState(nextState);
+    setDraftStates((prev) => ({ ...prev, [selectedAssignment.slotId]: nextState }));
   }, [selectedAssignment]);
 
   useEffect(() => {
@@ -315,6 +361,17 @@ export const InterviewerScreen = () => {
       .filter((item): item is EvaluationCriterionScore => Boolean(item));
   };
 
+  const updateLocalFormState = (updater: (prev: FormState) => FormState) => {
+    if (!selectedAssignment) {
+      return;
+    }
+    setFormState((prev) => {
+      const next = updater(prev);
+      setDraftStates((map) => ({ ...map, [selectedAssignment.slotId]: next }));
+      return next;
+    });
+  };
+
   const persistForm = async ({ submitted }: { submitted: boolean }) => {
     if (!session?.email || !selectedAssignment) {
       return;
@@ -356,6 +413,13 @@ export const InterviewerScreen = () => {
         type: 'info',
         text: submitted ? 'Evaluation submitted. Thank you for your feedback!' : 'Draft saved.'
       });
+      if (submitted) {
+        setDraftStates((prev) => {
+          const next = { ...prev };
+          delete next[selectedAssignment.slotId];
+          return next;
+        });
+      }
     } catch (error) {
       if (error instanceof ApiError) {
         if (error.code === 'access-denied') {
@@ -375,10 +439,22 @@ export const InterviewerScreen = () => {
   };
 
   const handleSaveDraft = () => {
+    if (!selectedAssignment) {
+      return;
+    }
+    if (activePeerSlotId && activePeerSlotId !== selectedAssignment.slotId) {
+      return;
+    }
     void persistForm({ submitted: false });
   };
 
   const handleSubmitFinal = () => {
+    if (!selectedAssignment) {
+      return;
+    }
+    if (activePeerSlotId && activePeerSlotId !== selectedAssignment.slotId) {
+      return;
+    }
     void persistForm({ submitted: true });
   };
 
@@ -404,6 +480,15 @@ export const InterviewerScreen = () => {
           const submitted = assignment.form?.submitted ?? false;
           const statusLabel = submitted ? 'Completed' : 'Assigned';
           const roundLabel = `Round ${assignment.roundNumber}`;
+          const outcomeDisplay = resolveOutcomeDisplay(assignment.decision ?? null);
+          const outcomeToneClass =
+            outcomeDisplay.tone === 'positive'
+              ? styles.outcomePillPositive
+              : outcomeDisplay.tone === 'progress'
+                ? styles.outcomePillProgress
+                : outcomeDisplay.tone === 'negative'
+                  ? styles.outcomePillNegative
+                  : styles.outcomePillPending;
           return (
             <li
               key={assignment.slotId}
@@ -416,6 +501,7 @@ export const InterviewerScreen = () => {
                 <span className={`${styles.statusPill} ${submitted ? styles.statusPillCompleted : styles.statusPillAssigned}`}>
                   {statusLabel}
                 </span>
+                <span className={`${styles.outcomePill} ${outcomeToneClass}`}>{outcomeDisplay.label}</span>
                 <span className={styles.listItemMetaText}>Assigned {formatDate(assignment.invitationSentAt)}</span>
               </div>
             </li>
@@ -449,18 +535,43 @@ export const InterviewerScreen = () => {
         </div>
       );
     }
+
     const candidate = selectedAssignment.candidate;
     const candidateName = candidate
       ? composeFullName(candidate.firstName, candidate.lastName) || candidate.id
       : 'Candidate not assigned';
     const fitQuestion = selectedAssignment.fitQuestion;
     const fitCriteria: CriterionDefinition[] = fitQuestion?.criteria ?? [];
-    const mergedCaseCriteriaMap = new Map<string, CriterionDefinition>();
 
+    const peerForms: PeerInterviewFormView[] = selectedAssignment.peerForms.length
+      ? selectedAssignment.peerForms
+      : [
+          {
+            slotId: selectedAssignment.slotId,
+            interviewerName: selectedAssignment.interviewerName,
+            interviewerEmail: selectedAssignment.interviewerEmail,
+            submitted: selectedAssignment.form?.submitted ?? false,
+            submittedAt: selectedAssignment.form?.submittedAt,
+            form: selectedAssignment.form?.submitted ? selectedAssignment.form : null
+          }
+        ];
+
+    const activeSlotId =
+      activePeerSlotId && peerForms.some((peer) => peer.slotId === activePeerSlotId)
+        ? activePeerSlotId
+        : selectedAssignment.slotId;
+    const activePeer = peerForms.find((peer) => peer.slotId === activeSlotId) ?? null;
+    const isOwnTab = activeSlotId === selectedAssignment.slotId;
+    const isSubmitted = isOwnTab
+      ? selectedAssignment.form?.submitted ?? false
+      : activePeer?.submitted ?? false;
+    const disableInputs = saving || isSubmitted || !isOwnTab;
+    const displayFormState = isOwnTab ? formState : buildFormStateFromRecord(activePeer?.form);
+
+    const mergedCaseCriteriaMap = new Map<string, CriterionDefinition>();
     (selectedAssignment.caseFolder?.evaluationCriteria ?? []).forEach((criterion) => {
       mergedCaseCriteriaMap.set(criterion.id, criterion);
     });
-
     globalCaseCriteria.forEach((criterion) => {
       mergedCaseCriteriaMap.set(criterion.id, {
         id: criterion.id,
@@ -468,7 +579,6 @@ export const InterviewerScreen = () => {
         ratings: criterion.ratings
       });
     });
-
     const caseCriteria = sortCaseCriteria(Array.from(mergedCaseCriteriaMap.values()));
     const resumeLink = candidate?.resume ? (
       <a className={styles.fileLink} href={candidate.resume.dataUrl} download={candidate.resume.fileName}>
@@ -478,27 +588,33 @@ export const InterviewerScreen = () => {
       <p className={styles.placeholderText}>Resume is not available.</p>
     );
     const roundLabel = `Round ${selectedAssignment.roundNumber}`;
-    const submittedAtLabel = selectedAssignment.form?.submittedAt
-      ? formatDate(selectedAssignment.form?.submittedAt)
-      : null;
+    const submittedAtLabel = isOwnTab
+      ? selectedAssignment.form?.submittedAt
+        ? formatDate(selectedAssignment.form?.submittedAt)
+        : null
+      : activePeer?.submittedAt
+        ? formatDate(activePeer.submittedAt)
+        : null;
+    const storedFitScoreValue = isOwnTab ? selectedAssignment.form?.fitScore : activePeer?.form?.fitScore;
+    const storedCaseScoreValue = isOwnTab ? selectedAssignment.form?.caseScore : activePeer?.form?.caseScore;
     const storedFitScore =
-      typeof selectedAssignment.form?.fitScore === 'number' && Number.isFinite(selectedAssignment.form?.fitScore)
-        ? selectedAssignment.form?.fitScore
+      typeof storedFitScoreValue === 'number' && Number.isFinite(storedFitScoreValue)
+        ? storedFitScoreValue
         : null;
     const storedCaseScore =
-      typeof selectedAssignment.form?.caseScore === 'number' && Number.isFinite(selectedAssignment.form?.caseScore)
-        ? selectedAssignment.form?.caseScore
+      typeof storedCaseScoreValue === 'number' && Number.isFinite(storedCaseScoreValue)
+        ? storedCaseScoreValue
         : null;
-    const calculatedFitScore = computeAverageScore(formState.fitCriteria);
-    const calculatedCaseScore = computeAverageScore(formState.caseCriteria);
+    const calculatedFitScore = computeAverageScore(displayFormState.fitCriteria);
+    const calculatedCaseScore = computeAverageScore(displayFormState.caseCriteria);
     const displayFitScore = calculatedFitScore ?? storedFitScore;
     const displayCaseScore = calculatedCaseScore ?? storedCaseScore;
     const targetOffice = candidate?.targetOffice?.trim();
     const targetRole = candidate?.desiredPosition?.trim();
 
-    const fitRatingsComplete = areRatingsComplete(fitCriteria, formState.fitCriteria);
-    const caseRatingsComplete = areRatingsComplete(caseCriteria, formState.caseCriteria);
-    const canSubmitFinal = fitRatingsComplete && caseRatingsComplete;
+    const fitRatingsComplete = isOwnTab ? areRatingsComplete(fitCriteria, formState.fitCriteria) : true;
+    const caseRatingsComplete = isOwnTab ? areRatingsComplete(caseCriteria, formState.caseCriteria) : true;
+    const canSubmitFinal = isOwnTab && fitRatingsComplete && caseRatingsComplete;
 
     return (
       <div className={styles.detailPanel}>
@@ -511,12 +627,40 @@ export const InterviewerScreen = () => {
               {targetOffice && <span className={styles.detailMetaItem}>Target office: {targetOffice}</span>}
             </div>
           </div>
-          <span
-            className={`${styles.statusPill} ${isSubmitted ? styles.statusPillCompleted : styles.statusPillAssigned}`}
-          >
+          <span className={`${styles.statusPill} ${isSubmitted ? styles.statusPillCompleted : styles.statusPillAssigned}`}>
             {isSubmitted ? 'Completed' : 'Assigned'}
           </span>
         </div>
+
+        <div className={styles.tabBar} role="tablist" aria-label="Interviewer forms">
+          {peerForms.map((peer) => {
+            const isActive = peer.slotId === activeSlotId;
+            const isSelf = peer.slotId === selectedAssignment.slotId;
+            const disabled = !isSelf && !peer.submitted;
+            const tabClassName = [
+              styles.tabButton,
+              isActive ? styles.tabButtonActive : '',
+              disabled ? styles.tabButtonDisabled : ''
+            ]
+              .filter(Boolean)
+              .join(' ');
+            return (
+              <button
+                key={peer.slotId}
+                type="button"
+                className={tabClassName}
+                role="tab"
+                aria-selected={isActive}
+                aria-controls={`interview-form-${peer.slotId}`}
+                disabled={disabled}
+                onClick={() => setActivePeerSlotId(peer.slotId)}
+              >
+                {peer.interviewerName || 'Interviewer'}
+              </button>
+            );
+          })}
+        </div>
+
         <div className={styles.detailColumns}>
           <aside className={styles.infoColumn}>
             <div className={styles.infoCard}>
@@ -543,12 +687,21 @@ export const InterviewerScreen = () => {
           <div className={styles.formColumn}>
             <form
               className={styles.form}
+              id={`interview-form-${activeSlotId}`}
               onSubmit={(event) => {
                 event.preventDefault();
+                if (!isOwnTab) {
+                  return;
+                }
                 handleSaveDraft();
               }}
             >
-              {isSubmitted && (
+              {!isOwnTab && (
+                <div className={styles.formNotice}>
+                  Viewing {activePeer?.interviewerName || 'interviewer'}'s submitted evaluation. Editing is disabled.
+                </div>
+              )}
+              {isOwnTab && isSubmitted && (
                 <div className={styles.formNotice}>
                   This evaluation was submitted
                   {submittedAtLabel ? ` on ${submittedAtLabel}` : ''} and can no longer be edited.
@@ -565,15 +718,18 @@ export const InterviewerScreen = () => {
                       <CriterionSelector
                         key={criterion.id}
                         criterion={criterion}
-                        value={formState.fitCriteria[criterion.id] ?? ''}
+                        value={displayFormState.fitCriteria[criterion.id] ?? ''}
                         disabled={disableInputs}
                         highlightSelection={isSubmitted}
-                        onChange={(next) =>
-                          setFormState((prev) => ({
+                        onChange={(next) => {
+                          if (!isOwnTab) {
+                            return;
+                          }
+                          updateLocalFormState((prev) => ({
                             ...prev,
                             fitCriteria: { ...prev.fitCriteria, [criterion.id]: next }
-                          }))
-                        }
+                          }));
+                        }}
                       />
                     ))}
                     <div className={`${styles.criterionCard} ${styles.criterionSummary}`}>
@@ -592,8 +748,14 @@ export const InterviewerScreen = () => {
                   <textarea
                     id="fitNotes"
                     rows={4}
-                    value={formState.fitNotes}
-                    onChange={(event) => setFormState((prev) => ({ ...prev, fitNotes: event.target.value }))}
+                    value={displayFormState.fitNotes}
+                    onChange={(event) => {
+                      if (!isOwnTab) {
+                        return;
+                      }
+                      const nextValue = event.target.value;
+                      updateLocalFormState((prev) => ({ ...prev, fitNotes: nextValue }));
+                    }}
                     disabled={disableInputs}
                   />
                 </div>
@@ -609,15 +771,18 @@ export const InterviewerScreen = () => {
                       <CriterionSelector
                         key={criterion.id}
                         criterion={criterion}
-                        value={formState.caseCriteria[criterion.id] ?? ''}
+                        value={displayFormState.caseCriteria[criterion.id] ?? ''}
                         disabled={disableInputs}
                         highlightSelection={isSubmitted}
-                        onChange={(next) =>
-                          setFormState((prev) => ({
+                        onChange={(next) => {
+                          if (!isOwnTab) {
+                            return;
+                          }
+                          updateLocalFormState((prev) => ({
                             ...prev,
                             caseCriteria: { ...prev.caseCriteria, [criterion.id]: next }
-                          }))
-                        }
+                          }));
+                        }}
                       />
                     ))}
                     <div className={`${styles.criterionCard} ${styles.criterionSummary}`}>
@@ -636,8 +801,14 @@ export const InterviewerScreen = () => {
                   <textarea
                     id="caseNotes"
                     rows={4}
-                    value={formState.caseNotes}
-                    onChange={(event) => setFormState((prev) => ({ ...prev, caseNotes: event.target.value }))}
+                    value={displayFormState.caseNotes}
+                    onChange={(event) => {
+                      if (!isOwnTab) {
+                        return;
+                      }
+                      const nextValue = event.target.value;
+                      updateLocalFormState((prev) => ({ ...prev, caseNotes: nextValue }));
+                    }}
                     disabled={disableInputs}
                   />
                 </div>
@@ -653,10 +824,14 @@ export const InterviewerScreen = () => {
                     aria-label="Interest level notes"
                     placeholder="Add notes about the candidate's interest level"
                     rows={3}
-                    value={formState.interestNotes}
-                    onChange={(event) =>
-                      setFormState((prev) => ({ ...prev, interestNotes: event.target.value }))
-                    }
+                    value={displayFormState.interestNotes}
+                    onChange={(event) => {
+                      if (!isOwnTab) {
+                        return;
+                      }
+                      const nextValue = event.target.value;
+                      updateLocalFormState((prev) => ({ ...prev, interestNotes: nextValue }));
+                    }}
                     disabled={disableInputs}
                   />
                 </div>
@@ -672,10 +847,14 @@ export const InterviewerScreen = () => {
                     aria-label="Issues to Test in Next Interview"
                     placeholder="List focus areas for the next interviewer"
                     rows={3}
-                    value={formState.issuesToTest}
-                    onChange={(event) =>
-                      setFormState((prev) => ({ ...prev, issuesToTest: event.target.value }))
-                    }
+                    value={displayFormState.issuesToTest}
+                    onChange={(event) => {
+                      if (!isOwnTab) {
+                        return;
+                      }
+                      const nextValue = event.target.value;
+                      updateLocalFormState((prev) => ({ ...prev, issuesToTest: nextValue }));
+                    }}
                     disabled={disableInputs}
                   />
                 </div>
@@ -692,11 +871,14 @@ export const InterviewerScreen = () => {
                         type="radio"
                         name="offerRecommendation"
                         value={option.value}
-                        checked={formState.offerRecommendation === option.value}
+                        checked={displayFormState.offerRecommendation === option.value}
                         disabled={disableInputs}
-                        onChange={() =>
-                          setFormState((prev) => ({ ...prev, offerRecommendation: option.value }))
-                        }
+                        onChange={() => {
+                          if (!isOwnTab) {
+                            return;
+                          }
+                          updateLocalFormState((prev) => ({ ...prev, offerRecommendation: option.value }));
+                        }}
                       />
                       <span>{option.label}</span>
                     </label>
@@ -707,8 +889,14 @@ export const InterviewerScreen = () => {
                   <textarea
                     id="generalNotes"
                     rows={4}
-                    value={formState.notes}
-                    onChange={(event) => setFormState((prev) => ({ ...prev, notes: event.target.value }))}
+                    value={displayFormState.notes}
+                    onChange={(event) => {
+                      if (!isOwnTab) {
+                        return;
+                      }
+                      const nextValue = event.target.value;
+                      updateLocalFormState((prev) => ({ ...prev, notes: nextValue }));
+                    }}
                     disabled={disableInputs}
                   />
                 </div>
@@ -723,23 +911,26 @@ export const InterviewerScreen = () => {
                 >
                   {saving ? 'Saving…' : 'Save draft'}
                 </button>
-            <button
-              type="button"
-              className={styles.primaryButton}
-              disabled={isSubmitted || saving || !canSubmitFinal}
-              onClick={() => {
-                if (!canSubmitFinal) {
-                  setBanner({
-                    type: 'error',
-                    text: 'Complete all quantitative ratings before submitting the evaluation.'
-                  });
-                  return;
-                }
-                handleSubmitFinal();
-              }}
-            >
-              Submit evaluation
-            </button>
+                <button
+                  type="button"
+                  className={styles.primaryButton}
+                  disabled={!isOwnTab || isSubmitted || saving || !canSubmitFinal}
+                  onClick={() => {
+                    if (!isOwnTab) {
+                      return;
+                    }
+                    if (!canSubmitFinal) {
+                      setBanner({
+                        type: 'error',
+                        text: 'Complete all quantitative ratings before submitting the evaluation.'
+                      });
+                      return;
+                    }
+                    handleSubmitFinal();
+                  }}
+                >
+                  Submit evaluation
+                </button>
               </div>
             </form>
           </div>

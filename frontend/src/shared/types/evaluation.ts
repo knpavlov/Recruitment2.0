@@ -25,6 +25,8 @@ export interface InterviewStatusRecord {
 
 export type EvaluationProcessStatus = 'draft' | 'in-progress' | 'completed';
 
+export type EvaluationDecision = 'offer' | 'accepted-offer' | 'reject' | 'progress';
+
 export interface EvaluationCriterionScore {
   criterionId: string;
   score?: number;
@@ -52,7 +54,7 @@ export interface EvaluationConfig {
   processStartedAt?: string;
   roundHistory: EvaluationRoundSnapshot[];
   invitationState: EvaluationInvitationState;
-  decision?: 'offer' | 'accepted-offer' | 'reject' | 'progress' | null;
+  decision?: EvaluationDecision | null;
 }
 
 export interface EvaluationRoundSnapshot {
@@ -65,7 +67,7 @@ export interface EvaluationRoundSnapshot {
   processStartedAt?: string;
   completedAt?: string;
   createdAt: string;
-  decision?: 'offer' | 'accepted-offer' | 'reject' | 'progress' | null;
+  decision?: EvaluationDecision | null;
 }
 
 export interface EvaluationInvitationState {
@@ -100,6 +102,15 @@ export interface InvitationDeliveryReport {
   skipped: string[];
 }
 
+export interface PeerInterviewFormView {
+  slotId: string;
+  interviewerName: string;
+  interviewerEmail: string;
+  submitted: boolean;
+  submittedAt?: string;
+  form: InterviewStatusRecord | null;
+}
+
 export interface InterviewerAssignmentView {
   evaluationId: string;
   slotId: string;
@@ -113,4 +124,6 @@ export interface InterviewerAssignmentView {
   caseFolder?: import('./caseLibrary').CaseFolder;
   fitQuestion?: import('./fitQuestion').FitQuestion;
   form: InterviewStatusRecord | null;
+  peerForms: PeerInterviewFormView[];
+  decision?: EvaluationDecision | null;
 }

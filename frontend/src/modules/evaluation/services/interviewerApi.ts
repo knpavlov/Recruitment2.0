@@ -1,9 +1,11 @@
 import { apiRequest } from '../../../shared/api/httpClient';
 import {
   EvaluationCriterionScore,
+  EvaluationDecision,
   InterviewerAssignmentView,
   InterviewStatusRecord,
-  OfferRecommendationValue
+  OfferRecommendationValue,
+  PeerInterviewFormView
 } from '../../../shared/types/evaluation';
 import {
   CandidateProfile,
@@ -98,6 +100,13 @@ const normalizeCriteriaList = (value: unknown): EvaluationCriterionScore[] => {
 
 const normalizeOfferRecommendation = (value: unknown): OfferRecommendationValue | undefined => {
   if (value === 'yes_priority' || value === 'yes_strong' || value === 'yes_keep_warm' || value === 'no_offer') {
+    return value;
+  }
+  return undefined;
+};
+
+const normalizeDecision = (value: unknown): EvaluationDecision | undefined => {
+  if (value === 'offer' || value === 'accepted-offer' || value === 'reject' || value === 'progress') {
     return value;
   }
   return undefined;
@@ -305,6 +314,43 @@ const normalizeForm = (value: unknown): InterviewStatusRecord | null => {
   };
 };
 
+const normalizePeerForm = (value: unknown): PeerInterviewFormView | null => {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const payload = value as Partial<PeerInterviewFormView> & {
+    slotId?: unknown;
+    interviewerName?: unknown;
+    interviewerEmail?: unknown;
+    submitted?: unknown;
+    submittedAt?: unknown;
+    form?: unknown;
+  };
+  const slotId = normalizeString(payload.slotId)?.trim();
+  if (!slotId) {
+    return null;
+  }
+  const submitted = payload.submitted === true;
+  const normalizedForm = normalizeForm(payload.form);
+  return {
+    slotId,
+    interviewerName: normalizeString(payload.interviewerName) ?? 'Interviewer',
+    interviewerEmail: normalizeString(payload.interviewerEmail) ?? '',
+    submitted,
+    submittedAt: normalizeIso(payload.submittedAt),
+    form: submitted && normalizedForm ? normalizedForm : null
+  };
+};
+
+const normalizePeerFormList = (value: unknown): PeerInterviewFormView[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((entry) => normalizePeerForm(entry))
+    .filter((item): item is PeerInterviewFormView => Boolean(item));
+};
+
 const normalizeAssignment = (value: unknown): InterviewerAssignmentView | null => {
   if (!value || typeof value !== 'object') {
     return null;
@@ -331,6 +377,20 @@ const normalizeAssignment = (value: unknown): InterviewerAssignmentView | null =
     return null;
   }
 
+  const form = normalizeForm(payload.form);
+
+  const peerForms = normalizePeerFormList(payload.peerForms);
+  if (!peerForms.some((peer) => peer.slotId === slotId)) {
+    peerForms.push({
+      slotId,
+      interviewerName: normalizeString(payload.interviewerName) ?? 'Interviewer',
+      interviewerEmail,
+      submitted: form?.submitted ?? false,
+      submittedAt: form?.submittedAt,
+      form: form && form.submitted ? form : null
+    });
+  }
+
   return {
     evaluationId,
     slotId,
@@ -344,7 +404,9 @@ const normalizeAssignment = (value: unknown): InterviewerAssignmentView | null =
     candidate: normalizeCandidate(payload.candidate),
     caseFolder: normalizeCaseFolder(payload.caseFolder),
     fitQuestion: normalizeFitQuestion(payload.fitQuestion),
-    form: normalizeForm(payload.form)
+    form,
+    peerForms,
+    decision: normalizeDecision(payload.decision)
   };
 };
 
