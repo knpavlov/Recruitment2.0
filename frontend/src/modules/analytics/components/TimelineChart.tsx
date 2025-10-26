@@ -30,6 +30,21 @@ const formatMonthLabel = (value: string) => {
   }).format(date);
 };
 
+const clampLabelY = (value: number) => Math.max(value, PADDING_Y + 12);
+
+const formatSeriesValue = (value: number, type: SeriesConfig['type']) => {
+  if (!Number.isFinite(value)) {
+    return '';
+  }
+  if (type === 'count') {
+    return Math.round(value).toString();
+  }
+  if (type === 'score') {
+    return Number(value.toFixed(1)).toString();
+  }
+  return `${Number((value * 100).toFixed(1))}%`;
+};
+
 export const TimelineChart = ({ points, series }: TimelineChartProps) => {
   const xPositions = useMemo(() => {
     if (points.length <= 1) {
@@ -186,23 +201,44 @@ export const TimelineChart = ({ points, series }: TimelineChartProps) => {
         {percentagePaths}
 
         {/* Data points */}
-        {series.map((item) =>
-          points.map((point, index) => {
-            const raw = point[item.key];
-            if (typeof raw !== 'number') {
-              return null;
-            }
-            const normalized =
-              item.type === 'count'
-                ? raw / countsMax
-                : item.type === 'score'
-                ? (raw * 20) / 100
-                : (raw * 100) / 100;
-            const x = xPositions[index];
-            const y = HEIGHT - PADDING_Y - normalized * availableHeight;
-            return <circle key={`${item.key}-${index}`} cx={x} cy={y} r={3.5} fill={item.color} />;
-          })
-        )}
+        {series.map((item) => (
+          <g key={`series-${item.key}`} aria-label={item.label}>
+            {points.map((point, index) => {
+              const raw = point[item.key];
+              if (typeof raw !== 'number') {
+                return null;
+              }
+              const normalized =
+                item.type === 'count'
+                  ? raw / countsMax
+                  : item.type === 'score'
+                  ? (raw * 20) / 100
+                  : (raw * 100) / 100;
+              const x = xPositions[index];
+              const y = HEIGHT - PADDING_Y - normalized * availableHeight;
+              const label = formatSeriesValue(raw, item.type);
+              const labelY = clampLabelY(y - 12);
+              return (
+                <g key={`${item.key}-${index}`}>
+                  <circle cx={x} cy={y} r={3.5} fill={item.color} />
+                  {label ? (
+                    <text
+                      x={x}
+                      y={labelY}
+                      textAnchor="middle"
+                      fontSize={11}
+                      fontWeight={600}
+                      fill={item.color}
+                      pointerEvents="none"
+                    >
+                      {label}
+                    </text>
+                  ) : null}
+                </g>
+              );
+            })}
+          </g>
+        ))}
       </svg>
     </div>
   );

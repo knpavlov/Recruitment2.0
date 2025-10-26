@@ -49,7 +49,7 @@ const readOptionalIsoDate = (value: unknown): string | undefined => {
 };
 
 const readDecision = (value: unknown): EvaluationRecord['decision'] | undefined => {
-  if (value === 'offer' || value === 'reject' || value === 'progress') {
+  if (value === 'offer' || value === 'accepted-offer' || value === 'reject' || value === 'progress') {
     return value;
   }
   if (value === null) {
