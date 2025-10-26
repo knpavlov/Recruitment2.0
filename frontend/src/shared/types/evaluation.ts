@@ -100,6 +100,13 @@ export interface InvitationDeliveryReport {
   skipped: string[];
 }
 
+export interface InterviewerPeerFormView {
+  slotId: string;
+  interviewerName: string;
+  submitted: boolean;
+  form: InterviewStatusRecord | null;
+}
+
 export interface InterviewerAssignmentView {
   evaluationId: string;
   slotId: string;
@@ -113,4 +120,6 @@ export interface InterviewerAssignmentView {
   caseFolder?: import('./caseLibrary').CaseFolder;
   fitQuestion?: import('./fitQuestion').FitQuestion;
   form: InterviewStatusRecord | null;
+  peerForms: InterviewerPeerFormView[];
+  decision?: 'offer' | 'accepted-offer' | 'reject' | 'progress' | null;
 }

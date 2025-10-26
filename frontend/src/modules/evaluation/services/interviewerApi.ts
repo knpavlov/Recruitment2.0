@@ -305,6 +305,35 @@ const normalizeForm = (value: unknown): InterviewStatusRecord | null => {
   };
 };
 
+const normalizePeerForm = (value: unknown): InterviewerAssignmentView['peerForms'][number] | null => {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const payload = value as Partial<InterviewerAssignmentView['peerForms'][number]> & { slotId?: unknown; form?: unknown };
+  const slotId = normalizeString(payload.slotId)?.trim();
+  if (!slotId) {
+    return null;
+  }
+  return {
+    slotId,
+    interviewerName: normalizeString(payload.interviewerName) ?? 'Interviewer',
+    submitted: typeof payload.submitted === 'boolean' ? payload.submitted : false,
+    form: normalizeForm(payload.form)
+  };
+};
+
+const normalizeDecision = (
+  value: unknown
+): InterviewerAssignmentView['decision'] => {
+  const normalized = normalizeString(value)?.trim();
+  if (!normalized) {
+    return null;
+  }
+  return ['offer', 'accepted-offer', 'reject', 'progress'].includes(normalized)
+    ? (normalized as InterviewerAssignmentView['decision'])
+    : null;
+};
+
 const normalizeAssignment = (value: unknown): InterviewerAssignmentView | null => {
   if (!value || typeof value !== 'object') {
     return null;
@@ -322,6 +351,8 @@ const normalizeAssignment = (value: unknown): InterviewerAssignmentView | null =
     caseFolder?: unknown;
     fitQuestion?: unknown;
     form?: unknown;
+    peerForms?: unknown;
+    decision?: unknown;
   };
 
   const evaluationId = normalizeString(payload.evaluationId)?.trim();
@@ -344,7 +375,13 @@ const normalizeAssignment = (value: unknown): InterviewerAssignmentView | null =
     candidate: normalizeCandidate(payload.candidate),
     caseFolder: normalizeCaseFolder(payload.caseFolder),
     fitQuestion: normalizeFitQuestion(payload.fitQuestion),
-    form: normalizeForm(payload.form)
+    form: normalizeForm(payload.form),
+    peerForms: Array.isArray(payload.peerForms)
+      ? payload.peerForms
+          .map((item) => normalizePeerForm(item))
+          .filter((item): item is InterviewerAssignmentView['peerForms'][number] => Boolean(item))
+      : [],
+    decision: normalizeDecision(payload.decision)
   };
 };
 

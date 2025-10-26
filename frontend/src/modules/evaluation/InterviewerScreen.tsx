@@ -5,7 +5,8 @@ import { interviewerApi } from './services/interviewerApi';
 import {
   InterviewerAssignmentView,
   OfferRecommendationValue,
-  EvaluationCriterionScore
+  EvaluationCriterionScore,
+  InterviewStatusRecord
 } from '../../shared/types/evaluation';
 import { CaseFolder } from '../../shared/types/caseLibrary';
 import { ApiError } from '../../shared/api/httpClient';
@@ -36,6 +37,14 @@ interface FormState {
   fitCriteria: Record<string, string>;
   caseCriteria: Record<string, string>;
 }
+
+type FormTab = {
+  slotId: string;
+  interviewerName: string;
+  submitted: boolean;
+  form: InterviewStatusRecord | null;
+  isSelf: boolean;
+};
 
 interface CriterionSelectorProps {
   criterion: CriterionDefinition;
@@ -106,8 +115,27 @@ const CriterionSelector = ({
   );
 };
 
-const createFormState = (assignment: InterviewerAssignmentView | null): FormState => {
-  if (!assignment?.form) {
+const createEmptyCriteria = (): Record<string, string> => ({});
+
+const toCriteriaMap = (entries: EvaluationCriterionScore[] | undefined): Record<string, string> => {
+  if (!entries) {
+    return createEmptyCriteria();
+  }
+  const map: Record<string, string> = {};
+  for (const item of entries) {
+    if (item.criterionId) {
+      if (item.notApplicable) {
+        map[item.criterionId] = 'n/a';
+      } else {
+        map[item.criterionId] = item.score != null ? String(item.score) : '';
+      }
+    }
+  }
+  return map;
+};
+
+const createFormStateFromForm = (form: InterviewStatusRecord | null): FormState => {
+  if (!form) {
     return {
       fitNotes: '',
       caseNotes: '',
@@ -115,37 +143,24 @@ const createFormState = (assignment: InterviewerAssignmentView | null): FormStat
       interestNotes: '',
       issuesToTest: '',
       offerRecommendation: '',
-      fitCriteria: {},
-      caseCriteria: {}
+      fitCriteria: createEmptyCriteria(),
+      caseCriteria: createEmptyCriteria()
     };
   }
-  const toCriteriaMap = (entries: EvaluationCriterionScore[] | undefined): Record<string, string> => {
-    if (!entries) {
-      return {};
-    }
-    const map: Record<string, string> = {};
-    for (const item of entries) {
-      if (item.criterionId) {
-        if (item.notApplicable) {
-          map[item.criterionId] = 'n/a';
-        } else {
-          map[item.criterionId] = item.score != null ? String(item.score) : '';
-        }
-      }
-    }
-    return map;
-  };
   return {
-    fitNotes: assignment.form.fitNotes ?? '',
-    caseNotes: assignment.form.caseNotes ?? '',
-    notes: assignment.form.notes ?? '',
-    interestNotes: assignment.form.interestNotes ?? '',
-    issuesToTest: assignment.form.issuesToTest ?? '',
-    offerRecommendation: assignment.form.offerRecommendation ?? '',
-    fitCriteria: toCriteriaMap(assignment.form.fitCriteria),
-    caseCriteria: toCriteriaMap(assignment.form.caseCriteria)
+    fitNotes: form.fitNotes ?? '',
+    caseNotes: form.caseNotes ?? '',
+    notes: form.notes ?? '',
+    interestNotes: form.interestNotes ?? '',
+    issuesToTest: form.issuesToTest ?? '',
+    offerRecommendation: form.offerRecommendation ?? '',
+    fitCriteria: toCriteriaMap(form.fitCriteria),
+    caseCriteria: toCriteriaMap(form.caseCriteria)
   };
 };
+
+const createFormState = (assignment: InterviewerAssignmentView | null): FormState =>
+  createFormStateFromForm(assignment?.form ?? null);
 
 const OFFER_OPTIONS: Array<{ value: OfferRecommendationValue; label: string }> = [
   { value: 'yes_priority', label: 'Yes, priority' },
@@ -216,6 +231,31 @@ const sortCaseCriteria = (criteria: CriterionDefinition[]): CriterionDefinition[
   });
 };
 
+type OutcomeKind = 'offer' | 'progress' | 'reject' | 'pending';
+
+const resolveOutcomeMeta = (
+  decision: InterviewerAssignmentView['decision']
+): { kind: OutcomeKind; label: string } => {
+  switch (decision) {
+    case 'offer':
+    case 'accepted-offer':
+      return { kind: 'offer', label: 'Offer' };
+    case 'progress':
+      return { kind: 'progress', label: 'Progress to next round' };
+    case 'reject':
+      return { kind: 'reject', label: 'Reject' };
+    default:
+      return { kind: 'pending', label: 'Outcome pending' };
+  }
+};
+
+const outcomeClassMap: Record<OutcomeKind, string> = {
+  offer: styles.outcomeTagOffer,
+  progress: styles.outcomeTagProgress,
+  reject: styles.outcomeTagReject,
+  pending: styles.outcomeTagPending
+};
+
 export const InterviewerScreen = () => {
   const { session } = useAuth();
   const { list: globalCaseCriteria } = useCaseCriteriaState();
@@ -224,7 +264,8 @@ export const InterviewerScreen = () => {
   const [banner, setBanner] = useState<Banner | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [formState, setFormState] = useState<FormState>(createFormState(null));
+  const [formStates, setFormStates] = useState<Record<string, FormState>>({});
+  const [activeFormSlotId, setActiveFormSlotId] = useState<string | null>(null);
 
   const selectedAssignment = useMemo(() => {
     if (!selectedSlot) {
@@ -233,12 +274,98 @@ export const InterviewerScreen = () => {
     return assignments.find((item) => item.slotId === selectedSlot) ?? null;
   }, [assignments, selectedSlot]);
 
-  const isSubmitted = selectedAssignment?.form?.submitted ?? false;
-  const disableInputs = saving || isSubmitted;
+  const formTabs = useMemo<FormTab[]>(() => {
+    if (!selectedAssignment) {
+      return [];
+    }
+    const tabs: FormTab[] = [
+      {
+        slotId: selectedAssignment.slotId,
+        interviewerName: selectedAssignment.interviewerName || 'Interviewer',
+        submitted: selectedAssignment.form?.submitted ?? false,
+        form: selectedAssignment.form,
+        isSelf: true
+      }
+    ];
+    for (const peer of selectedAssignment.peerForms ?? []) {
+      if (!peer || peer.slotId === selectedAssignment.slotId) {
+        continue;
+      }
+      tabs.push({
+        slotId: peer.slotId,
+        interviewerName: peer.interviewerName || 'Interviewer',
+        submitted: peer.submitted,
+        form: peer.form,
+        isSelf: false
+      });
+    }
+    return tabs;
+  }, [selectedAssignment]);
 
   useEffect(() => {
-    setFormState(createFormState(selectedAssignment));
+    if (!selectedAssignment) {
+      setActiveFormSlotId(null);
+      return;
+    }
+    setFormStates((prev) => {
+      const existing = prev[selectedAssignment.slotId];
+      const nextFromServer = createFormState(selectedAssignment);
+      if (!existing || selectedAssignment.form?.submitted) {
+        return { ...prev, [selectedAssignment.slotId]: nextFromServer };
+      }
+      return prev;
+    });
   }, [selectedAssignment]);
+
+  useEffect(() => {
+    if (!selectedAssignment) {
+      setActiveFormSlotId(null);
+      return;
+    }
+    setActiveFormSlotId((prev) => {
+      if (prev && formTabs.some((tab) => tab.slotId === prev && (tab.isSelf || tab.submitted))) {
+        return prev;
+      }
+      return selectedAssignment.slotId;
+    });
+  }, [selectedAssignment, formTabs]);
+
+  const editableFormState = useMemo(() => {
+    if (!selectedAssignment) {
+      return createFormState(null);
+    }
+    return formStates[selectedAssignment.slotId] ?? createFormState(selectedAssignment);
+  }, [formStates, selectedAssignment]);
+
+  const activeFormTab = useMemo(() => {
+    if (!formTabs.length) {
+      return null;
+    }
+    const current = formTabs.find((tab) => tab.slotId === activeFormSlotId);
+    return current ?? formTabs[0];
+  }, [activeFormSlotId, formTabs]);
+
+  const isOwnTab = Boolean(activeFormTab && selectedAssignment && activeFormTab.slotId === selectedAssignment.slotId);
+  const activeFormState = isOwnTab
+    ? editableFormState
+    : createFormStateFromForm(activeFormTab?.form ?? null);
+  const ownFormSubmitted = selectedAssignment?.form?.submitted ?? false;
+  const activeFormSubmitted = activeFormTab?.submitted ?? false;
+  const disableInputs = saving || ownFormSubmitted || !isOwnTab;
+
+  const updateEditableFormState = (updater: (current: FormState) => FormState) => {
+    if (!selectedAssignment || !isOwnTab) {
+      return;
+    }
+    setFormStates((prev) => {
+      const current = prev[selectedAssignment.slotId] ?? createFormState(selectedAssignment);
+      const next = updater(current);
+      if (next === current) {
+        return prev;
+      }
+      return { ...prev, [selectedAssignment.slotId]: next };
+    });
+  };
 
   useEffect(() => {
     if (!session?.email) {
@@ -326,8 +453,8 @@ export const InterviewerScreen = () => {
     setSaving(true);
     setBanner(null);
     try {
-      const computedFitScore = computeAverageScore(formState.fitCriteria);
-      const computedCaseScore = computeAverageScore(formState.caseCriteria);
+      const computedFitScore = computeAverageScore(editableFormState.fitCriteria);
+      const computedCaseScore = computeAverageScore(editableFormState.caseCriteria);
       const existingFitScore =
         typeof selectedAssignment.form?.fitScore === 'number' && Number.isFinite(selectedAssignment.form?.fitScore)
           ? selectedAssignment.form?.fitScore
@@ -342,14 +469,14 @@ export const InterviewerScreen = () => {
         submitted,
         fitScore: computedFitScore ?? existingFitScore,
         caseScore: computedCaseScore ?? existingCaseScore,
-        fitNotes: formState.fitNotes.trim() || undefined,
-        caseNotes: formState.caseNotes.trim() || undefined,
-        notes: formState.notes.trim() || undefined,
-        interestNotes: formState.interestNotes.trim() || undefined,
-        issuesToTest: formState.issuesToTest.trim() || undefined,
-        offerRecommendation: formState.offerRecommendation || undefined,
-        fitCriteria: buildCriteriaPayload(formState.fitCriteria),
-        caseCriteria: buildCriteriaPayload(formState.caseCriteria)
+        fitNotes: editableFormState.fitNotes.trim() || undefined,
+        caseNotes: editableFormState.caseNotes.trim() || undefined,
+        notes: editableFormState.notes.trim() || undefined,
+        interestNotes: editableFormState.interestNotes.trim() || undefined,
+        issuesToTest: editableFormState.issuesToTest.trim() || undefined,
+        offerRecommendation: editableFormState.offerRecommendation || undefined,
+        fitCriteria: buildCriteriaPayload(editableFormState.fitCriteria),
+        caseCriteria: buildCriteriaPayload(editableFormState.caseCriteria)
       });
       await refreshAssignments();
       setBanner({
@@ -375,10 +502,16 @@ export const InterviewerScreen = () => {
   };
 
   const handleSaveDraft = () => {
+    if (!isOwnTab) {
+      return;
+    }
     void persistForm({ submitted: false });
   };
 
   const handleSubmitFinal = () => {
+    if (!isOwnTab) {
+      return;
+    }
     void persistForm({ submitted: true });
   };
 
@@ -404,6 +537,8 @@ export const InterviewerScreen = () => {
           const submitted = assignment.form?.submitted ?? false;
           const statusLabel = submitted ? 'Completed' : 'Assigned';
           const roundLabel = `Round ${assignment.roundNumber}`;
+          const outcomeMeta = resolveOutcomeMeta(assignment.decision ?? null);
+          const outcomeClass = outcomeClassMap[outcomeMeta.kind];
           return (
             <li
               key={assignment.slotId}
@@ -416,6 +551,7 @@ export const InterviewerScreen = () => {
                 <span className={`${styles.statusPill} ${submitted ? styles.statusPillCompleted : styles.statusPillAssigned}`}>
                   {statusLabel}
                 </span>
+                <span className={`${styles.outcomeTag} ${outcomeClass}`}>{outcomeMeta.label}</span>
                 <span className={styles.listItemMetaText}>Assigned {formatDate(assignment.invitationSentAt)}</span>
               </div>
             </li>
@@ -481,23 +617,20 @@ export const InterviewerScreen = () => {
     const submittedAtLabel = selectedAssignment.form?.submittedAt
       ? formatDate(selectedAssignment.form?.submittedAt)
       : null;
+    const storedForm = isOwnTab ? selectedAssignment.form : activeFormTab?.form ?? null;
     const storedFitScore =
-      typeof selectedAssignment.form?.fitScore === 'number' && Number.isFinite(selectedAssignment.form?.fitScore)
-        ? selectedAssignment.form?.fitScore
-        : null;
+      typeof storedForm?.fitScore === 'number' && Number.isFinite(storedForm?.fitScore) ? storedForm?.fitScore : null;
     const storedCaseScore =
-      typeof selectedAssignment.form?.caseScore === 'number' && Number.isFinite(selectedAssignment.form?.caseScore)
-        ? selectedAssignment.form?.caseScore
-        : null;
-    const calculatedFitScore = computeAverageScore(formState.fitCriteria);
-    const calculatedCaseScore = computeAverageScore(formState.caseCriteria);
+      typeof storedForm?.caseScore === 'number' && Number.isFinite(storedForm?.caseScore) ? storedForm?.caseScore : null;
+    const calculatedFitScore = computeAverageScore(activeFormState.fitCriteria);
+    const calculatedCaseScore = computeAverageScore(activeFormState.caseCriteria);
     const displayFitScore = calculatedFitScore ?? storedFitScore;
     const displayCaseScore = calculatedCaseScore ?? storedCaseScore;
     const targetOffice = candidate?.targetOffice?.trim();
     const targetRole = candidate?.desiredPosition?.trim();
 
-    const fitRatingsComplete = areRatingsComplete(fitCriteria, formState.fitCriteria);
-    const caseRatingsComplete = areRatingsComplete(caseCriteria, formState.caseCriteria);
+    const fitRatingsComplete = areRatingsComplete(fitCriteria, editableFormState.fitCriteria);
+    const caseRatingsComplete = areRatingsComplete(caseCriteria, editableFormState.caseCriteria);
     const canSubmitFinal = fitRatingsComplete && caseRatingsComplete;
 
     return (
@@ -512,9 +645,9 @@ export const InterviewerScreen = () => {
             </div>
           </div>
           <span
-            className={`${styles.statusPill} ${isSubmitted ? styles.statusPillCompleted : styles.statusPillAssigned}`}
+            className={`${styles.statusPill} ${ownFormSubmitted ? styles.statusPillCompleted : styles.statusPillAssigned}`}
           >
-            {isSubmitted ? 'Completed' : 'Assigned'}
+            {ownFormSubmitted ? 'Completed' : 'Assigned'}
           </span>
         </div>
         <div className={styles.detailColumns}>
@@ -541,6 +674,38 @@ export const InterviewerScreen = () => {
             </div>
           </aside>
           <div className={styles.formColumn}>
+            {formTabs.length > 0 && (
+              <div className={styles.formTabs} role="tablist" aria-label="Interviewer evaluations">
+                {formTabs.map((tab) => {
+                  const isActive = activeFormTab?.slotId === tab.slotId;
+                  const isDisabled = !tab.isSelf && !tab.submitted;
+                  return (
+                    <button
+                      key={tab.slotId}
+                      type="button"
+                      className={[
+                        styles.formTab,
+                        isActive ? styles.formTabActive : '',
+                        isDisabled ? styles.formTabDisabled : ''
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
+                      onClick={() => {
+                        if (isDisabled) {
+                          return;
+                        }
+                        setActiveFormSlotId(tab.slotId);
+                      }}
+                      disabled={isDisabled}
+                      aria-selected={isActive}
+                    >
+                      <span>{tab.interviewerName}</span>
+                      {!tab.isSelf && !tab.submitted && <span className={styles.formTabBadge}>Pending</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             <form
               className={styles.form}
               onSubmit={(event) => {
@@ -548,7 +713,12 @@ export const InterviewerScreen = () => {
                 handleSaveDraft();
               }}
             >
-              {isSubmitted && (
+              {!isOwnTab && (
+                <div className={styles.formNotice}>
+                  Viewing submission from {activeFormTab?.interviewerName}. Editing is disabled.
+                </div>
+              )}
+              {ownFormSubmitted && (
                 <div className={styles.formNotice}>
                   This evaluation was submitted
                   {submittedAtLabel ? ` on ${submittedAtLabel}` : ''} and can no longer be edited.
@@ -565,15 +735,18 @@ export const InterviewerScreen = () => {
                       <CriterionSelector
                         key={criterion.id}
                         criterion={criterion}
-                        value={formState.fitCriteria[criterion.id] ?? ''}
+                        value={activeFormState.fitCriteria[criterion.id] ?? ''}
                         disabled={disableInputs}
-                        highlightSelection={isSubmitted}
-                        onChange={(next) =>
-                          setFormState((prev) => ({
+                        highlightSelection={activeFormSubmitted}
+                        onChange={(next) => {
+                          if (!isOwnTab) {
+                            return;
+                          }
+                          updateEditableFormState((prev) => ({
                             ...prev,
                             fitCriteria: { ...prev.fitCriteria, [criterion.id]: next }
-                          }))
-                        }
+                          }));
+                        }}
                       />
                     ))}
                     <div className={`${styles.criterionCard} ${styles.criterionSummary}`}>
@@ -592,8 +765,14 @@ export const InterviewerScreen = () => {
                   <textarea
                     id="fitNotes"
                     rows={4}
-                    value={formState.fitNotes}
-                    onChange={(event) => setFormState((prev) => ({ ...prev, fitNotes: event.target.value }))}
+                    value={activeFormState.fitNotes}
+                    onChange={(event) => {
+                      if (!isOwnTab) {
+                        return;
+                      }
+                      const value = event.target.value;
+                      updateEditableFormState((prev) => ({ ...prev, fitNotes: value }));
+                    }}
                     disabled={disableInputs}
                   />
                 </div>
@@ -609,15 +788,18 @@ export const InterviewerScreen = () => {
                       <CriterionSelector
                         key={criterion.id}
                         criterion={criterion}
-                        value={formState.caseCriteria[criterion.id] ?? ''}
+                        value={activeFormState.caseCriteria[criterion.id] ?? ''}
                         disabled={disableInputs}
-                        highlightSelection={isSubmitted}
-                        onChange={(next) =>
-                          setFormState((prev) => ({
+                        highlightSelection={activeFormSubmitted}
+                        onChange={(next) => {
+                          if (!isOwnTab) {
+                            return;
+                          }
+                          updateEditableFormState((prev) => ({
                             ...prev,
                             caseCriteria: { ...prev.caseCriteria, [criterion.id]: next }
-                          }))
-                        }
+                          }));
+                        }}
                       />
                     ))}
                     <div className={`${styles.criterionCard} ${styles.criterionSummary}`}>
@@ -636,8 +818,14 @@ export const InterviewerScreen = () => {
                   <textarea
                     id="caseNotes"
                     rows={4}
-                    value={formState.caseNotes}
-                    onChange={(event) => setFormState((prev) => ({ ...prev, caseNotes: event.target.value }))}
+                    value={activeFormState.caseNotes}
+                    onChange={(event) => {
+                      if (!isOwnTab) {
+                        return;
+                      }
+                      const value = event.target.value;
+                      updateEditableFormState((prev) => ({ ...prev, caseNotes: value }));
+                    }}
                     disabled={disableInputs}
                   />
                 </div>
@@ -653,10 +841,14 @@ export const InterviewerScreen = () => {
                     aria-label="Interest level notes"
                     placeholder="Add notes about the candidate's interest level"
                     rows={3}
-                    value={formState.interestNotes}
-                    onChange={(event) =>
-                      setFormState((prev) => ({ ...prev, interestNotes: event.target.value }))
-                    }
+                    value={activeFormState.interestNotes}
+                    onChange={(event) => {
+                      if (!isOwnTab) {
+                        return;
+                      }
+                      const value = event.target.value;
+                      updateEditableFormState((prev) => ({ ...prev, interestNotes: value }));
+                    }}
                     disabled={disableInputs}
                   />
                 </div>
@@ -672,10 +864,14 @@ export const InterviewerScreen = () => {
                     aria-label="Issues to Test in Next Interview"
                     placeholder="List focus areas for the next interviewer"
                     rows={3}
-                    value={formState.issuesToTest}
-                    onChange={(event) =>
-                      setFormState((prev) => ({ ...prev, issuesToTest: event.target.value }))
-                    }
+                    value={activeFormState.issuesToTest}
+                    onChange={(event) => {
+                      if (!isOwnTab) {
+                        return;
+                      }
+                      const value = event.target.value;
+                      updateEditableFormState((prev) => ({ ...prev, issuesToTest: value }));
+                    }}
                     disabled={disableInputs}
                   />
                 </div>
@@ -692,11 +888,14 @@ export const InterviewerScreen = () => {
                         type="radio"
                         name="offerRecommendation"
                         value={option.value}
-                        checked={formState.offerRecommendation === option.value}
+                        checked={activeFormState.offerRecommendation === option.value}
                         disabled={disableInputs}
-                        onChange={() =>
-                          setFormState((prev) => ({ ...prev, offerRecommendation: option.value }))
-                        }
+                        onChange={() => {
+                          if (!isOwnTab) {
+                            return;
+                          }
+                          updateEditableFormState((prev) => ({ ...prev, offerRecommendation: option.value }));
+                        }}
                       />
                       <span>{option.label}</span>
                     </label>
@@ -707,40 +906,48 @@ export const InterviewerScreen = () => {
                   <textarea
                     id="generalNotes"
                     rows={4}
-                    value={formState.notes}
-                    onChange={(event) => setFormState((prev) => ({ ...prev, notes: event.target.value }))}
+                    value={activeFormState.notes}
+                    onChange={(event) => {
+                      if (!isOwnTab) {
+                        return;
+                      }
+                      const value = event.target.value;
+                      updateEditableFormState((prev) => ({ ...prev, notes: value }));
+                    }}
                     disabled={disableInputs}
                   />
                 </div>
               </section>
 
-              <div className={styles.formActions}>
-                <button
-                  type="button"
-                  className={styles.secondaryButton}
-                  disabled={disableInputs}
-                  onClick={handleSaveDraft}
-                >
-                  {saving ? 'Saving…' : 'Save draft'}
-                </button>
-            <button
-              type="button"
-              className={styles.primaryButton}
-              disabled={isSubmitted || saving || !canSubmitFinal}
-              onClick={() => {
-                if (!canSubmitFinal) {
-                  setBanner({
-                    type: 'error',
-                    text: 'Complete all quantitative ratings before submitting the evaluation.'
-                  });
-                  return;
-                }
-                handleSubmitFinal();
-              }}
-            >
-              Submit evaluation
-            </button>
-              </div>
+              {isOwnTab && (
+                <div className={styles.formActions}>
+                  <button
+                    type="button"
+                    className={styles.secondaryButton}
+                    disabled={disableInputs}
+                    onClick={handleSaveDraft}
+                  >
+                    {saving ? 'Saving…' : 'Save draft'}
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.primaryButton}
+                    disabled={ownFormSubmitted || saving || !canSubmitFinal}
+                    onClick={() => {
+                      if (!canSubmitFinal) {
+                        setBanner({
+                          type: 'error',
+                          text: 'Complete all quantitative ratings before submitting the evaluation.'
+                        });
+                        return;
+                      }
+                      handleSubmitFinal();
+                    }}
+                  >
+                    Submit evaluation
+                  </button>
+                </div>
+              )}
             </form>
           </div>
         </div>
