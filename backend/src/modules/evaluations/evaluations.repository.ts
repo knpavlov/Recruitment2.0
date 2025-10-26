@@ -56,11 +56,24 @@ const mapCriterionScore = (value: unknown): EvaluationCriterionScore | null => {
     return null;
   }
   const payload = value as Record<string, unknown>;
-  const criterionId = typeof payload.criterionId === 'string' ? payload.criterionId.trim() : '';
+  const criterionIdRaw =
+    typeof payload.criterionId === 'string'
+      ? payload.criterionId.trim()
+      : typeof payload.criterion_id === 'string'
+      ? payload.criterion_id.trim()
+      : typeof payload.criteriaId === 'string'
+      ? payload.criteriaId.trim()
+      : typeof payload.id === 'string'
+      ? payload.id.trim()
+      : typeof payload.key === 'string'
+      ? payload.key.trim()
+      : '';
+  const criterionId = criterionIdRaw;
   if (!criterionId) {
     return null;
   }
-  const rawScore = payload.score;
+  const rawScore =
+    payload.score ?? payload.value ?? payload.rating ?? payload.result ?? payload.points ?? null;
   let score: number | undefined;
   if (typeof rawScore === 'number' && Number.isFinite(rawScore)) {
     score = rawScore;
@@ -70,17 +83,41 @@ const mapCriterionScore = (value: unknown): EvaluationCriterionScore | null => {
       score = parsed;
     }
   }
-  const notApplicable = payload.notApplicable === true;
+  const notApplicable =
+    payload.notApplicable === true ||
+    (typeof payload.notApplicable === 'string' && payload.notApplicable.toLowerCase() === 'true') ||
+    (typeof payload.notApplicable === 'string' && payload.notApplicable.toLowerCase() === 'n/a');
   return { criterionId, score, notApplicable };
 };
 
 const mapCriteriaList = (value: unknown): EvaluationCriterionScore[] => {
-  if (!Array.isArray(value)) {
-    return [];
+  const bucket: EvaluationCriterionScore[] = [];
+  const pushIfValid = (candidate: unknown) => {
+    const mapped = mapCriterionScore(candidate);
+    if (mapped) {
+      bucket.push(mapped);
+    }
+  };
+
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      pushIfValid(entry);
+    }
+    return bucket;
   }
-  return value
-    .map((entry) => mapCriterionScore(entry))
-    .filter((item): item is EvaluationCriterionScore => Boolean(item));
+
+  if (value && typeof value === 'object') {
+    for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+      if (entry && typeof entry === 'object' && 'criterionId' in entry) {
+        pushIfValid(entry);
+        continue;
+      }
+      pushIfValid({ criterionId: key, score: entry });
+    }
+    return bucket;
+  }
+
+  return bucket;
 };
 
 const readOfferRecommendation = (value: unknown): InterviewStatusModel['offerRecommendation'] | undefined => {

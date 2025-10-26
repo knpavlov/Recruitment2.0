@@ -57,6 +57,15 @@
   overflow-y: auto;
 }
 
+.listHint {
+  padding: 8px 12px;
+  font-size: 13px;
+  color: #475569;
+  border: 1px dashed #cbd5f5;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
 .listItem {
   border: 1px solid #e2e8f0;
   border-radius: 10px;
@@ -86,6 +95,16 @@
   gap: 8px;
   font-size: 13px;
   color: #475569;
+}
+
+.listItemOutcomeRow {
+  margin-top: 8px;
+}
+
+.outcomeText {
+  font-size: 13px;
+  font-weight: 500;
+  color: #1e293b;
 }
 
 .roundBadge {
@@ -132,6 +151,49 @@
   display: flex;
   flex-direction: column;
   gap: 24px;
+}
+
+.tabBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.tabButton {
+  border: 1px solid #cbd5f5;
+  background: #f8fafc;
+  color: #1e293b;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 600;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  cursor: pointer;
+}
+
+.tabButton:hover:not(.tabButtonDisabled) {
+  background: #e0e7ff;
+  border-color: #818cf8;
+}
+
+.tabButtonActive {
+  background: #4338ca;
+  color: #ffffff;
+  border-color: #4338ca;
+}
+
+.tabButtonDisabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.readOnlyNotice {
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 14px;
 }
 
 .detailColumns {
