@@ -24,8 +24,8 @@
 
 .content {
   display: grid;
-  grid-template-columns: 320px 1fr;
-  gap: 24px;
+  grid-template-columns: minmax(248px, 280px) minmax(0, 1fr);
+  gap: 20px;
   flex: 1;
   min-height: 0;
 }
@@ -151,6 +151,7 @@
   display: flex;
   flex-direction: column;
   gap: 24px;
+  min-width: 0;
 }
 
 .tabBar {
@@ -198,8 +199,8 @@
 
 .detailColumns {
   display: grid;
-  grid-template-columns: 320px 1fr;
-  gap: 24px;
+  grid-template-columns: minmax(248px, 280px) minmax(0, 1fr);
+  gap: 20px;
   align-items: flex-start;
 }
 
@@ -207,12 +208,14 @@
   display: flex;
   flex-direction: column;
   gap: 24px;
+  min-width: 0;
 }
 
 .formColumn {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-width: 0;
 }
 
 .detailHeader {
@@ -616,6 +619,21 @@
 
 .offerOption input {
   accent-color: #4338ca;
+}
+
+.offerOptionSelected {
+  border-color: transparent;
+  background: linear-gradient(135deg, #0ea5e9, #6366f1);
+  box-shadow: 0 10px 24px rgba(99, 102, 241, 0.32);
+  color: #ffffff;
+}
+
+.offerOptionSelected span {
+  color: inherit;
+}
+
+.offerOptionSelected input {
+  accent-color: #ffffff;
 }
 
 @media (max-width: 768px) {

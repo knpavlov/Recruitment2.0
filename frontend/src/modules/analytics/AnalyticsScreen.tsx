@@ -13,15 +13,18 @@ import type { InterviewerPeriod, SummaryPeriod, TimelineGrouping } from './types
 import type { InterviewerSeniority } from '../../shared/types/account';
 
 const INTERVIEWER_GRAPH_PERIOD: InterviewerPeriod = 'rolling_12';
+const DEFAULT_TIMELINE_START = '2025-09-01';
 
 export const AnalyticsScreen = () => {
   const [summaryPeriod, setSummaryPeriod] = useState<SummaryPeriod>('rolling_3');
   const [timelineGrouping, setTimelineGrouping] = useState<TimelineGrouping>('month');
-  const [timelineFrom, setTimelineFrom] = useState<string | undefined>(undefined);
+  const [timelineFrom, setTimelineFrom] = useState<string | undefined>(DEFAULT_TIMELINE_START);
   const [timelineTo, setTimelineTo] = useState<string | undefined>(undefined);
   const [interviewerPeriod, setInterviewerPeriod] = useState<InterviewerPeriod>('last_month');
   const [interviewerGraphGrouping, setInterviewerGraphGrouping] = useState<TimelineGrouping>('month');
-  const [interviewerGraphFrom, setInterviewerGraphFrom] = useState<string | undefined>(undefined);
+  const [interviewerGraphFrom, setInterviewerGraphFrom] = useState<string | undefined>(
+    DEFAULT_TIMELINE_START
+  );
   const [interviewerGraphTo, setInterviewerGraphTo] = useState<string | undefined>(undefined);
   const [selectedInterviewers, setSelectedInterviewers] = useState<string[]>([]);
   const [selectedRoles, setSelectedRoles] = useState<InterviewerSeniority[]>([]);
