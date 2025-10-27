@@ -2,6 +2,7 @@ import { NavigationItem, NavigationKey } from '../../app/navigation';
 import styles from '../../styles/Sidebar.module.css';
 import { useAuth } from '../../modules/auth/AuthContext';
 import { AccountRole } from '../../shared/types/account';
+import { LoadDemoDataLink } from '../../modules/demo/components/LoadDemoDataLink';
 
 interface SidebarProps {
   navigationItems: NavigationItem[];
@@ -51,6 +52,7 @@ export const Sidebar = ({ navigationItems, activeItem, onNavigate }: SidebarProp
         >
           Sign out
         </button>
+        <LoadDemoDataLink />
       </div>
     </aside>
   );
