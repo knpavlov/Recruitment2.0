@@ -43,8 +43,7 @@ interface CandidateTableProps {
 const formatDate = (input: string) => {
   const date = new Date(input);
   return new Intl.DateTimeFormat('en-US', {
-    dateStyle: 'medium',
-    timeStyle: 'short'
+    dateStyle: 'medium'
   }).format(date);
 };
 
