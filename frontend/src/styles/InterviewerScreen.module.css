@@ -618,6 +618,12 @@
   accent-color: #4338ca;
 }
 
+.offerOptionSelected {
+  border-color: #4338ca;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(79, 70, 229, 0.08));
+  box-shadow: 0 6px 18px rgba(67, 56, 202, 0.18);
+}
+
 @media (max-width: 768px) {
   .wrapper {
     margin-top: 0;
