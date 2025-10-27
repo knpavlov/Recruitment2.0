@@ -618,6 +618,21 @@
   accent-color: #4338ca;
 }
 
+.offerOptionSelected {
+  border-color: transparent;
+  background: linear-gradient(135deg, #0ea5e9, #6366f1);
+  box-shadow: 0 10px 24px rgba(99, 102, 241, 0.32);
+  color: #ffffff;
+}
+
+.offerOptionSelected span {
+  color: inherit;
+}
+
+.offerOptionSelected input {
+  accent-color: #ffffff;
+}
+
 @media (max-width: 768px) {
   .wrapper {
     margin-top: 0;
