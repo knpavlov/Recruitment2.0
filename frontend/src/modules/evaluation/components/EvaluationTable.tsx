@@ -5,6 +5,20 @@ type DecisionOption = 'offer' | 'accepted-offer' | 'progress' | 'reject';
 
 type SortableColumnKey = 'name' | 'position' | 'created' | 'round' | 'avgFit' | 'avgCase';
 
+export type OfferVoteKey = 'yes_priority' | 'yes_strong' | 'yes_keep_warm' | 'no_offer';
+
+export const OFFER_VOTE_KEYS: OfferVoteKey[] = [
+  'yes_priority',
+  'yes_strong',
+  'yes_keep_warm',
+  'no_offer'
+];
+
+export interface OfferVotesData {
+  total: number;
+  segments: Array<{ key: OfferVoteKey; count: number; ratio: number }>;
+}
+
 export interface EvaluationTableRow {
   id: string;
   candidateName: string;
@@ -21,7 +35,7 @@ export interface EvaluationTableRow {
   formsPlanned: number;
   avgFitScore: number | null;
   avgCaseScore: number | null;
-  offerSummary: string;
+  offerVotes: OfferVotesData;
   processLabel: string;
   invitesButtonLabel: string;
   invitesDisabled: boolean;
@@ -62,6 +76,47 @@ const DECISION_OPTIONS: Array<{ option: DecisionOption; label: string }> = [
   { option: 'reject', label: 'Reject' },
   { option: 'progress', label: 'Next round' }
 ];
+
+const OFFER_SEGMENT_CLASSNAME: Record<OfferVoteKey, string> = {
+  yes_priority: styles.offerSegmentStrong,
+  yes_strong: styles.offerSegmentPositive,
+  yes_keep_warm: styles.offerSegmentWarm,
+  no_offer: styles.offerSegmentReject
+};
+
+const OFFER_SEGMENT_LABEL: Record<OfferVoteKey, string> = {
+  yes_priority: 'Yes, priority',
+  yes_strong: 'Yes, meets high bar',
+  yes_keep_warm: 'Turndown, stay in contact',
+  no_offer: 'Turndown'
+};
+
+const OfferVotesBar = ({ total, segments }: OfferVotesData) => {
+  if (total === 0) {
+    return <span className={styles.offerPlaceholder}>—</span>;
+  }
+
+  return (
+    <div className={styles.offerBar}>
+      <div className={styles.offerBarTrack}>
+        {segments.map((segment) => {
+          const flexGrow = segment.count > 0 ? Math.max(segment.ratio, 0.08) : 0.02;
+          const opacity = segment.count > 0 ? 1 : 0.4;
+          return (
+            <div
+              key={segment.key}
+              className={`${styles.offerBarSegment} ${OFFER_SEGMENT_CLASSNAME[segment.key]}`}
+              style={{ flexGrow, opacity }}
+              title={`${OFFER_SEGMENT_LABEL[segment.key]} — ${segment.count} / ${total}`}
+              aria-label={`${OFFER_SEGMENT_LABEL[segment.key]}: ${segment.count} of ${total}`}
+            />
+          );
+        })}
+      </div>
+      <span className={styles.offerBarLabel}>{total} vote{total === 1 ? '' : 's'}</span>
+    </div>
+  );
+};
 
 export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: EvaluationTableProps) => {
   const [openDecisionId, setOpenDecisionId] = useState<string | null>(null);
@@ -238,7 +293,9 @@ export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: 
                 <td>{avgFitLabel}</td>
                 <td>{avgCaseLabel}</td>
                 <td>{formsLabel}</td>
-                <td>{row.offerSummary}</td>
+                <td className={styles.offerCell}>
+                  <OfferVotesBar total={row.offerVotes.total} segments={row.offerVotes.segments} />
+                </td>
                 <td>{row.processLabel}</td>
                 <td className={styles.actionsCell}>
                   <div className={styles.actionsGrid}>

@@ -11,7 +11,12 @@ import {
   useAccountsState
 } from '../../app/state/AppStateContext';
 import { EvaluationConfig } from '../../shared/types/evaluation';
-import { EvaluationTable, EvaluationTableRow } from './components/EvaluationTable';
+import {
+  EvaluationTable,
+  EvaluationTableRow,
+  OFFER_VOTE_KEYS,
+  type OfferVotesData
+} from './components/EvaluationTable';
 import { formatDate } from '../../shared/utils/date';
 import { composeFullName, buildLastNameSortKey } from '../../shared/utils/personName';
 
@@ -250,11 +255,14 @@ export const EvaluationScreen = () => {
         }
       }
       const totalOffers = offerResponses.length;
-      const offerSummary = totalOffers
-        ? (['yes_priority', 'yes_strong', 'yes_keep_warm', 'no_offer'] as const)
-            .map((key) => `${Math.round((offerTotals[key] / totalOffers) * 100)}%`)
-            .join(' / ')
-        : '—';
+      const offerVotes: OfferVotesData = {
+        total: totalOffers,
+        segments: OFFER_VOTE_KEYS.map((key) => ({
+          key,
+          count: offerTotals[key],
+          ratio: totalOffers > 0 ? offerTotals[key] / totalOffers : 0
+        }))
+      };
 
       const roundOptionsMap = new Map<number, string>();
       evaluation.roundHistory.forEach((round) => {
@@ -421,7 +429,7 @@ export const EvaluationScreen = () => {
         formsPlanned,
         avgFitScore,
         avgCaseScore,
-        offerSummary,
+        offerVotes,
         processLabel,
         invitesButtonLabel,
         invitesDisabled,

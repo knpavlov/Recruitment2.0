@@ -1056,13 +1056,19 @@ export const InterviewerScreen = () => {
                   <h3>Summary & recommendation</h3>
                 </header>
                 <div className={styles.offerGroup}>
-                  {OFFER_OPTIONS.map((option) => (
-                    <label key={option.value} className={styles.offerOption}>
-                      <input
-                        type="radio"
-                        name="offerRecommendation"
-                        value={option.value}
-                        checked={displayedFormState.offerRecommendation === option.value}
+                  {OFFER_OPTIONS.map((option) => {
+                    const highlightDecision =
+                      (!isOwnTab || isSubmitted) && displayedFormState.offerRecommendation === option.value;
+                    const offerOptionClassName = `${styles.offerOption} ${
+                      highlightDecision ? styles.offerOptionSelected : ''
+                    }`;
+                    return (
+                      <label key={option.value} className={offerOptionClassName}>
+                        <input
+                          type="radio"
+                          name="offerRecommendation"
+                          value={option.value}
+                          checked={displayedFormState.offerRecommendation === option.value}
                         disabled={disableInputs}
                         onChange={() => {
                           if (!isOwnTab) {
@@ -1073,7 +1079,8 @@ export const InterviewerScreen = () => {
                       />
                       <span>{option.label}</span>
                     </label>
-                  ))}
+                    );
+                  })}
                 </div>
                 <div className={styles.formRow}>
                   <label htmlFor="generalNotes">Comments (optional)</label>

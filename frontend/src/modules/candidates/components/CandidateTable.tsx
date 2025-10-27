@@ -43,24 +43,28 @@ interface CandidateTableProps {
 const formatDate = (input: string) => {
   const date = new Date(input);
   return new Intl.DateTimeFormat('en-US', {
-    dateStyle: 'medium',
-    timeStyle: 'short'
+    dateStyle: 'medium'
   }).format(date);
 };
 
-const SORTABLE_COLUMNS: Array<{ key: CandidateSortKey; title: string }> = [
-  { key: 'firstName', title: 'First name' },
-  { key: 'lastName', title: 'Last name' },
-  { key: 'gender', title: 'Gender' },
-  { key: 'age', title: 'Age' },
+const SORTABLE_COLUMNS: Array<{
+  key: CandidateSortKey;
+  title: string;
+  headerClassName?: string;
+  cellClassName?: string;
+}> = [
+  { key: 'firstName', title: 'First name', headerClassName: styles.compactHeader },
+  { key: 'lastName', title: 'Last name', headerClassName: styles.compactHeader },
+  { key: 'gender', title: 'Gender', headerClassName: styles.compactHeader, cellClassName: styles.narrowCell },
+  { key: 'age', title: 'Age', headerClassName: styles.compactHeader, cellClassName: styles.narrowCell },
   { key: 'city', title: 'City' },
   { key: 'desiredPosition', title: 'Desired position' },
   { key: 'targetPractice', title: 'Target practice' },
   { key: 'targetOffice', title: 'Target office' },
-  { key: 'phone', title: 'Phone' },
-  { key: 'email', title: 'Email' },
-  { key: 'totalExperience', title: 'Total experience' },
-  { key: 'updatedAt', title: 'Last updated' }
+  { key: 'phone', title: 'Phone', headerClassName: styles.compactHeader, cellClassName: styles.nowrapCell },
+  { key: 'email', title: 'Email', headerClassName: styles.compactHeader, cellClassName: styles.nowrapCell },
+  { key: 'totalExperience', title: 'Total experience', headerClassName: styles.compactHeader, cellClassName: styles.narrowCell },
+  { key: 'updatedAt', title: 'Last updated', headerClassName: styles.compactHeader, cellClassName: styles.dateColumn }
 ];
 
 const getSortLabel = (direction: 'asc' | 'desc') => (direction === 'asc' ? '▲' : '▼');
@@ -85,7 +89,7 @@ export const CandidateTable = ({ rows, sortDirection, sortKey, onSortChange }: C
             {SORTABLE_COLUMNS.map((column) => {
               const isActive = sortKey === column.key;
               return (
-                <th key={column.key}>
+                <th key={column.key} className={column.headerClassName}>
                   <button
                     type="button"
                     className={`${styles.sortButton} ${isActive ? styles.sortButtonActive : ''}`}
@@ -97,41 +101,40 @@ export const CandidateTable = ({ rows, sortDirection, sortKey, onSortChange }: C
                 </th>
               );
             })}
-            <th>Resume</th>
+            <th className={styles.resumeHeader}>Resume</th>
             <th className={styles.actionsHeader}>Actions</th>
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
-            <tr key={row.id}>
-              <td>{row.firstName}</td>
-              <td>{row.lastName}</td>
-              <td>{row.gender}</td>
-              <td>{row.age}</td>
-              <td>{row.city}</td>
-              <td>{row.desiredPosition}</td>
-              <td>{row.targetPractice}</td>
-              <td>{row.targetOffice}</td>
-              <td>{row.phone}</td>
-              <td>{row.email}</td>
-              <td>{row.totalExperience}</td>
-              <td>{formatDate(row.updatedAt)}</td>
-              <td>
-                {row.hasResume ? (
-                  <button
-                    className={styles.tableSecondaryButton}
-                    onClick={() => row.onDownloadResume?.()}
-                  >
+            {rows.map((row) => (
+              <tr key={row.id}>
+                {SORTABLE_COLUMNS.map((column) => {
+                  const value =
+                    column.key === 'updatedAt'
+                      ? formatDate(row.updatedAt)
+                      : (row[column.key as keyof CandidateTableRow] as string);
+                  return (
+                    <td key={column.key} className={column.cellClassName}>
+                      {value}
+                    </td>
+                  );
+                })}
+                <td className={styles.resumeCell}>
+                  {row.hasResume ? (
+                    <button
+                      className={styles.tableSecondaryButton}
+                      onClick={() => row.onDownloadResume?.()}
+                    >
                     Download
                   </button>
                 ) : (
                   <span className={styles.resumePlaceholder}>No resume</span>
-                )}
-              </td>
-              <td className={styles.actionsCell}>
-                <button className={styles.tableSecondaryButton} onClick={row.onOpen}>
-                  Open
-                </button>
+                  )}
+                </td>
+                <td className={styles.actionsCell}>
+                  <button className={styles.tableSecondaryButton} onClick={row.onOpen}>
+                    Open
+                  </button>
               </td>
             </tr>
           ))}
