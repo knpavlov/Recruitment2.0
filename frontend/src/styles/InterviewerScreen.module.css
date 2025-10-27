@@ -612,10 +612,25 @@
   border-radius: 10px;
   background: #fff;
   font-size: 14px;
+  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .offerOption input {
   accent-color: #4338ca;
+}
+
+.offerOptionActive {
+  border-color: #4338ca;
+  background: rgba(99, 102, 241, 0.12);
+  box-shadow: 0 6px 18px rgba(67, 56, 202, 0.16);
+}
+
+.offerOptionDisabled {
+  cursor: default;
+}
+
+.offerOptionDisabled input {
+  pointer-events: none;
 }
 
 @media (max-width: 768px) {

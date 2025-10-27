@@ -1056,13 +1056,22 @@ export const InterviewerScreen = () => {
                   <h3>Summary & recommendation</h3>
                 </header>
                 <div className={styles.offerGroup}>
-                  {OFFER_OPTIONS.map((option) => (
-                    <label key={option.value} className={styles.offerOption}>
-                      <input
-                        type="radio"
-                        name="offerRecommendation"
-                        value={option.value}
-                        checked={displayedFormState.offerRecommendation === option.value}
+                  {OFFER_OPTIONS.map((option) => {
+                    const isSelected = displayedFormState.offerRecommendation === option.value;
+                    const optionClassName = [
+                      styles.offerOption,
+                      isSelected ? styles.offerOptionActive : '',
+                      disableInputs ? styles.offerOptionDisabled : ''
+                    ]
+                      .filter(Boolean)
+                      .join(' ');
+                    return (
+                      <label key={option.value} className={optionClassName}>
+                        <input
+                          type="radio"
+                          name="offerRecommendation"
+                          value={option.value}
+                          checked={displayedFormState.offerRecommendation === option.value}
                         disabled={disableInputs}
                         onChange={() => {
                           if (!isOwnTab) {
@@ -1070,10 +1079,11 @@ export const InterviewerScreen = () => {
                           }
                           updateCurrentFormState((prev) => ({ ...prev, offerRecommendation: option.value }));
                         }}
-                      />
-                      <span>{option.label}</span>
-                    </label>
-                  ))}
+                        />
+                        <span>{option.label}</span>
+                      </label>
+                    );
+                  })}
                 </div>
                 <div className={styles.formRow}>
                   <label htmlFor="generalNotes">Comments (optional)</label>
