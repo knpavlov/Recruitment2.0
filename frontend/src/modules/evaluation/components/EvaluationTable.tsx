@@ -1,5 +1,6 @@
 import { ChangeEvent, useState } from 'react';
 import styles from '../../../styles/EvaluationScreen.module.css';
+import { OfferVotesBar, type OfferVotesData } from './OfferVotesBar';
 
 type DecisionOption = 'offer' | 'accepted-offer' | 'progress' | 'reject';
 
@@ -21,7 +22,7 @@ export interface EvaluationTableRow {
   formsPlanned: number;
   avgFitScore: number | null;
   avgCaseScore: number | null;
-  offerSummary: string;
+  offerVotes: OfferVotesData;
   processLabel: string;
   invitesButtonLabel: string;
   invitesDisabled: boolean;
@@ -238,7 +239,9 @@ export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: 
                 <td>{avgFitLabel}</td>
                 <td>{avgCaseLabel}</td>
                 <td>{formsLabel}</td>
-                <td>{row.offerSummary}</td>
+                <td>
+                  <OfferVotesBar votes={row.offerVotes} />
+                </td>
                 <td>{row.processLabel}</td>
                 <td className={styles.actionsCell}>
                   <div className={styles.actionsGrid}>

@@ -7,7 +7,6 @@ import {
 import styles from '../../../styles/CandidateModal.module.css';
 import { generateId } from '../../../shared/ui/generateId';
 import { convertFileToResume } from '../services/resumeAdapter';
-import { parseResumeText } from '../services/resumeParser';
 import { formatDate } from '../../../shared/utils/date';
 
 type UploadState = { status: 'idle' | 'processing' | 'done'; progress: number };
@@ -66,7 +65,6 @@ export const CandidateModal = ({
 }: CandidateModalProps) => {
   const [profile, setProfile] = useState<CandidateProfile>(createEmptyProfile());
   const [resume, setResume] = useState<CandidateResume | undefined>(undefined);
-  const [aiStatus, setAiStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const dragCounterRef = useRef(0);
   const [isDragActive, setIsDragActive] = useState(false);
@@ -123,7 +121,6 @@ export const CandidateModal = ({
     setUploadState({ status: 'processing', progress: 0 });
     setIsDragActive(false);
     onFeedbackClear();
-    setAiStatus('idle');
     try {
       const converted = await convertFileToResume(file, (value) => {
         setUploadState((previous) => ({
@@ -137,7 +134,6 @@ export const CandidateModal = ({
       scheduleHideProgress();
     } catch (error) {
       setUploadState({ status: 'idle', progress: 0 });
-      setAiStatus('idle');
     }
   };
 
@@ -147,22 +143,8 @@ export const CandidateModal = ({
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
-    setAiStatus('idle');
     onFeedbackClear();
     setUploadState({ status: 'idle', progress: 0 });
-  };
-
-  const handleAiFill = async () => {
-    if (!resume?.textContent) {
-      setAiStatus('error');
-      return;
-    }
-    setAiStatus('loading');
-    onFeedbackClear();
-    await new Promise((resolve) => setTimeout(resolve, 600));
-    const parsed = parseResumeText(resume.textContent);
-    setProfile((prev) => ({ ...prev, ...parsed }));
-    setAiStatus('success');
   };
 
   const trimmedProfile: CandidateProfile = {
@@ -280,9 +262,6 @@ export const CandidateModal = ({
             >
               Delete resume
             </button>
-            <button className={styles.primaryButton} onClick={handleAiFill} disabled={!resume || aiStatus === 'loading'}>
-              {aiStatus === 'loading' ? 'AI is analysing…' : 'Fill with AI'}
-            </button>
             <input
               ref={fileInputRef}
               type="file"
@@ -298,8 +277,6 @@ export const CandidateModal = ({
               }}
             />
           </div>
-          {aiStatus === 'success' && <p className={styles.aiSuccess}>Fields populated automatically.</p>}
-          {aiStatus === 'error' && <p className={styles.aiError}>Upload a text-based resume for analysis.</p>}
         </section>
 
         <div className={styles.formGrid}>
