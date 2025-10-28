@@ -14,6 +14,7 @@ import type {
   TimelinePoint,
   TimelineResponse
 } from './analytics.types.js';
+import type { OfferDecisionStatus } from '../evaluations/evaluations.types.js';
 
 const FISCAL_YEAR_START_MONTH = 4; // April
 const MIN_TIMELINE_START = new Date(Date.UTC(2025, 8, 1));
@@ -179,7 +180,9 @@ interface MonthlyMetricAccumulator {
   candidateCount: number;
   femaleCount: number;
   acceptedOffers: number;
+  acceptedCrossOffers: number;
   pendingOffers: number;
+  declinedOffers: number;
   rejectedOffers: number;
 }
 
@@ -217,6 +220,34 @@ interface InterviewerBucketAccumulator {
   rejectRecommendations: number;
 }
 
+const OFFER_STATUS_VALUES: OfferDecisionStatus[] = [
+  'pending',
+  'accepted',
+  'accepted-co',
+  'declined',
+  'declined-co'
+];
+
+const resolveOfferStatus = (
+  decision: EvaluationSnapshotRow['decision'],
+  status: EvaluationSnapshotRow['offerDecisionStatus']
+): OfferDecisionStatus => {
+  if (status && OFFER_STATUS_VALUES.includes(status)) {
+    return status;
+  }
+  if (decision === 'accepted-offer') {
+    return 'accepted';
+  }
+  return 'pending';
+};
+
+const normalizeDecision = (value: EvaluationSnapshotRow['decision']): EvaluationSnapshotRow['decision'] => {
+  if (value === 'accepted-offer') {
+    return 'offer';
+  }
+  return value;
+};
+
 const buildMonthlyMetrics = (
   candidates: CandidateSnapshotRow[],
   evaluations: EvaluationSnapshotRow[],
@@ -235,6 +266,8 @@ const buildMonthlyMetrics = (
           femaleCount: 0,
           pendingOffers: 0,
           acceptedOffers: 0,
+          acceptedCrossOffers: 0,
+          declinedOffers: 0,
           rejectedOffers: 0
         };
       map.set(key, bucket);
@@ -260,11 +293,20 @@ const buildMonthlyMetrics = (
       continue;
     }
     const bucket = ensureMonth(updatedAt);
-    if (evaluation.decision === 'accepted-offer') {
-      bucket.acceptedOffers += 1;
-    } else if (evaluation.decision === 'offer') {
-      bucket.pendingOffers += 1;
-    } else if (evaluation.decision === 'reject') {
+    const decision = normalizeDecision(evaluation.decision);
+    if (decision === 'offer') {
+      const offerStatus = resolveOfferStatus(evaluation.decision, evaluation.offerDecisionStatus ?? null);
+      if (offerStatus === 'accepted') {
+        bucket.acceptedOffers += 1;
+      } else if (offerStatus === 'accepted-co') {
+        bucket.acceptedOffers += 1;
+        bucket.acceptedCrossOffers += 1;
+      } else if (offerStatus === 'declined' || offerStatus === 'declined-co') {
+        bucket.declinedOffers += 1;
+      } else {
+        bucket.pendingOffers += 1;
+      }
+    } else if (decision === 'reject') {
       bucket.rejectedOffers += 1;
     }
   }
@@ -366,7 +408,9 @@ export class AnalyticsService {
     let femaleCount = 0;
     let candidateCount = 0;
     let acceptedOffers = 0;
+    let acceptedCrossOffers = 0;
     let pendingOffers = 0;
+    let declinedOffers = 0;
     let rejectedOffers = 0;
 
     for (const month of monthly) {
@@ -376,11 +420,13 @@ export class AnalyticsService {
       femaleCount += month.femaleCount;
       candidateCount += month.candidateCount;
       acceptedOffers += month.acceptedOffers;
+      acceptedCrossOffers += month.acceptedCrossOffers;
       pendingOffers += month.pendingOffers;
+      declinedOffers += month.declinedOffers;
       rejectedOffers += month.rejectedOffers;
     }
 
-    const offersMade = acceptedOffers + pendingOffers;
+    const offersMade = acceptedOffers + pendingOffers + declinedOffers;
     const decisionsWithOutcome = offersMade + rejectedOffers;
 
     const buildMetric = (numerator: number, denominator: number): SummaryMetricValue => ({
@@ -395,7 +441,8 @@ export class AnalyticsService {
       metrics: {
         femaleShare: buildMetric(femaleCount, candidateCount),
         offerAcceptance: buildMetric(acceptedOffers, offersMade),
-        offerRate: buildMetric(offersMade, decisionsWithOutcome)
+        offerRate: buildMetric(offersMade, decisionsWithOutcome),
+        crossOfferAcceptance: buildMetric(acceptedCrossOffers, offersMade)
       }
     };
   }
@@ -462,9 +509,10 @@ export class AnalyticsService {
       const updatedAt = parseDate(evaluation.updatedAt);
       if (updatedAt && isWithinRange(updatedAt, alignedStart, rangeEnd)) {
         const decisionBucket = ensureBucket(updatedAt);
-        if (evaluation.decision === 'offer' || evaluation.decision === 'accepted-offer') {
+        const decision = normalizeDecision(evaluation.decision);
+        if (decision === 'offer') {
           decisionBucket.offers += 1;
-        } else if (evaluation.decision === 'reject') {
+        } else if (decision === 'reject') {
           decisionBucket.rejects += 1;
         }
       }
@@ -776,15 +824,18 @@ export class AnalyticsService {
       'female_share',
       'offers_made',
       'offers_accepted',
+      'offers_declined',
       'offer_acceptance',
-      'offer_rate'
+      'offer_rate',
+      'cross_offers_accepted',
+      'cross_offer_acceptance'
     ];
 
     const lines = [header.join(',')];
 
     for (const row of rows) {
       const periodEnd = addDaysUtc(addMonthsUtc(row.start, 1), -1);
-      const offersMade = row.acceptedOffers + row.pendingOffers;
+      const offersMade = row.acceptedOffers + row.pendingOffers + row.declinedOffers;
       lines.push(
         [
           row.start.toISOString(),
@@ -794,8 +845,11 @@ export class AnalyticsService {
           formatRatio(row.femaleCount, row.candidateCount),
           String(offersMade),
           String(row.acceptedOffers),
+          String(row.declinedOffers),
           formatRatio(row.acceptedOffers, offersMade),
-          formatRatio(row.acceptedOffers, row.candidateCount)
+          formatRatio(row.acceptedOffers, row.candidateCount),
+          String(row.acceptedCrossOffers),
+          formatRatio(row.acceptedCrossOffers, offersMade)
         ].join(',')
       );
     }

@@ -167,6 +167,16 @@ const parseRound = (value: unknown): EvaluationRoundSnapshot | null => {
     value.decision === null
       ? value.decision ?? undefined
       : undefined;
+  const offerDecisionStatus =
+    value.offerDecisionStatus === 'pending' ||
+    value.offerDecisionStatus === 'accepted' ||
+    value.offerDecisionStatus === 'accepted-co' ||
+    value.offerDecisionStatus === 'declined' ||
+    value.offerDecisionStatus === 'declined-co'
+      ? value.offerDecisionStatus
+      : value.offerDecisionStatus === null
+        ? null
+        : undefined;
   return {
     roundNumber,
     interviewCount: interviewCount ?? parseFormList(value.forms).length,
@@ -177,7 +187,8 @@ const parseRound = (value: unknown): EvaluationRoundSnapshot | null => {
     processStartedAt: parseIsoDate(value.processStartedAt) ?? undefined,
     completedAt: parseIsoDate(value.completedAt) ?? undefined,
     createdAt: parseIsoDate(value.createdAt) ?? new Date().toISOString(),
-    decision
+    decision,
+    offerDecisionStatus
   };
 };
 
@@ -215,10 +226,11 @@ export class AnalyticsRepository {
       created_at: Date;
       updated_at: Date;
       decision: string | null;
+      decision_status: string | null;
       round_history: unknown;
       forms: unknown;
     }>(
-      `SELECT id, candidate_id, created_at, updated_at, decision, round_history, forms FROM evaluations`
+      `SELECT id, candidate_id, created_at, updated_at, decision, decision_status, round_history, forms FROM evaluations`
     );
 
     return result.rows.map((row) => ({
@@ -235,6 +247,16 @@ export class AnalyticsRepository {
           : row.decision === null
           ? null
           : null,
+      offerDecisionStatus:
+        row.decision_status === 'pending' ||
+        row.decision_status === 'accepted' ||
+        row.decision_status === 'accepted-co' ||
+        row.decision_status === 'declined' ||
+        row.decision_status === 'declined-co'
+          ? row.decision_status
+          : row.decision_status === null
+            ? null
+            : null,
       roundHistory: parseRoundHistory(row.round_history),
       forms: parseFormList(row.forms)
     }));

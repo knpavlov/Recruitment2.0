@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import { evaluationWorkflowService, evaluationsService } from './evaluations.module.js';
+import type { OfferDecisionStatus } from './evaluations.types.js';
 
 const router = Router();
 
@@ -44,6 +45,11 @@ const handleError = (error: unknown, res: Response) => {
       res
         .status(400)
         .json({ code: 'invalid-selection', message: 'Select at least one interviewer before resending invites.' });
+      return;
+    case 'FORBIDDEN':
+      res
+        .status(403)
+        .json({ code: 'invalid-input', message: 'Offer status cannot be updated for this evaluation.' });
       return;
     case 'INVITATION_DELIVERY_FAILED':
       res
@@ -148,6 +154,36 @@ router.post('/:id/decision', async (req, res) => {
     const evaluation = await evaluationWorkflowService.updateDecision(
       req.params.id,
       normalizedDecision,
+      expectedVersion
+    );
+    res.json(evaluation);
+  } catch (error) {
+    handleError(error, res);
+  }
+});
+
+router.post('/:id/decision-status', async (req, res) => {
+  try {
+    const { status, expectedVersion } = (req.body ?? {}) as {
+      status?: unknown;
+      expectedVersion?: unknown;
+    };
+    if (typeof expectedVersion !== 'number') {
+      res.status(400).json({ code: 'invalid-input', message: 'Provide the expected version.' });
+      return;
+    }
+    const allowedStatuses = ['pending', 'accepted', 'accepted-co', 'declined', 'declined-co'] as const;
+    const normalizedStatus =
+      typeof status === 'string' && allowedStatuses.includes(status as (typeof allowedStatuses)[number])
+        ? (status as OfferDecisionStatus)
+        : null;
+    if (!normalizedStatus) {
+      res.status(400).json({ code: 'invalid-input', message: 'Provide a valid offer decision status.' });
+      return;
+    }
+    const evaluation = await evaluationWorkflowService.updateOfferDecisionStatus(
+      req.params.id,
+      normalizedStatus,
       expectedVersion
     );
     res.json(evaluation);

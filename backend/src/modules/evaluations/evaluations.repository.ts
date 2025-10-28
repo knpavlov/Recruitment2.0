@@ -26,6 +26,7 @@ interface EvaluationRow extends Record<string, unknown> {
   process_started_at: Date | null;
   round_history: unknown;
   decision: string | null;
+  decision_status: string | null;
 }
 
 const mapSlots = (value: unknown): InterviewSlotModel[] => {
@@ -212,6 +213,19 @@ const mapRoundHistory = (value: unknown): EvaluationRoundSnapshot[] => {
       decision = null;
     }
 
+    let decisionStatus: EvaluationRoundSnapshot['offerDecisionStatus'];
+    if (
+      item.offerDecisionStatus === 'pending' ||
+      item.offerDecisionStatus === 'accepted' ||
+      item.offerDecisionStatus === 'accepted-co' ||
+      item.offerDecisionStatus === 'declined' ||
+      item.offerDecisionStatus === 'declined-co'
+    ) {
+      decisionStatus = item.offerDecisionStatus;
+    } else if (item.offerDecisionStatus === null) {
+      decisionStatus = null;
+    }
+
     history.push({
       roundNumber,
       interviewCount,
@@ -222,7 +236,8 @@ const mapRoundHistory = (value: unknown): EvaluationRoundSnapshot[] => {
       processStartedAt,
       completedAt,
       createdAt,
-      decision
+      decision,
+      offerDecisionStatus: decisionStatus
     });
   }
 
@@ -249,6 +264,19 @@ const mapRowToRecord = (row: EvaluationRow): EvaluationRecord => {
     decision = null;
   }
 
+  let decisionStatus: EvaluationRecord['offerDecisionStatus'];
+  if (
+    row.decision_status === 'pending' ||
+    row.decision_status === 'accepted' ||
+    row.decision_status === 'accepted-co' ||
+    row.decision_status === 'declined' ||
+    row.decision_status === 'declined-co'
+  ) {
+    decisionStatus = row.decision_status;
+  } else if (row.decision_status === null) {
+    decisionStatus = null;
+  }
+
   return {
     id: row.id,
     candidateId: row.candidate_id ?? undefined,
@@ -264,7 +292,8 @@ const mapRowToRecord = (row: EvaluationRow): EvaluationRecord => {
     processStartedAt: row.process_started_at ? row.process_started_at.toISOString() : undefined,
     roundHistory: mapRoundHistory(row.round_history),
     invitationState: { hasInvitations: false, hasPendingChanges: false, slots: [] },
-    decision
+    decision,
+    offerDecisionStatus: decisionStatus
   } satisfies EvaluationRecord;
 };
 
@@ -373,8 +402,8 @@ export class EvaluationsRepository {
     const historyJson = JSON.stringify(model.roundHistory ?? []);
 
     const result = await postgresPool.query<EvaluationRow>(
-      `INSERT INTO evaluations (id, candidate_id, round_number, interview_count, interviews, fit_question_id, version, created_at, updated_at, forms, round_history, process_status, process_started_at, decision)
-         VALUES ($1, $2, $3, $4, $5::jsonb, $6, 1, NOW(), NOW(), $7::jsonb, $8::jsonb, $9, $10, $11)
+      `INSERT INTO evaluations (id, candidate_id, round_number, interview_count, interviews, fit_question_id, version, created_at, updated_at, forms, round_history, process_status, process_started_at, decision, decision_status)
+         VALUES ($1, $2, $3, $4, $5::jsonb, $6, 1, NOW(), NOW(), $7::jsonb, $8::jsonb, $9, $10, $11, $12)
       RETURNING id,
                 candidate_id,
                 round_number,
@@ -388,7 +417,8 @@ export class EvaluationsRepository {
                 process_status,
                 process_started_at,
                 round_history,
-                decision;`,
+                decision,
+                decision_status;`,
       [
         model.id,
         model.candidateId ?? null,
@@ -400,7 +430,8 @@ export class EvaluationsRepository {
         historyJson,
         model.processStatus ?? 'draft',
         model.processStartedAt ?? null,
-        model.decision ?? null
+        model.decision ?? null,
+        model.offerDecisionStatus ?? 'pending'
       ]
     );
 
@@ -427,9 +458,10 @@ export class EvaluationsRepository {
               process_status = $8,
               process_started_at = $9,
               decision = $10,
+              decision_status = $11,
               version = version + 1,
               updated_at = NOW()
-        WHERE id = $11 AND version = $12
+        WHERE id = $12 AND version = $13
       RETURNING id,
                 candidate_id,
                 round_number,
@@ -443,7 +475,8 @@ export class EvaluationsRepository {
                 process_status,
                 process_started_at,
                 round_history,
-                decision;`,
+                decision,
+                decision_status;`,
       [
         model.candidateId ?? null,
         model.roundNumber ?? null,
@@ -455,6 +488,7 @@ export class EvaluationsRepository {
         model.processStatus ?? 'draft',
         model.processStartedAt ?? null,
         model.decision ?? null,
+        model.offerDecisionStatus ?? 'pending',
         model.id,
         expectedVersion
       ]
