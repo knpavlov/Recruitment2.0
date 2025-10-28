@@ -198,8 +198,8 @@
 
 .detailColumns {
   display: grid;
-  grid-template-columns: minmax(240px, 280px) minmax(0, 1fr);
-  gap: 20px;
+  grid-template-columns: minmax(210px, 240px) minmax(0, 1fr);
+  gap: 18px;
   align-items: flex-start;
 }
 
@@ -207,7 +207,7 @@
   display: flex;
   flex-direction: column;
   gap: 20px;
-  max-width: 280px;
+  max-width: 240px;
 }
 
 .formColumn {
