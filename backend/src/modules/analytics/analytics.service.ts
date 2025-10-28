@@ -16,6 +16,7 @@ import type {
 } from './analytics.types.js';
 
 const FISCAL_YEAR_START_MONTH = 4; // April
+const MIN_TIMELINE_START = new Date(Date.UTC(2025, 8, 1));
 
 const startOfDayUtc = (value: Date) => {
   const date = new Date(value.getTime());
@@ -405,8 +406,12 @@ export class AnalyticsService {
   ): Promise<TimelineResponse> {
     const referenceEnd = options.to ? parseDate(options.to) ?? new Date() : new Date();
     const rangeEnd = endOfDayUtc(referenceEnd);
-    const defaultStart = startOfMonthUtc(addMonthsUtc(rangeEnd, -11));
-    const rangeStart = options.from ? parseDate(options.from) ?? defaultStart : defaultStart;
+    const defaultStartCandidate = startOfMonthUtc(addMonthsUtc(rangeEnd, -11));
+    const minimumStart = startOfMonthUtc(MIN_TIMELINE_START);
+    const defaultStart =
+      defaultStartCandidate.getTime() < minimumStart.getTime() ? minimumStart : defaultStartCandidate;
+    const providedStart = options.from ? parseDate(options.from) : null;
+    const rangeStart = providedStart ?? defaultStart;
     const alignedStart = startOfDayUtc(rangeStart);
 
     const [candidates, evaluations] = await Promise.all([

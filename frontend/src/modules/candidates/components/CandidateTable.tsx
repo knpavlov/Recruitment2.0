@@ -11,7 +11,6 @@ export type CandidateSortKey =
   | 'targetOffice'
   | 'phone'
   | 'email'
-  | 'totalExperience'
   | 'updatedAt';
 
 export interface CandidateTableRow {
@@ -26,7 +25,6 @@ export interface CandidateTableRow {
   targetOffice: string;
   phone: string;
   email: string;
-  totalExperience: string;
   updatedAt: string;
   hasResume: boolean;
   onOpen: () => void;
@@ -43,8 +41,7 @@ interface CandidateTableProps {
 const formatDate = (input: string) => {
   const date = new Date(input);
   return new Intl.DateTimeFormat('en-US', {
-    dateStyle: 'medium',
-    timeStyle: 'short'
+    dateStyle: 'medium'
   }).format(date);
 };
 
@@ -59,7 +56,6 @@ const SORTABLE_COLUMNS: Array<{ key: CandidateSortKey; title: string }> = [
   { key: 'targetOffice', title: 'Target office' },
   { key: 'phone', title: 'Phone' },
   { key: 'email', title: 'Email' },
-  { key: 'totalExperience', title: 'Total experience' },
   { key: 'updatedAt', title: 'Last updated' }
 ];
 
@@ -97,7 +93,7 @@ export const CandidateTable = ({ rows, sortDirection, sortKey, onSortChange }: C
                 </th>
               );
             })}
-            <th>Resume</th>
+            <th className={styles.resumeHeader}>Resume</th>
             <th className={styles.actionsHeader}>Actions</th>
           </tr>
         </thead>
@@ -114,9 +110,8 @@ export const CandidateTable = ({ rows, sortDirection, sortKey, onSortChange }: C
               <td>{row.targetOffice}</td>
               <td>{row.phone}</td>
               <td>{row.email}</td>
-              <td>{row.totalExperience}</td>
               <td>{formatDate(row.updatedAt)}</td>
-              <td>
+              <td className={styles.resumeCell}>
                 {row.hasResume ? (
                   <button
                     className={styles.tableSecondaryButton}

@@ -38,9 +38,11 @@ const AppContent = () => {
 
       if (item.key === 'interviews') {
         if (session.role === 'user') {
-          return true;
+          return hasInterviewerAssignments;
         }
-        return hasInterviewerAssignments;
+
+        // Для админов не требуем назначений интервью, чтобы все админские разделы оставались доступными
+        return true;
       }
 
       return true;

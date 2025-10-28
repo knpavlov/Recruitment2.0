@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/app/server.ts",
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/app/server.js"
+    "start": "node dist/app/server.js",
+    "seed:demo": "npm run build && node dist/scripts/seedDemoData.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
