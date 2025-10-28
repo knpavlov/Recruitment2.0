@@ -63,6 +63,24 @@ const readDecision = (value: unknown): EvaluationRecord['decision'] | undefined 
   return undefined;
 };
 
+const readOfferDecisionStatus = (
+  value: unknown
+): EvaluationRecord['offerDecisionStatus'] | undefined => {
+  if (
+    value === 'pending' ||
+    value === 'accepted' ||
+    value === 'accepted-co' ||
+    value === 'declined' ||
+    value === 'declined-co'
+  ) {
+    return value;
+  }
+  if (value === null) {
+    return null;
+  }
+  return undefined;
+};
+
 const sanitizeSlots = (value: unknown): EvaluationWriteModel['interviews'] => {
   if (!Array.isArray(value)) {
     return [];
@@ -197,7 +215,8 @@ const sanitizeRoundHistory = (value: unknown): EvaluationRoundSnapshot[] => {
       processStartedAt: readOptionalIsoDate(payload.processStartedAt),
       completedAt: readOptionalIsoDate(payload.completedAt),
       createdAt: readOptionalIsoDate(payload.createdAt) ?? new Date().toISOString(),
-      decision: readDecision(payload.decision)
+      decision: readDecision(payload.decision),
+      offerDecisionStatus: readOfferDecisionStatus(payload.offerDecisionStatus) ?? null
     });
   }
 
@@ -252,7 +271,8 @@ const buildWriteModel = (payload: unknown): EvaluationWriteModel => {
     processStatus: readProcessStatus(source.processStatus),
     processStartedAt,
     roundHistory,
-    decision: readDecision(source.decision) ?? null
+    decision: readDecision(source.decision) ?? null,
+    offerDecisionStatus: readOfferDecisionStatus(source.offerDecisionStatus) ?? 'pending'
   };
 };
 

@@ -179,7 +179,9 @@ interface MonthlyMetricAccumulator {
   candidateCount: number;
   femaleCount: number;
   acceptedOffers: number;
+  acceptedCrossOffers: number;
   pendingOffers: number;
+  declinedOffers: number;
   rejectedOffers: number;
 }
 
@@ -235,10 +237,12 @@ const buildMonthlyMetrics = (
           femaleCount: 0,
           pendingOffers: 0,
           acceptedOffers: 0,
+          acceptedCrossOffers: 0,
+          declinedOffers: 0,
           rejectedOffers: 0
         };
-      map.set(key, bucket);
-    }
+        map.set(key, bucket);
+      }
     return bucket;
   };
 
@@ -260,11 +264,20 @@ const buildMonthlyMetrics = (
       continue;
     }
     const bucket = ensureMonth(updatedAt);
-    if (evaluation.decision === 'accepted-offer') {
-      bucket.acceptedOffers += 1;
-    } else if (evaluation.decision === 'offer') {
-      bucket.pendingOffers += 1;
-    } else if (evaluation.decision === 'reject') {
+    const decision = evaluation.decision === 'accepted-offer' ? 'offer' : evaluation.decision;
+    if (decision === 'offer') {
+      const status = evaluation.offerDecisionStatus ?? 'pending';
+      if (status === 'accepted' || status === 'accepted-co') {
+        bucket.acceptedOffers += 1;
+        if (status === 'accepted-co') {
+          bucket.acceptedCrossOffers += 1;
+        }
+      } else if (status === 'declined' || status === 'declined-co') {
+        bucket.declinedOffers += 1;
+      } else {
+        bucket.pendingOffers += 1;
+      }
+    } else if (decision === 'reject') {
       bucket.rejectedOffers += 1;
     }
   }
@@ -366,7 +379,9 @@ export class AnalyticsService {
     let femaleCount = 0;
     let candidateCount = 0;
     let acceptedOffers = 0;
+    let acceptedCrossOffers = 0;
     let pendingOffers = 0;
+    let declinedOffers = 0;
     let rejectedOffers = 0;
 
     for (const month of monthly) {
@@ -376,11 +391,13 @@ export class AnalyticsService {
       femaleCount += month.femaleCount;
       candidateCount += month.candidateCount;
       acceptedOffers += month.acceptedOffers;
+      acceptedCrossOffers += month.acceptedCrossOffers;
       pendingOffers += month.pendingOffers;
+      declinedOffers += month.declinedOffers;
       rejectedOffers += month.rejectedOffers;
     }
 
-    const offersMade = acceptedOffers + pendingOffers;
+    const offersMade = acceptedOffers + pendingOffers + declinedOffers;
     const decisionsWithOutcome = offersMade + rejectedOffers;
 
     const buildMetric = (numerator: number, denominator: number): SummaryMetricValue => ({
@@ -395,6 +412,7 @@ export class AnalyticsService {
       metrics: {
         femaleShare: buildMetric(femaleCount, candidateCount),
         offerAcceptance: buildMetric(acceptedOffers, offersMade),
+        crossOfferAcceptance: buildMetric(acceptedCrossOffers, offersMade),
         offerRate: buildMetric(offersMade, decisionsWithOutcome)
       }
     };
@@ -776,7 +794,10 @@ export class AnalyticsService {
       'female_share',
       'offers_made',
       'offers_accepted',
+      'offers_cross_accepted',
+      'offers_declined',
       'offer_acceptance',
+      'cross_offer_acceptance',
       'offer_rate'
     ];
 
@@ -784,7 +805,7 @@ export class AnalyticsService {
 
     for (const row of rows) {
       const periodEnd = addDaysUtc(addMonthsUtc(row.start, 1), -1);
-      const offersMade = row.acceptedOffers + row.pendingOffers;
+      const offersMade = row.acceptedOffers + row.pendingOffers + row.declinedOffers;
       lines.push(
         [
           row.start.toISOString(),
@@ -794,8 +815,11 @@ export class AnalyticsService {
           formatRatio(row.femaleCount, row.candidateCount),
           String(offersMade),
           String(row.acceptedOffers),
+          String(row.acceptedCrossOffers),
+          String(row.declinedOffers),
           formatRatio(row.acceptedOffers, offersMade),
-          formatRatio(row.acceptedOffers, row.candidateCount)
+          formatRatio(row.acceptedCrossOffers, offersMade),
+          formatRatio(offersMade, row.candidateCount)
         ].join(',')
       );
     }

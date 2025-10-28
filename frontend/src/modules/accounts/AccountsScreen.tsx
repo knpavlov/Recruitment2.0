@@ -14,7 +14,7 @@ const INTERVIEWER_ROLES: InterviewerSeniority[] = ['MD', 'SD', 'D', 'SM', 'M', '
 export const AccountsScreen = () => {
   const { session } = useAuth();
   const role = session?.role ?? 'user';
-  const { list, inviteAccount, activateAccount, removeAccount } = useAccountsState();
+  const { list, inviteAccount, activateAccount, removeAccount, updateRole } = useAccountsState();
   const [email, setEmail] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -23,6 +23,7 @@ export const AccountsScreen = () => {
   const [banner, setBanner] = useState<Banner>(null);
   const [sortKey, setSortKey] = useState<SortKey>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [updatingRoleId, setUpdatingRoleId] = useState<string | null>(null);
 
   const sortedAccounts = useMemo(() => {
     const copy = [...list];
@@ -100,12 +101,12 @@ export const AccountsScreen = () => {
     });
   };
 
-  if (role !== 'super-admin') {
+  if (role !== 'super-admin' && role !== 'admin') {
     return (
       <section className={styles.wrapper}>
         <div className={styles.restricted}>
           <h1>Access denied</h1>
-          <p>Only the super admin can manage accounts.</p>
+          <p>Only administrators can manage accounts.</p>
         </div>
       </section>
     );
@@ -126,10 +127,10 @@ export const AccountsScreen = () => {
       return;
     }
     setBanner({ type: 'info', text: `Invitation email sent to ${result.data.email}.` });
-      setEmail('');
-      setFirstName('');
-      setLastName('');
-      setInterviewerRole('MD');
+    setEmail('');
+    setFirstName('');
+    setLastName('');
+    setInterviewerRole('MD');
   };
 
   const handleCopyToken = async (token: string) => {
@@ -170,6 +171,31 @@ export const AccountsScreen = () => {
       return;
     }
     setBanner({ type: 'info', text: 'Account deleted.' });
+  };
+
+  const handleRoleChange = async (id: string, nextRole: 'admin' | 'user') => {
+    setUpdatingRoleId(id);
+    try {
+      const result = await updateRole(id, nextRole);
+      if (!result.ok) {
+        const message =
+          result.error === 'not-found'
+            ? 'Account not found.'
+            : result.error === 'invalid-input'
+              ? 'This access level cannot be assigned to the selected account.'
+              : 'Failed to update the access level.';
+        setBanner({ type: 'error', text: message });
+        return;
+      }
+      const updatedAccount = result.data;
+      const name = resolveAccountName(updatedAccount) || updatedAccount.email;
+      setBanner({ type: 'info', text: `Access level updated for ${name}.` });
+    } catch (error) {
+      console.error('Failed to update account role:', error);
+      setBanner({ type: 'error', text: 'Failed to update the access level.' });
+    } finally {
+      setUpdatingRoleId(null);
+    }
   };
 
   return (
@@ -319,7 +345,24 @@ export const AccountsScreen = () => {
                     {account.status === 'active' ? 'Active' : 'Pending activation'}
                   </span>
                 </td>
-                <td>{account.role === 'super-admin' ? 'Super admin' : account.role === 'admin' ? 'Admin' : 'User'}</td>
+                <td>
+                  {account.role === 'super-admin' ? (
+                    'Super admin'
+                  ) : (
+                    <select
+                      className={styles.roleInlineSelect}
+                      value={account.role}
+                      disabled={updatingRoleId === account.id}
+                      aria-label={`Change access level for ${resolveAccountName(account) || account.email}`}
+                      onChange={(event) =>
+                        handleRoleChange(account.id, event.target.value === 'admin' ? 'admin' : 'user')
+                      }
+                    >
+                      <option value="admin">Admin</option>
+                      <option value="user">User</option>
+                    </select>
+                  )}
+                </td>
                 <td>{account.interviewerRole ?? '—'}</td>
                 <td>
                   {account.status === 'pending' ? (

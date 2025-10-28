@@ -146,6 +146,18 @@ export class AccountsRepository {
     return row ? mapRowToAccount(row) : null;
   }
 
+  async updateRole(id: string, role: 'admin' | 'user'): Promise<AccountRecord | null> {
+    const result = await postgresPool.query(
+      `UPDATE accounts
+          SET role = $2
+        WHERE id = $1
+        RETURNING *;`,
+      [id, role]
+    );
+    const row = result.rows[0];
+    return row ? mapRowToAccount(row) : null;
+  }
+
   async removeAccount(id: string): Promise<AccountRecord | null> {
     const result = await postgresPool.query('DELETE FROM accounts WHERE id = $1 RETURNING *;', [id]);
     const row = result.rows[0];

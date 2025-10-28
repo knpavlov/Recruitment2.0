@@ -1,7 +1,7 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { CaseFolder, CaseFileUploadDto } from '../../shared/types/caseLibrary';
 import { CandidateProfile } from '../../shared/types/candidate';
-import { EvaluationConfig, InvitationDeliveryReport } from '../../shared/types/evaluation';
+import { EvaluationConfig, InvitationDeliveryReport, OfferDecisionStatus } from '../../shared/types/evaluation';
 import { AccountRecord, AccountRole, InterviewerSeniority } from '../../shared/types/account';
 import { FitQuestion } from '../../shared/types/fitQuestion';
 import { CaseCriterion } from '../../shared/types/caseCriteria';
@@ -73,6 +73,11 @@ interface AppStateContextValue {
       decision: 'offer' | 'accepted-offer' | 'reject' | null,
       expectedVersion: number
     ) => Promise<DomainResult<EvaluationConfig>>;
+    setOfferStatus: (
+      id: string,
+      status: OfferDecisionStatus,
+      expectedVersion: number
+    ) => Promise<DomainResult<EvaluationConfig>>;
   };
   accounts: {
     list: AccountRecord[];
@@ -85,6 +90,7 @@ interface AppStateContextValue {
     ) => Promise<DomainResult<AccountRecord>>;
     activateAccount: (id: string) => Promise<DomainResult<AccountRecord>>;
     removeAccount: (id: string) => Promise<DomainResult<string>>;
+    updateRole: (id: string, role: 'admin' | 'user') => Promise<DomainResult<AccountRecord>>;
   };
 }
 
@@ -673,6 +679,37 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
           console.error('Failed to update evaluation decision:', error);
           return { ok: false, error: 'unknown' };
         }
+      },
+      setOfferStatus: async (id, status, expectedVersion) => {
+        const allowedStatuses: OfferDecisionStatus[] = [
+          'pending',
+          'accepted',
+          'accepted-co',
+          'declined',
+          'declined-co'
+        ];
+        if (!allowedStatuses.includes(status)) {
+          return { ok: false, error: 'invalid-input' };
+        }
+        try {
+          const updated = await evaluationsApi.setOfferStatus(id, status, expectedVersion);
+          setEvaluations((prev) => prev.map((item) => (item.id === id ? updated : item)));
+          return { ok: true, data: updated };
+        } catch (error) {
+          if (error instanceof ApiError) {
+            if (error.code === 'version-conflict') {
+              return { ok: false, error: 'version-conflict' };
+            }
+            if (error.code === 'not-found' || error.status === 404) {
+              return { ok: false, error: 'not-found' };
+            }
+            if (error.status === 403 || error.code === 'invalid-input') {
+              return { ok: false, error: 'invalid-input' };
+            }
+          }
+          console.error('Failed to update offer decision status:', error);
+          return { ok: false, error: 'unknown' };
+        }
       }
     },
     accounts: {
@@ -752,6 +789,37 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
             }
           }
           console.error('Failed to delete account:', error);
+          return { ok: false, error: 'unknown' };
+        }
+      },
+      updateRole: async (id, role) => {
+        if (role !== 'admin' && role !== 'user') {
+          return { ok: false, error: 'invalid-input' };
+        }
+
+        const existing = accounts.find((item) => item.id === id);
+        if (!existing) {
+          return { ok: false, error: 'not-found' };
+        }
+
+        if (existing.role === role) {
+          return { ok: true, data: existing };
+        }
+
+        try {
+          const updated = await accountsApi.updateRole(id, role);
+          setAccounts((prev) => prev.map((item) => (item.id === id ? updated : item)));
+          return { ok: true, data: updated };
+        } catch (error) {
+          if (error instanceof ApiError) {
+            if (error.code === 'not-found' || error.status === 404) {
+              return { ok: false, error: 'not-found' };
+            }
+            if (error.status === 403) {
+              return { ok: false, error: 'invalid-input' };
+            }
+          }
+          console.error('Failed to update account role:', error);
           return { ok: false, error: 'unknown' };
         }
       }
