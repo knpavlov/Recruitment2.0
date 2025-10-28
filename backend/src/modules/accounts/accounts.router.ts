@@ -66,6 +66,34 @@ router.post('/:id/activate', async (req, res) => {
   }
 });
 
+router.patch('/:id/role', async (req, res) => {
+  const { role } = (req.body ?? {}) as { role?: unknown };
+  if (role !== 'admin' && role !== 'user') {
+    res.status(400).json({ code: 'invalid-input', message: 'Provide a valid role.' });
+    return;
+  }
+  try {
+    const account = await accountsService.changeRole(req.params.id, role);
+    res.json(account);
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.message === 'FORBIDDEN') {
+        res.status(403).json({ code: 'invalid-input', message: 'Cannot change this account role.' });
+        return;
+      }
+      if (error.message === 'NOT_FOUND') {
+        res.status(404).json({ code: 'not-found', message: 'Account not found.' });
+        return;
+      }
+      if (error.message === 'INVALID_INPUT') {
+        res.status(400).json({ code: 'invalid-input', message: 'Provide a valid role.' });
+        return;
+      }
+    }
+    res.status(500).json({ code: 'unknown', message: 'Failed to update the role.' });
+  }
+});
+
 router.delete('/:id', async (req, res) => {
   try {
     const account = await accountsService.removeAccount(req.params.id);

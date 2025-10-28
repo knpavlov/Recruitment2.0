@@ -1,5 +1,10 @@
 import { EvaluationsRepository } from './evaluations.repository.js';
-import { EvaluationRecord, EvaluationRoundSnapshot, EvaluationWriteModel } from './evaluations.types.js';
+import {
+  EvaluationRecord,
+  EvaluationRoundSnapshot,
+  EvaluationWriteModel,
+  OfferDecisionStatus
+} from './evaluations.types.js';
 import { computeInvitationState } from './evaluationAssignments.utils.js';
 
 const readOptionalString = (value: unknown): string | undefined => {
@@ -61,6 +66,23 @@ const readDecision = (value: unknown): EvaluationRecord['decision'] | undefined 
     return null;
   }
   return undefined;
+};
+
+const readOfferStatus = (value: unknown): OfferDecisionStatus | null | undefined => {
+  if (value === null) {
+    return null;
+  }
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) {
+    return undefined;
+  }
+  const allowed: OfferDecisionStatus[] = ['pending', 'accepted', 'accepted-co', 'declined-co', 'declined'];
+  return allowed.includes(normalized as OfferDecisionStatus)
+    ? (normalized as OfferDecisionStatus)
+    : undefined;
 };
 
 const sanitizeSlots = (value: unknown): EvaluationWriteModel['interviews'] => {
@@ -197,7 +219,8 @@ const sanitizeRoundHistory = (value: unknown): EvaluationRoundSnapshot[] => {
       processStartedAt: readOptionalIsoDate(payload.processStartedAt),
       completedAt: readOptionalIsoDate(payload.completedAt),
       createdAt: readOptionalIsoDate(payload.createdAt) ?? new Date().toISOString(),
-      decision: readDecision(payload.decision)
+      decision: readDecision(payload.decision),
+      offerStatus: readOfferStatus(payload.offerStatus)
     });
   }
 
@@ -252,7 +275,8 @@ const buildWriteModel = (payload: unknown): EvaluationWriteModel => {
     processStatus: readProcessStatus(source.processStatus),
     processStartedAt,
     roundHistory,
-    decision: readDecision(source.decision) ?? null
+    decision: readDecision(source.decision) ?? null,
+    offerStatus: readOfferStatus(source.offerStatus) ?? null
   };
 };
 

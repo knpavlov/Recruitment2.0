@@ -14,7 +14,7 @@ const INTERVIEWER_ROLES: InterviewerSeniority[] = ['MD', 'SD', 'D', 'SM', 'M', '
 export const AccountsScreen = () => {
   const { session } = useAuth();
   const role = session?.role ?? 'user';
-  const { list, inviteAccount, activateAccount, removeAccount } = useAccountsState();
+  const { list, inviteAccount, activateAccount, removeAccount, changeRole } = useAccountsState();
   const [email, setEmail] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -100,16 +100,18 @@ export const AccountsScreen = () => {
     });
   };
 
-  if (role !== 'super-admin') {
+  if (role !== 'super-admin' && role !== 'admin') {
     return (
       <section className={styles.wrapper}>
         <div className={styles.restricted}>
           <h1>Access denied</h1>
-          <p>Only the super admin can manage accounts.</p>
+          <p>Only admins can manage accounts.</p>
         </div>
       </section>
     );
   }
+
+  const [roleUpdatingId, setRoleUpdatingId] = useState<string | null>(null);
 
   const handleInvite = async () => {
     const result = await inviteAccount(email, targetRole, firstName, lastName, interviewerRole);
@@ -170,6 +172,24 @@ export const AccountsScreen = () => {
       return;
     }
     setBanner({ type: 'info', text: 'Account deleted.' });
+  };
+
+  const handleRoleChange = async (id: string, nextRole: 'admin' | 'user') => {
+    setRoleUpdatingId(id);
+    const result = await changeRole(id, nextRole);
+    setRoleUpdatingId(null);
+    if (!result.ok) {
+      const message =
+        result.error === 'not-found'
+          ? 'Account not found.'
+          : result.error === 'invalid-input'
+            ? 'Failed to update the role. Try again later.'
+            : 'Unexpected error. Try again later.';
+      setBanner({ type: 'error', text: message });
+      return;
+    }
+    const label = nextRole === 'admin' ? 'Admin' : 'User';
+    setBanner({ type: 'info', text: `Role updated to ${label}.` });
   };
 
   return (
@@ -319,7 +339,23 @@ export const AccountsScreen = () => {
                     {account.status === 'active' ? 'Active' : 'Pending activation'}
                   </span>
                 </td>
-                <td>{account.role === 'super-admin' ? 'Super admin' : account.role === 'admin' ? 'Admin' : 'User'}</td>
+                <td>
+                  {account.role === 'super-admin' ? (
+                    'Super admin'
+                  ) : (
+                    <select
+                      className={styles.roleSelect}
+                      value={account.role}
+                      onChange={(event) =>
+                        void handleRoleChange(account.id, event.target.value as 'admin' | 'user')
+                      }
+                      disabled={roleUpdatingId === account.id}
+                    >
+                      <option value="admin">Admin</option>
+                      <option value="user">User</option>
+                    </select>
+                  )}
+                </td>
                 <td>{account.interviewerRole ?? '—'}</td>
                 <td>
                   {account.status === 'pending' ? (

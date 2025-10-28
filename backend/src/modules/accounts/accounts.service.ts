@@ -172,4 +172,29 @@ export class AccountsService {
     }
     return removed;
   }
+
+  async changeRole(id: string, role: 'admin' | 'user') {
+    const trimmed = id.trim();
+    if (!trimmed) {
+      throw new Error('INVALID_INPUT');
+    }
+    if (role !== 'admin' && role !== 'user') {
+      throw new Error('INVALID_INPUT');
+    }
+    const account = await this.repository.findById(trimmed);
+    if (!account) {
+      throw new Error('NOT_FOUND');
+    }
+    if (account.role === 'super-admin') {
+      throw new Error('FORBIDDEN');
+    }
+    if (account.role === role) {
+      return account;
+    }
+    const updated = await this.repository.updateRole(trimmed, role);
+    if (!updated) {
+      throw new Error('NOT_FOUND');
+    }
+    return updated;
+  }
 }

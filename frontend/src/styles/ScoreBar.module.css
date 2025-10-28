@@ -1,0 +1,42 @@
+.wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 140px;
+}
+
+.track {
+  position: relative;
+  flex: 1;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.3);
+  overflow: hidden;
+}
+
+.fill {
+  height: 100%;
+  border-radius: inherit;
+  transition: width 0.3s ease;
+}
+
+.caseFill {
+  background: linear-gradient(135deg, #8b5cf6, #6366f1);
+}
+
+.fitFill {
+  background: linear-gradient(135deg, #0ea5e9, #38bdf8);
+}
+
+.value {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+  min-width: 3.6ch;
+  text-align: right;
+}
+
+.placeholder {
+  color: #94a3b8;
+  font-weight: 600;
+}

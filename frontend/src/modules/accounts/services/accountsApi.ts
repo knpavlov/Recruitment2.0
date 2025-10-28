@@ -140,5 +140,12 @@ export const accountsApi = {
       await apiRequest<unknown>(`/accounts/${id}`, {
         method: 'DELETE'
       })
+    ),
+  updateRole: async (id: string, role: 'admin' | 'user') =>
+    ensureAccount(
+      await apiRequest<unknown>(`/accounts/${id}/role`, {
+        method: 'PATCH',
+        body: { role }
+      })
     )
 };
