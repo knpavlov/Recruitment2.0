@@ -55,6 +55,19 @@ const normalizeInterviewerRole = (value: unknown): InterviewerSeniority | null =
     : null;
 };
 
+const normalizeRole = (value: unknown): AccountRecord['role'] => {
+  if (typeof value !== 'string') {
+    return 'user';
+  }
+
+  const normalized = value.trim().toLowerCase();
+  const allowed: AccountRecord['role'][] = ['super-admin', 'admin', 'user'];
+
+  return allowed.includes(normalized as AccountRecord['role'])
+    ? (normalized as AccountRecord['role'])
+    : 'user';
+};
+
 const mapRowToAccount = (row: any): AccountRecord => {
   const displayName = typeof row.display_name === 'string' ? row.display_name.trim() : '';
   const legacyName = readLegacyName(row);
@@ -67,7 +80,8 @@ const mapRowToAccount = (row: any): AccountRecord => {
   return {
     id: row.id,
     email: row.email,
-    role: row.role,
+    // Сохраняем роли в едином нижнем регистре, чтобы фронтенд и бэкенд использовали одинаковые ключи.
+    role: normalizeRole(row.role),
     status: row.status,
     interviewerRole: normalizeInterviewerRole(row.interviewer_role),
     name: fallbackName || undefined,

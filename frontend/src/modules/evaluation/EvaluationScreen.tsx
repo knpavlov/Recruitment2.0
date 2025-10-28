@@ -250,11 +250,13 @@ export const EvaluationScreen = () => {
         }
       }
       const totalOffers = offerResponses.length;
-      const offerSummary = totalOffers
-        ? (['yes_priority', 'yes_strong', 'yes_keep_warm', 'no_offer'] as const)
-            .map((key) => `${Math.round((offerTotals[key] / totalOffers) * 100)}%`)
-            .join(' / ')
-        : '—';
+      const offerBreakdown = {
+        total: totalOffers,
+        yesPriority: offerTotals.yes_priority,
+        yesStrong: offerTotals.yes_strong,
+        yesKeepWarm: offerTotals.yes_keep_warm,
+        noOffer: offerTotals.no_offer
+      };
 
       const roundOptionsMap = new Map<number, string>();
       evaluation.roundHistory.forEach((round) => {
@@ -421,7 +423,7 @@ export const EvaluationScreen = () => {
         formsPlanned,
         avgFitScore,
         avgCaseScore,
-        offerSummary,
+        offerBreakdown,
         processLabel,
         invitesButtonLabel,
         invitesDisabled,

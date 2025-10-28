@@ -67,6 +67,17 @@ const SHORT_SESSION_MS = 12 * 60 * 60 * 1000;
 
 const isBrowserEnvironment = () => typeof window !== 'undefined';
 
+const normalizeAccountRole = (value: unknown): AccountRole | null => {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  const allowed: AccountRole[] = ['super-admin', 'admin', 'user'];
+
+  return allowed.includes(normalized as AccountRole) ? (normalized as AccountRole) : null;
+};
+
 const readStoredSession = (): AuthSession | null => {
   if (!isBrowserEnvironment()) {
     return null;
@@ -82,13 +93,13 @@ const readStoredSession = (): AuthSession | null => {
 
     try {
       const parsed = JSON.parse(raw) as Partial<AuthSession> | null;
-      if (
-        !parsed ||
-        typeof parsed.token !== 'string' ||
-        typeof parsed.email !== 'string' ||
-        typeof parsed.role !== 'string' ||
-        typeof parsed.expiresAt !== 'number'
-      ) {
+      if (!parsed || typeof parsed.token !== 'string' || typeof parsed.email !== 'string' || typeof parsed.expiresAt !== 'number') {
+        storage.removeItem(SESSION_STORAGE_KEY);
+        continue;
+      }
+
+      const role = normalizeAccountRole(parsed.role);
+      if (!role) {
         storage.removeItem(SESSION_STORAGE_KEY);
         continue;
       }
@@ -98,7 +109,12 @@ const readStoredSession = (): AuthSession | null => {
         continue;
       }
 
-      return parsed as AuthSession;
+      return {
+        token: parsed.token,
+        email: parsed.email,
+        role,
+        expiresAt: parsed.expiresAt
+      };
     } catch (error) {
       console.warn('Failed to parse persisted session:', error);
       storage.removeItem(SESSION_STORAGE_KEY);
@@ -198,11 +214,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       try {
         const response = await authApi.verifyCode(normalizedEmail, trimmedCode);
+        const normalizedRole = normalizeAccountRole(response.role);
+        const resolvedRole = normalizedRole ?? 'user';
+        if (!normalizedRole) {
+          console.warn('Получена неизвестная роль, по умолчанию используем user:', response.role);
+        }
         const expiresAt = Date.now() + (remember ? LONG_SESSION_MS : SHORT_SESSION_MS);
         const nextSession: AuthSession = {
           token: response.token,
           email: response.email,
-          role: response.role,
+          role: resolvedRole,
           expiresAt
         };
         setSession(nextSession);
