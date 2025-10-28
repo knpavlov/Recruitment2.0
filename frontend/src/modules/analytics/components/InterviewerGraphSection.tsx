@@ -28,6 +28,7 @@ interface InterviewerGraphSectionProps {
   onDownload: () => void;
 }
 
+const DEFAULT_FROM_DATE = '2025-09-01';
 const WIDTH = 960;
 const HEIGHT = 320;
 const PADDING_X = 64;
@@ -199,9 +200,14 @@ export const InterviewerGraphSection = ({
     return <path key={key} d={path} fill="none" stroke={color} strokeWidth={2.4} strokeLinejoin="round" strokeLinecap="round" />;
   };
 
-  const defaultFrom = data ? data.range.start.slice(0, 10) : '';
+  const datasetFrom = data ? data.range.start.slice(0, 10) : '';
+  const fallbackFrom = datasetFrom
+    ? datasetFrom > DEFAULT_FROM_DATE
+      ? datasetFrom
+      : DEFAULT_FROM_DATE
+    : DEFAULT_FROM_DATE;
   const defaultTo = data ? data.range.end.slice(0, 10) : '';
-  const controlledFrom = from ?? defaultFrom;
+  const controlledFrom = from ?? fallbackFrom;
   const controlledTo = to ?? defaultTo;
   const [fromDraft, setFromDraft] = useState(controlledFrom);
   const [toDraft, setToDraft] = useState(controlledTo);

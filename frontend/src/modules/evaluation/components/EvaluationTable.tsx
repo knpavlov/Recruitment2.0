@@ -1,4 +1,4 @@
-import { ChangeEvent, useState } from 'react';
+import { ChangeEvent, useState, type SVGProps } from 'react';
 import styles from '../../../styles/EvaluationScreen.module.css';
 import { OfferVotesBar, type OfferVotesBreakdown } from './OfferVotesBar';
 
@@ -63,6 +63,30 @@ const DECISION_OPTIONS: Array<{ option: DecisionOption; label: string }> = [
   { option: 'reject', label: 'Reject' },
   { option: 'progress', label: 'Next round' }
 ];
+
+const PencilIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <path d="M4 20h4" />
+    <path d="M18.4 3.6a2 2 0 0 1 0 2.83L9.5 15.33 6 18l0.67-3.5 8.9-8.9a2 2 0 0 1 2.83 0Z" />
+    <path d="M13.5 6.5l4 4" />
+  </svg>
+);
+
+const EnvelopeIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <rect x="3" y="5.25" width="18" height="13.5" rx="2" />
+    <path d="M4.5 7l7.5 6 7.5-6" />
+  </svg>
+);
+
+const ChartIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <path d="M4 20.25h16" />
+    <path d="M7 17V9.5" />
+    <path d="M12 17V6.75" />
+    <path d="M17 17V11.5" />
+  </svg>
+);
 
 export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: EvaluationTableProps) => {
   const [openDecisionId, setOpenDecisionId] = useState<string | null>(null);
@@ -130,7 +154,7 @@ export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: 
             const roundLabel = selectedRoundOption?.label ?? `Round ${row.selectedRound}`;
             const isInvitesMenuOpen = openInvitesId === row.id;
             const isDecisionMenuOpen = openDecisionId === row.id;
-            const decisionButtonClassName = `${styles.actionButton} ${styles.decisionButton} ${
+            const decisionButtonClassName = `${styles.actionButton} ${styles.compactButton} ${styles.decisionButton} ${
               row.decisionState === 'offer'
                 ? styles.decisionOffer
                 : row.decisionState === 'accepted-offer'
@@ -244,106 +268,101 @@ export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: 
                 </td>
                 <td>{row.processLabel}</td>
                 <td className={styles.actionsCell}>
-                  <div className={styles.actionsGrid}>
-                    <div className={styles.actionCell}>
-                      <button
-                        type="button"
-                        className={`${styles.actionButton} ${styles.neutralButton}`}
-                        onClick={() => {
-                          closeMenus();
-                          row.onEdit();
-                        }}
-                      >
-                        Edit
-                      </button>
-                    </div>
-                    <div className={styles.actionCell}>
-                      <div className={styles.buttonWithMenu}>
+                  <button
+                    type="button"
+                    className={`${styles.actionButton} ${styles.iconOnlyButton} ${styles.neutralButton}`}
+                    onClick={() => {
+                      closeMenus();
+                      row.onEdit();
+                    }}
+                    aria-label="Edit evaluation"
+                  >
+                    <PencilIcon className={styles.iconGlyph} aria-hidden="true" />
+                    <span className={styles.visuallyHidden}>Edit evaluation</span>
+                  </button>
+                  <div className={`${styles.buttonWithMenu} ${styles.inviteButtonWrapper}`}>
+                    <button
+                      type="button"
+                      className={`${styles.actionButton} ${styles.compactButton} ${styles.neutralButton}`}
+                      onClick={handleInvitesClick}
+                      disabled={row.invitesDisabled}
+                      data-tooltip={row.invitesTooltip ?? undefined}
+                    >
+                      <EnvelopeIcon className={styles.iconGlyph} aria-hidden="true" />
+                      <span className={styles.buttonLabel}>{row.invitesButtonLabel}</span>
+                    </button>
+                    {row.hasInvitations && isInvitesMenuOpen && (
+                      <div className={styles.dropdownMenu}>
+                        <label className={styles.inviteOption}>
+                          <input
+                            type="checkbox"
+                            checked={allSelected}
+                            onChange={(event) => toggleSelectAll(event.target.checked)}
+                          />
+                          <span>Select all</span>
+                        </label>
+                        <div className={styles.inviteOptions}>
+                          {row.invitees.map((invitee) => {
+                            const checked = selectionSet.has(invitee.slotId);
+                            return (
+                              <label key={invitee.slotId} className={styles.inviteOption}>
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => toggleInvitee(invitee.slotId)}
+                                />
+                                <span>{invitee.label}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
                         <button
                           type="button"
-                          className={`${styles.actionButton} ${styles.neutralButton}`}
-                          onClick={handleInvitesClick}
-                          disabled={row.invitesDisabled}
-                          data-tooltip={row.invitesTooltip ?? undefined}
+                          className={`${styles.actionButton} ${styles.dropdownSendButton}`}
+                          onClick={handleSendSelection}
+                          disabled={selectionSet.size === 0}
                         >
-                          {row.invitesButtonLabel}
+                          Send
                         </button>
-                        {row.hasInvitations && isInvitesMenuOpen && (
-                          <div className={styles.dropdownMenu}>
-                            <label className={styles.inviteOption}>
-                              <input
-                                type="checkbox"
-                                checked={allSelected}
-                                onChange={(event) => toggleSelectAll(event.target.checked)}
-                              />
-                              <span>Select all</span>
-                            </label>
-                            <div className={styles.inviteOptions}>
-                              {row.invitees.map((invitee) => {
-                                const checked = selectionSet.has(invitee.slotId);
-                                return (
-                                  <label key={invitee.slotId} className={styles.inviteOption}>
-                                    <input
-                                      type="checkbox"
-                                      checked={checked}
-                                      onChange={() => toggleInvitee(invitee.slotId)}
-                                    />
-                                    <span>{invitee.label}</span>
-                                  </label>
-                                );
-                              })}
-                            </div>
-                            <button
-                              type="button"
-                              className={`${styles.actionButton} ${styles.dropdownSendButton}`}
-                              onClick={handleSendSelection}
-                              disabled={selectionSet.size === 0}
-                            >
-                              Send
-                            </button>
-                          </div>
-                        )}
                       </div>
-                    </div>
-                    <div className={styles.actionCell}>
-                      <button
-                        type="button"
-                        className={`${styles.actionButton} ${styles.neutralButton}`}
-                        onClick={() => {
-                          closeMenus();
-                          row.onOpenStatus();
-                        }}
-                      >
-                        Results
-                      </button>
-                    </div>
-                    <div className={styles.actionCell}>
-                      <div className={styles.buttonWithMenu}>
-                        <button
-                          type="button"
-                          className={decisionButtonClassName}
-                          onClick={handleDecisionToggle}
-                          disabled={row.decisionDisabled}
-                          data-tooltip={row.decisionDisabled ? row.decisionTooltip : undefined}
-                        >
-                          {row.decisionLabel}
-                        </button>
-                        {isDecisionMenuOpen && (
-                          <div className={styles.dropdownMenu}>
-                            {DECISION_OPTIONS.map((item) => (
-                              <button
-                                key={item.option}
-                                type="button"
-                                className={styles.dropdownItem}
-                                onClick={() => handleDecisionSelect(item.option)}
-                              >
-                                {item.label}
-                              </button>
-                            ))}
-                          </div>
-                        )}
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    className={`${styles.actionButton} ${styles.iconOnlyButton} ${styles.neutralButton}`}
+                    onClick={() => {
+                      closeMenus();
+                      row.onOpenStatus();
+                    }}
+                    aria-label="View results"
+                  >
+                    <ChartIcon className={styles.iconGlyph} aria-hidden="true" />
+                    <span className={styles.visuallyHidden}>View results</span>
+                  </button>
+                  <div className={styles.buttonWithMenu}>
+                    <button
+                      type="button"
+                      className={decisionButtonClassName}
+                      onClick={handleDecisionToggle}
+                      disabled={row.decisionDisabled}
+                      data-tooltip={row.decisionDisabled ? row.decisionTooltip : undefined}
+                    >
+                      <span className={styles.buttonLabel}>{row.decisionLabel}</span>
+                    </button>
+                    {isDecisionMenuOpen && (
+                      <div className={styles.dropdownMenu}>
+                        {DECISION_OPTIONS.map((item) => (
+                          <button
+                            key={item.option}
+                            type="button"
+                            className={styles.dropdownItem}
+                            onClick={() => handleDecisionSelect(item.option)}
+                          >
+                            {item.label}
+                          </button>
+                        ))}
                       </div>
-                    </div>
+                    )}
                   </div>
                 </td>
               </tr>

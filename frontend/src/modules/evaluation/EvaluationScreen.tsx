@@ -299,7 +299,7 @@ export const EvaluationScreen = () => {
         invitesTooltip = 'Complete all interviewer, case and fit question assignments before sending invites.';
       }
 
-      const invitesButtonLabel = evaluation.invitationState.hasInvitations ? 'Send Invites Again' : 'Send Invites';
+      const invitesButtonLabel = evaluation.invitationState.hasInvitations ? 'Resend Invites' : 'Send Invites';
       const hasInvitations = evaluation.invitationState.hasInvitations && !isHistoricalView;
       if (!invitesDisabled && hasInvitations && evaluation.invitationState.hasPendingChanges) {
         invitesTooltip = 'Select interviewers to resend updated invites.';
