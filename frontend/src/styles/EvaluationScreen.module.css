@@ -56,23 +56,36 @@
   border-radius: 24px;
   background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(16px);
-  padding: 24px;
+  padding: 20px 18px;
 }
 
 .table {
   width: 100%;
   border-collapse: collapse;
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 .table th,
 .table td {
-  padding: 16px;
+  padding: 10px 8px;
   text-align: left;
   border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+  vertical-align: middle;
+}
+
+.table th {
+  white-space: nowrap;
 }
 
 .actionsHeader {
-  width: 360px;
+  width: 150px;
+  text-align: right;
+}
+
+.decisionHeader {
+  width: 160px;
+  text-align: right;
 }
 
 .sortButton {
@@ -96,19 +109,24 @@
   font-size: 12px;
 }
 
+
 .actionsCell {
-  padding: 0;
-}
-
-.actionsGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  align-items: stretch;
-}
-
-.actionCell {
+  padding: 8px;
   display: flex;
+  justify-content: flex-end;
+}
+
+.actionColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.decisionCell,
+.statusCell {
+  padding: 8px;
+  text-align: right;
 }
 
 .actionButton {
@@ -116,14 +134,13 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 8px 16px;
-  border-radius: 12px;
+  padding: 6px 12px;
+  border-radius: 10px;
   border: none;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
-  width: 100%;
 }
 
 .actionButton:not(:disabled):hover,
@@ -150,25 +167,35 @@
   border-color: rgba(148, 163, 184, 0.28);
 }
 
+.compactButton {
+  padding: 6px 10px;
+  gap: 6px;
+}
+
+.iconButton {
+  width: 34px;
+  height: 34px;
+  padding: 6px;
+}
+
+.buttonIcon {
+  flex-shrink: 0;
+}
+
 .buttonWithMenu {
   position: relative;
   display: inline-flex;
-  width: 100%;
-}
-
-.buttonWithMenu > button {
-  width: 100%;
 }
 
 .dropdownMenu {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + 6px);
   right: 0;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 12px;
-  min-width: 260px;
+  padding: 10px;
+  min-width: 220px;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.95);
   box-shadow: 0 16px 32px rgba(15, 23, 42, 0.18);
@@ -179,7 +206,7 @@
 .inviteOptions {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   max-height: 240px;
   overflow-y: auto;
   padding-right: 4px;
@@ -189,7 +216,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
+  font-size: 13px;
   color: #0f172a;
 }
 
@@ -198,13 +225,24 @@
   height: 16px;
 }
 
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
 .dropdownItem {
   border: none;
   background: rgba(148, 163, 184, 0.14);
   color: #0f172a;
-  padding: 10px 14px;
+  padding: 8px 12px;
   border-radius: 10px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   text-align: left;
   cursor: pointer;
@@ -222,10 +260,13 @@
   border-radius: 10px;
   background: linear-gradient(135deg, #2563eb, #3b82f6);
   color: #ffffff;
-  padding: 10px 14px;
-  font-size: 14px;
+  padding: 8px 12px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .dropdownSendButton:disabled {
@@ -237,6 +278,8 @@
 .decisionButton {
   color: #ffffff;
   border: none;
+  min-width: 150px;
+  justify-content: center;
 }
 
 .decisionButton:disabled {
@@ -266,6 +309,52 @@
   background: linear-gradient(135deg, #b91c1c, #f97316);
 }
 
+.statusButton {
+  background: linear-gradient(135deg, #0284c7, #38bdf8);
+  color: #0f172a;
+  border: none;
+  min-width: 150px;
+  justify-content: center;
+}
+
+.statusButton:disabled {
+  background: rgba(14, 165, 233, 0.2);
+  color: #0f172a;
+  border: 1px solid rgba(14, 165, 233, 0.35);
+}
+
+.statusButton[data-loading='true'] {
+  color: transparent;
+}
+
+.statusButton[data-loading='true']::after {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.7);
+  border-top-color: rgba(15, 23, 42, 0.85);
+  animation: evaluationSpin 0.8s linear infinite;
+}
+
+.statusPlaceholder {
+  display: inline-flex;
+  justify-content: flex-end;
+  min-width: 150px;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+@keyframes evaluationSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .roundSelect {
   padding: 8px 12px;
   border-radius: 10px;
@@ -276,13 +365,13 @@
 
 
 @media (max-width: 960px) {
-  .actionsGrid {
-    grid-template-columns: 1fr;
-    gap: 10px;
+  .actionColumn {
+    align-items: stretch;
   }
 
-  .dropdownMenu {
-    min-width: 220px;
+  .iconButton {
+    width: 32px;
+    height: 32px;
   }
 }
 

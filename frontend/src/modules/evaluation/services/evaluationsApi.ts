@@ -9,7 +9,8 @@ import {
   EvaluationInvitationState,
   InvitationSlotState,
   InvitationDeliveryReport,
-  InvitationDeliveryFailure
+  InvitationDeliveryFailure,
+  OfferDecisionStatus
 } from '../../../shared/types/evaluation';
 
 const normalizeString = (value: unknown): string | undefined => {
@@ -76,6 +77,23 @@ const normalizeDecision = (
   return undefined;
 };
 
+const normalizeOfferStatus = (value: unknown): OfferDecisionStatus | null | undefined => {
+  if (value === null) {
+    return null;
+  }
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) {
+    return undefined;
+  }
+  const allowed: OfferDecisionStatus[] = ['pending', 'accepted', 'accepted-co', 'declined-co', 'declined'];
+  return allowed.includes(normalized as OfferDecisionStatus)
+    ? (normalized as OfferDecisionStatus)
+    : undefined;
+};
+
 const normalizeRoundHistory = (value: unknown): EvaluationRoundSnapshot[] => {
   if (!Array.isArray(value)) {
     return [];
@@ -110,7 +128,8 @@ const normalizeRoundHistory = (value: unknown): EvaluationRoundSnapshot[] => {
       processStartedAt: normalizeIsoString(payload.processStartedAt),
       completedAt: normalizeIsoString(payload.completedAt),
       createdAt: normalizeIsoString(payload.createdAt) ?? new Date().toISOString(),
-      decision: normalizeDecision(payload.decision)
+      decision: normalizeDecision(payload.decision),
+      offerStatus: normalizeOfferStatus(payload.offerStatus)
     });
   }
   return rounds.sort((a, b) => a.roundNumber - b.roundNumber);
@@ -330,7 +349,8 @@ const normalizeEvaluation = (value: unknown): EvaluationConfig | null => {
     processStartedAt: normalizeIsoString(payload.processStartedAt),
     roundHistory: normalizeRoundHistory(payload.roundHistory),
     invitationState: normalizeInvitationState(payload.invitationState),
-    decision: normalizeDecision(payload.decision)
+    decision: normalizeDecision(payload.decision),
+    offerStatus: normalizeOfferStatus(payload.offerStatus) ?? null
   };
 };
 
@@ -409,6 +429,7 @@ const serializeRoundHistory = (history: EvaluationRoundSnapshot[]) =>
     processStartedAt: round.processStartedAt ?? null,
     completedAt: round.completedAt ?? null,
     decision: round.decision ?? null,
+    offerStatus: round.offerStatus ?? null,
     interviews: round.interviews.map((slot) => ({
       ...slot,
       caseFolderId: slot.caseFolderId ?? null,
@@ -474,7 +495,8 @@ const serializeEvaluation = (config: EvaluationConfig) => ({
   processStatus: config.processStatus,
   processStartedAt: config.processStartedAt ?? null,
   roundHistory: serializeRoundHistory(config.roundHistory),
-  decision: config.decision ?? null
+  decision: config.decision ?? null,
+  offerStatus: config.offerStatus ?? null
 });
 
 export const evaluationsApi = {
@@ -521,6 +543,13 @@ export const evaluationsApi = {
       await apiRequest<unknown>(`/evaluations/${id}/decision`, {
         method: 'POST',
         body: { decision, expectedVersion }
+      })
+    ),
+  setOfferStatus: async (id: string, status: OfferDecisionStatus, expectedVersion: number) =>
+    ensureEvaluation(
+      await apiRequest<unknown>(`/evaluations/${id}/offer-status`, {
+        method: 'POST',
+        body: { status, expectedVersion }
       })
     ),
   remove: async (id: string) =>
