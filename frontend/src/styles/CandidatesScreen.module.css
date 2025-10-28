@@ -82,20 +82,35 @@
   border-radius: 24px;
   background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(16px);
-  padding: 24px;
+  padding: 20px 18px;
   overflow-x: auto;
 }
 
 .table {
   width: 100%;
   border-collapse: collapse;
+  font-size: 13px;
 }
 
 .table th,
 .table td {
-  padding: 16px;
+  padding: 10px 8px;
   text-align: left;
   border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+  vertical-align: top;
+  line-height: 1.4;
+}
+
+.table td {
+  word-break: break-word;
+}
+
+.table th {
+  white-space: nowrap;
+}
+
+.table td:nth-child(10) {
+  word-break: break-all;
 }
 
 .sortButton {
@@ -108,6 +123,7 @@
   font: inherit;
   color: inherit;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .sortButtonActive {
@@ -119,27 +135,52 @@
   font-size: 12px;
 }
 
+.resumeHeader {
+  width: 110px;
+}
+
+.resumeCell {
+  white-space: nowrap;
+}
+
 .actionsHeader {
-  width: 160px;
+  width: 130px;
 }
 
 .actionsCell {
   display: flex;
-  gap: 12px;
+  gap: 8px;
 }
 
 .tableSecondaryButton {
-  padding: 10px 16px;
+  padding: 6px 12px;
   border-radius: 12px;
   border: none;
   background: rgba(148, 163, 184, 0.2);
   color: #0f172a;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .resumePlaceholder {
   color: #64748b;
   font-size: 13px;
+  white-space: nowrap;
+}
+
+@media (max-width: 1280px) {
+  .table {
+    font-size: 12px;
+  }
+
+  .table th,
+  .table td {
+    padding: 8px 6px;
+  }
+
+  .actionsHeader {
+    width: 120px;
+  }
 }
 
 .emptyState {

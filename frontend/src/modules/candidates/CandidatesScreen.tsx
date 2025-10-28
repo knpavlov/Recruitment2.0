@@ -98,9 +98,6 @@ export const CandidatesScreen = () => {
         case 'email':
           result = compareStrings(a.email, b.email);
           break;
-        case 'totalExperience':
-          result = compareNumbers(a.totalExperienceYears, b.totalExperienceYears);
-          break;
         case 'updatedAt':
           result = new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
           break;
@@ -132,13 +129,6 @@ export const CandidatesScreen = () => {
   const formatText = (value?: string | null) => {
     const trimmed = value?.trim();
     return trimmed && trimmed.length > 0 ? trimmed : '—';
-  };
-
-  const formatExperience = (value?: number | null) => {
-    if (value == null) {
-      return '—';
-    }
-    return value === 1 ? '1 yr' : `${value} yrs`;
   };
 
   const downloadResumeFile = useCallback((resume: CandidateResume) => {
@@ -185,7 +175,6 @@ export const CandidatesScreen = () => {
           targetOffice: formatText(candidate.targetOffice),
           phone: formatText(candidate.phone),
           email: formatText(candidate.email),
-          totalExperience: formatExperience(candidate.totalExperienceYears),
           updatedAt: candidate.updatedAt,
           hasResume: Boolean(resume),
           onOpen: () => openCandidate(candidate),

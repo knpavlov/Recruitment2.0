@@ -24,7 +24,7 @@
 
 .content {
   display: grid;
-  grid-template-columns: 320px 1fr;
+  grid-template-columns: 300px 1fr;
   gap: 24px;
   flex: 1;
   min-height: 0;
@@ -198,21 +198,23 @@
 
 .detailColumns {
   display: grid;
-  grid-template-columns: 320px 1fr;
-  gap: 24px;
+  grid-template-columns: minmax(240px, 280px) minmax(0, 1fr);
+  gap: 20px;
   align-items: flex-start;
 }
 
 .infoColumn {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 20px;
+  max-width: 280px;
 }
 
 .formColumn {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-width: 0;
 }
 
 .detailHeader {
@@ -244,8 +246,8 @@
 .infoCard {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 16px;
+  gap: 10px;
+  padding: 14px;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   background: #f8fafc;
@@ -616,6 +618,21 @@
 
 .offerOption input {
   accent-color: #4338ca;
+}
+
+.offerOptionSelected {
+  border-color: transparent;
+  background: linear-gradient(135deg, #1e1b4b, #312e81);
+  box-shadow: 0 12px 28px rgba(30, 27, 75, 0.38);
+  color: #ffffff;
+}
+
+.offerOptionSelected span {
+  color: inherit;
+}
+
+.offerOptionSelected input {
+  accent-color: #ffffff;
 }
 
 @media (max-width: 768px) {
