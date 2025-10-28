@@ -55,6 +55,26 @@ const normalizeInterviewerRole = (value: unknown): InterviewerSeniority | null =
     : null;
 };
 
+const normalizeAccountRole = (value: unknown): AccountRecord['role'] => {
+  if (typeof value !== 'string') {
+    // Неизвестное значение роли трактуем как роль пользователя.
+    return 'user';
+  }
+
+  switch (value.trim().toLowerCase()) {
+    case 'super-admin':
+    case 'super_admin':
+    case 'superadmin':
+      return 'super-admin';
+    case 'admin':
+    case 'administrator':
+      return 'admin';
+    case 'user':
+    default:
+      return 'user';
+  }
+};
+
 const mapRowToAccount = (row: any): AccountRecord => {
   const displayName = typeof row.display_name === 'string' ? row.display_name.trim() : '';
   const legacyName = readLegacyName(row);
@@ -67,7 +87,7 @@ const mapRowToAccount = (row: any): AccountRecord => {
   return {
     id: row.id,
     email: row.email,
-    role: row.role,
+    role: normalizeAccountRole(row.role),
     status: row.status,
     interviewerRole: normalizeInterviewerRole(row.interviewer_role),
     name: fallbackName || undefined,
