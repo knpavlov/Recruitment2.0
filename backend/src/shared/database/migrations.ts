@@ -219,7 +219,8 @@ const createTables = async () => {
       process_status TEXT NOT NULL DEFAULT 'draft',
       process_started_at TIMESTAMPTZ,
       round_history JSONB NOT NULL DEFAULT '[]'::JSONB,
-      decision TEXT
+      decision TEXT,
+      decision_status TEXT
     );
   `);
 
@@ -234,7 +235,14 @@ const createTables = async () => {
       ADD COLUMN IF NOT EXISTS process_status TEXT NOT NULL DEFAULT 'draft',
       ADD COLUMN IF NOT EXISTS process_started_at TIMESTAMPTZ,
       ADD COLUMN IF NOT EXISTS round_history JSONB NOT NULL DEFAULT '[]'::JSONB,
-      ADD COLUMN IF NOT EXISTS decision TEXT;
+      ADD COLUMN IF NOT EXISTS decision TEXT,
+      ADD COLUMN IF NOT EXISTS decision_status TEXT;
+  `);
+
+  await postgresPool.query(`
+    UPDATE evaluations
+       SET decision_status = COALESCE(decision_status, 'pending')
+     WHERE decision_status IS NULL;
   `);
 
   await postgresPool.query(`

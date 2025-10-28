@@ -1,6 +1,11 @@
 import { ChangeEvent, useState } from 'react';
 import styles from '../../../styles/EvaluationScreen.module.css';
 import { OfferVotesBar, type OfferVotesBreakdown } from './OfferVotesBar';
+import { EditIcon } from '../../../components/icons/EditIcon';
+import { SendIcon } from '../../../components/icons/SendIcon';
+import { ResultsIcon } from '../../../components/icons/ResultsIcon';
+import { OfferDecisionStatus } from '../../../shared/types/evaluation';
+import { AverageScoreBar } from './AverageScoreBar';
 
 type DecisionOption = 'offer' | 'accepted-offer' | 'progress' | 'reject';
 
@@ -37,6 +42,12 @@ export interface EvaluationTableRow {
   decisionLabel: string;
   decisionState: DecisionOption | null;
   onDecisionSelect: (option: DecisionOption) => void;
+  statusLabel: string;
+  statusState: OfferDecisionStatus;
+  statusDisabled: boolean;
+  statusTooltip?: string;
+  isStatusPending: boolean;
+  onStatusSelect: (status: OfferDecisionStatus) => void;
 }
 
 export interface EvaluationTableProps {
@@ -64,14 +75,24 @@ const DECISION_OPTIONS: Array<{ option: DecisionOption; label: string }> = [
   { option: 'progress', label: 'Next round' }
 ];
 
+const STATUS_OPTIONS: Array<{ value: OfferDecisionStatus; label: string }> = [
+  { value: 'pending', label: 'Pending' },
+  { value: 'accepted', label: 'Accepted' },
+  { value: 'accepted-co', label: 'Accepted (CO)' },
+  { value: 'declined', label: 'Declined' },
+  { value: 'declined-co', label: 'Declined (CO)' }
+];
+
 export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: EvaluationTableProps) => {
   const [openDecisionId, setOpenDecisionId] = useState<string | null>(null);
   const [openInvitesId, setOpenInvitesId] = useState<string | null>(null);
+  const [openStatusId, setOpenStatusId] = useState<string | null>(null);
   const [inviteSelections, setInviteSelections] = useState<Record<string, string[]>>({});
 
   const closeMenus = () => {
     setOpenDecisionId(null);
     setOpenInvitesId(null);
+    setOpenStatusId(null);
   };
 
   if (rows.length === 0) {
@@ -119,18 +140,25 @@ export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: 
             </th>
             <th>Process</th>
             <th className={styles.actionsHeader}>Actions</th>
+            <th className={styles.decisionHeader}>Decision</th>
+            <th>
+              <span className={styles.columnHeaderWithTooltip}>
+                Status
+                <span className={styles.tooltipTrigger} data-tooltip="CO stands for cross offer.">
+                  ⓘ
+                </span>
+              </span>
+            </th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => {
             const formsLabel = `${row.formsCompleted}/${row.formsPlanned}`;
-            const avgFitLabel = row.avgFitScore != null ? row.avgFitScore.toFixed(1) : '—';
-            const avgCaseLabel = row.avgCaseScore != null ? row.avgCaseScore.toFixed(1) : '—';
             const selectedRoundOption = row.roundOptions.find((option) => option.value === row.selectedRound);
             const roundLabel = selectedRoundOption?.label ?? `Round ${row.selectedRound}`;
             const isInvitesMenuOpen = openInvitesId === row.id;
             const isDecisionMenuOpen = openDecisionId === row.id;
-            const decisionButtonClassName = `${styles.actionButton} ${styles.decisionButton} ${
+            const decisionButtonClassName = `${styles.actionButton} ${styles.compactButton} ${styles.decisionButton} ${
               row.decisionState === 'offer'
                 ? styles.decisionOffer
                 : row.decisionState === 'accepted-offer'
@@ -192,6 +220,7 @@ export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: 
                 return;
               }
               setOpenDecisionId(null);
+              setOpenStatusId(null);
               setInviteSelections((prev) => ({
                 ...prev,
                 [row.id]: row.invitees.map((item) => item.slotId)
@@ -210,6 +239,7 @@ export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: 
                 return;
               }
               setOpenInvitesId(null);
+              setOpenStatusId(null);
               setOpenDecisionId((current) => (current === row.id ? null : row.id));
             };
 
@@ -236,114 +266,168 @@ export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: 
                     roundLabel
                   )}
                 </td>
-                <td>{avgFitLabel}</td>
-                <td>{avgCaseLabel}</td>
+                <td>
+                  <AverageScoreBar value={row.avgFitScore} variant="fit" />
+                </td>
+                <td>
+                  <AverageScoreBar value={row.avgCaseScore} variant="case" />
+                </td>
                 <td>{formsLabel}</td>
                 <td>
                   <OfferVotesBar counts={row.offerBreakdown} />
                 </td>
                 <td>{row.processLabel}</td>
                 <td className={styles.actionsCell}>
-                  <div className={styles.actionsGrid}>
-                    <div className={styles.actionCell}>
+                  <div className={styles.actionToolbar} role="group" aria-label="Действия с оценкой">
+                    <button
+                      type="button"
+                      className={`${styles.actionButton} ${styles.iconButton} ${styles.neutralButton}`}
+                      onClick={() => {
+                        closeMenus();
+                        row.onEdit();
+                      }}
+                      aria-label="Редактировать оценку"
+                    >
+                      <EditIcon width={16} height={16} />
+                      <span className={styles.srOnly}>Редактировать</span>
+                    </button>
+                    <div className={styles.buttonWithMenu}>
                       <button
                         type="button"
-                        className={`${styles.actionButton} ${styles.neutralButton}`}
-                        onClick={() => {
-                          closeMenus();
-                          row.onEdit();
-                        }}
+                        className={`${styles.actionButton} ${styles.iconButton} ${styles.neutralButton}`}
+                        onClick={handleInvitesClick}
+                        disabled={row.invitesDisabled}
+                        data-tooltip={row.invitesTooltip ?? undefined}
+                        aria-label={row.invitesButtonLabel}
                       >
-                        Edit
-                      </button>
-                    </div>
-                    <div className={styles.actionCell}>
-                      <div className={styles.buttonWithMenu}>
-                        <button
-                          type="button"
-                          className={`${styles.actionButton} ${styles.neutralButton}`}
-                          onClick={handleInvitesClick}
-                          disabled={row.invitesDisabled}
-                          data-tooltip={row.invitesTooltip ?? undefined}
-                        >
-                          {row.invitesButtonLabel}
-                        </button>
-                        {row.hasInvitations && isInvitesMenuOpen && (
-                          <div className={styles.dropdownMenu}>
-                            <label className={styles.inviteOption}>
-                              <input
-                                type="checkbox"
-                                checked={allSelected}
-                                onChange={(event) => toggleSelectAll(event.target.checked)}
-                              />
-                              <span>Select all</span>
-                            </label>
-                            <div className={styles.inviteOptions}>
-                              {row.invitees.map((invitee) => {
-                                const checked = selectionSet.has(invitee.slotId);
-                                return (
-                                  <label key={invitee.slotId} className={styles.inviteOption}>
-                                    <input
-                                      type="checkbox"
-                                      checked={checked}
-                                      onChange={() => toggleInvitee(invitee.slotId)}
-                                    />
-                                    <span>{invitee.label}</span>
-                                  </label>
-                                );
-                              })}
-                            </div>
-                            <button
-                              type="button"
-                              className={`${styles.actionButton} ${styles.dropdownSendButton}`}
-                              onClick={handleSendSelection}
-                              disabled={selectionSet.size === 0}
-                            >
-                              Send
-                            </button>
-                          </div>
+                        {row.hasInvitations ? (
+                          <span className={styles.resendIconWrapper}>
+                            <SendIcon width={16} height={16} className={styles.buttonIcon} />
+                            <span className={styles.resendBadge}>✓</span>
+                            <span className={styles.srOnly}>Already sent</span>
+                          </span>
+                        ) : (
+                          <SendIcon width={16} height={16} className={styles.buttonIcon} />
                         )}
-                      </div>
-                    </div>
-                    <div className={styles.actionCell}>
-                      <button
-                        type="button"
-                        className={`${styles.actionButton} ${styles.neutralButton}`}
-                        onClick={() => {
-                          closeMenus();
-                          row.onOpenStatus();
-                        }}
-                      >
-                        Results
                       </button>
-                    </div>
-                    <div className={styles.actionCell}>
-                      <div className={styles.buttonWithMenu}>
-                        <button
-                          type="button"
-                          className={decisionButtonClassName}
-                          onClick={handleDecisionToggle}
-                          disabled={row.decisionDisabled}
-                          data-tooltip={row.decisionDisabled ? row.decisionTooltip : undefined}
-                        >
-                          {row.decisionLabel}
-                        </button>
-                        {isDecisionMenuOpen && (
-                          <div className={styles.dropdownMenu}>
-                            {DECISION_OPTIONS.map((item) => (
-                              <button
-                                key={item.option}
-                                type="button"
-                                className={styles.dropdownItem}
-                                onClick={() => handleDecisionSelect(item.option)}
-                              >
-                                {item.label}
-                              </button>
-                            ))}
+                      {row.hasInvitations && isInvitesMenuOpen && (
+                        <div className={styles.dropdownMenu}>
+                          <label className={styles.inviteOption}>
+                            <input
+                              type="checkbox"
+                              checked={allSelected}
+                              onChange={(event) => toggleSelectAll(event.target.checked)}
+                            />
+                            <span>Select all</span>
+                          </label>
+                          <div className={styles.inviteOptions}>
+                            {row.invitees.map((invitee) => {
+                              const checked = selectionSet.has(invitee.slotId);
+                              return (
+                                <label key={invitee.slotId} className={styles.inviteOption}>
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={() => toggleInvitee(invitee.slotId)}
+                                  />
+                                  <span>{invitee.label}</span>
+                                </label>
+                              );
+                            })}
                           </div>
-                        )}
-                      </div>
+                          <button
+                            type="button"
+                            className={`${styles.actionButton} ${styles.compactButton} ${styles.dropdownSendButton}`}
+                            onClick={handleSendSelection}
+                            disabled={selectionSet.size === 0}
+                          >
+                            Send
+                          </button>
+                        </div>
+                      )}
                     </div>
+                    <button
+                      type="button"
+                      className={`${styles.actionButton} ${styles.iconButton} ${styles.neutralButton}`}
+                      onClick={() => {
+                        closeMenus();
+                        row.onOpenStatus();
+                      }}
+                      aria-label="Открыть итоги"
+                    >
+                      <ResultsIcon width={16} height={16} />
+                      <span className={styles.srOnly}>Результаты</span>
+                    </button>
+                  </div>
+                </td>
+                <td className={styles.decisionCell}>
+                  <div className={styles.buttonWithMenu}>
+                    <button
+                      type="button"
+                      className={decisionButtonClassName}
+                      onClick={handleDecisionToggle}
+                      disabled={row.decisionDisabled}
+                      data-tooltip={row.decisionDisabled ? row.decisionTooltip : undefined}
+                    >
+                      {row.decisionLabel}
+                    </button>
+                    {isDecisionMenuOpen && (
+                      <div className={styles.dropdownMenu}>
+                        {DECISION_OPTIONS.map((item) => (
+                          <button
+                            key={item.option}
+                            type="button"
+                            className={styles.dropdownItem}
+                            onClick={() => handleDecisionSelect(item.option)}
+                          >
+                            {item.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </td>
+                <td>
+                  <div
+                    className={styles.buttonWithMenu}
+                    data-tooltip={row.statusTooltip && (openStatusId === row.id ? undefined : row.statusTooltip)}
+                  >
+                    <button
+                      type="button"
+                      className={`${styles.actionButton} ${styles.statusButton}`}
+                      onClick={() => {
+                        if (row.statusDisabled || row.isStatusPending) {
+                          return;
+                        }
+                        const isOpen = openStatusId === row.id;
+                        setOpenInvitesId(null);
+                        setOpenDecisionId(null);
+                        setOpenStatusId(isOpen ? null : row.id);
+                      }}
+                      disabled={row.statusDisabled || row.isStatusPending}
+                      aria-expanded={openStatusId === row.id}
+                    >
+                      {row.statusLabel}
+                    </button>
+                    {openStatusId === row.id && !row.statusDisabled && (
+                      <div className={styles.dropdownMenu}>
+                        {STATUS_OPTIONS.map((option) => (
+                          <button
+                            key={option.value}
+                            type="button"
+                            className={`${styles.dropdownItem} ${
+                              option.value === row.statusState ? styles.dropdownItemActive : ''
+                            }`}
+                            onClick={() => {
+                              closeMenus();
+                              row.onStatusSelect(option.value);
+                            }}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </td>
               </tr>
