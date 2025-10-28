@@ -62,11 +62,10 @@ export const OfferVotesBar = ({ counts }: { counts: OfferVotesBreakdown }) => {
     .join('; ');
 
   return (
-    <div className={styles.wrapper} aria-label={`Offer votes — ${ariaLabel}`}> 
+    <div className={styles.wrapper} aria-label={`Offer votes — ${ariaLabel}`}>
       <div className={styles.bar} role="img">
         {parts.length > 0 ? parts : <div className={styles.segmentFallback} />}
       </div>
-      <span className={styles.totalLabel}>{total}</span>
     </div>
   );
 };

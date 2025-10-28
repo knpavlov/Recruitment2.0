@@ -39,6 +39,13 @@ export type OfferRecommendationValue =
 
 export type EvaluationDecision = 'offer' | 'accepted-offer' | 'reject' | 'progress';
 
+export type EvaluationDecisionStatus =
+  | 'pending'
+  | 'accepted'
+  | 'accepted-cross-offer'
+  | 'declined'
+  | 'declined-cross-offer';
+
 export interface EvaluationConfig {
   id: string;
   candidateId?: string;
@@ -55,6 +62,7 @@ export interface EvaluationConfig {
   roundHistory: EvaluationRoundSnapshot[];
   invitationState: EvaluationInvitationState;
   decision?: 'offer' | 'accepted-offer' | 'reject' | 'progress' | null;
+  decisionStatus?: EvaluationDecisionStatus | null;
 }
 
 export interface EvaluationRoundSnapshot {
@@ -68,6 +76,7 @@ export interface EvaluationRoundSnapshot {
   completedAt?: string;
   createdAt: string;
   decision?: 'offer' | 'accepted-offer' | 'reject' | 'progress' | null;
+  decisionStatus?: EvaluationDecisionStatus | null;
 }
 
 export interface EvaluationInvitationState {
@@ -117,6 +126,7 @@ export interface InterviewerAssignmentView {
   form: InterviewStatusRecord | null;
   peerForms: InterviewPeerFormView[];
   decision?: EvaluationDecision | null;
+  decisionStatus?: EvaluationDecisionStatus | null;
 }
 
 export interface InterviewPeerFormView {

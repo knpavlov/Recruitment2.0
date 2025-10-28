@@ -1,0 +1,42 @@
+.wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 110px;
+}
+
+.track {
+  position: relative;
+  flex: 1;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.3);
+  overflow: hidden;
+}
+
+.value {
+  height: 100%;
+  transition: width 0.3s ease;
+  border-radius: inherit;
+}
+
+.valueFit {
+  background: linear-gradient(135deg, #8b5cf6, #6366f1);
+}
+
+.valueCase {
+  background: linear-gradient(135deg, #0ea5e9, #2563eb);
+}
+
+.label {
+  min-width: 40px;
+  text-align: right;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.empty {
+  color: #94a3b8;
+  font-size: 12px;
+}

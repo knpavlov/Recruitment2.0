@@ -41,6 +41,13 @@ export type OfferRecommendationValue =
 
 export type EvaluationDecision = 'offer' | 'accepted-offer' | 'reject' | 'progress';
 
+export type EvaluationDecisionStatus =
+  | 'pending'
+  | 'accepted'
+  | 'accepted-cross-offer'
+  | 'declined'
+  | 'declined-cross-offer';
+
 export type EvaluationProcessStatus = 'draft' | 'in-progress' | 'completed';
 
 export interface InterviewAssignmentModel {
@@ -62,6 +69,7 @@ export interface EvaluationRoundSnapshot {
   completedAt?: string;
   createdAt: string;
   decision?: EvaluationDecision | null;
+  decisionStatus?: EvaluationDecisionStatus | null;
 }
 
 export type InvitationSlotStatus = 'pending' | 'delivered' | 'stale' | 'failed' | 'unassigned';
@@ -129,6 +137,7 @@ export interface EvaluationRecord {
   roundHistory: EvaluationRoundSnapshot[];
   invitationState: EvaluationInvitationState;
   decision?: EvaluationDecision | null;
+  decisionStatus?: EvaluationDecisionStatus | null;
 }
 
 export interface EvaluationWriteModel {
@@ -143,6 +152,7 @@ export interface EvaluationWriteModel {
   processStartedAt?: string | null;
   roundHistory: EvaluationRoundSnapshot[];
   decision?: EvaluationDecision | null;
+  decisionStatus?: EvaluationDecisionStatus | null;
 }
 
 export interface InterviewPeerFormView {
@@ -168,4 +178,5 @@ export interface InterviewerAssignmentView {
   form: InterviewStatusModel | null;
   peerForms: InterviewPeerFormView[];
   decision?: EvaluationDecision | null;
+  decisionStatus?: EvaluationDecisionStatus | null;
 }

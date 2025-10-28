@@ -76,6 +76,24 @@ const normalizeDecision = (
   return undefined;
 };
 
+const normalizeDecisionStatus = (
+  value: unknown
+): EvaluationConfig['decisionStatus'] | undefined => {
+  if (
+    value === 'pending' ||
+    value === 'accepted' ||
+    value === 'accepted-cross-offer' ||
+    value === 'declined' ||
+    value === 'declined-cross-offer'
+  ) {
+    return value;
+  }
+  if (value === null) {
+    return null;
+  }
+  return undefined;
+};
+
 const normalizeRoundHistory = (value: unknown): EvaluationRoundSnapshot[] => {
   if (!Array.isArray(value)) {
     return [];
@@ -110,7 +128,8 @@ const normalizeRoundHistory = (value: unknown): EvaluationRoundSnapshot[] => {
       processStartedAt: normalizeIsoString(payload.processStartedAt),
       completedAt: normalizeIsoString(payload.completedAt),
       createdAt: normalizeIsoString(payload.createdAt) ?? new Date().toISOString(),
-      decision: normalizeDecision(payload.decision)
+      decision: normalizeDecision(payload.decision),
+      decisionStatus: normalizeDecisionStatus(payload.decisionStatus)
     });
   }
   return rounds.sort((a, b) => a.roundNumber - b.roundNumber);
@@ -330,7 +349,8 @@ const normalizeEvaluation = (value: unknown): EvaluationConfig | null => {
     processStartedAt: normalizeIsoString(payload.processStartedAt),
     roundHistory: normalizeRoundHistory(payload.roundHistory),
     invitationState: normalizeInvitationState(payload.invitationState),
-    decision: normalizeDecision(payload.decision)
+    decision: normalizeDecision(payload.decision),
+    decisionStatus: normalizeDecisionStatus(payload.decisionStatus)
   };
 };
 
@@ -521,6 +541,13 @@ export const evaluationsApi = {
       await apiRequest<unknown>(`/evaluations/${id}/decision`, {
         method: 'POST',
         body: { decision, expectedVersion }
+      })
+    ),
+  setDecisionStatus: async (id: string, status: EvaluationConfig['decisionStatus'], expectedVersion: number) =>
+    ensureEvaluation(
+      await apiRequest<unknown>(`/evaluations/${id}/decision-status`, {
+        method: 'POST',
+        body: { status, expectedVersion }
       })
     ),
   remove: async (id: string) =>

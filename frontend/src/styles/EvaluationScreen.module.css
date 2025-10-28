@@ -56,23 +56,37 @@
   border-radius: 24px;
   background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(16px);
-  padding: 24px;
+  padding: 20px 18px;
 }
 
 .table {
   width: 100%;
   border-collapse: collapse;
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 .table th,
 .table td {
-  padding: 16px;
+  padding: 10px 8px;
   text-align: left;
   border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+  vertical-align: middle;
+}
+
+.table th {
+  white-space: nowrap;
 }
 
 .actionsHeader {
-  width: 360px;
+  width: 160px;
+  text-align: right;
+}
+
+.decisionHeader,
+.statusHeader {
+  width: 140px;
+  text-align: right;
 }
 
 .sortButton {
@@ -96,19 +110,23 @@
   font-size: 12px;
 }
 
+
 .actionsCell {
-  padding: 0;
-}
-
-.actionsGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  align-items: stretch;
-}
-
-.actionCell {
+  padding: 8px;
   display: flex;
+  justify-content: flex-end;
+}
+
+.decisionCell,
+.statusCell {
+  padding: 8px;
+  text-align: right;
+}
+
+.actionToolbar {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .actionButton {
@@ -116,14 +134,13 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 8px 16px;
-  border-radius: 12px;
+  padding: 6px 12px;
+  border-radius: 10px;
   border: none;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
-  width: 100%;
 }
 
 .actionButton:not(:disabled):hover,
@@ -150,25 +167,74 @@
   border-color: rgba(148, 163, 184, 0.28);
 }
 
+.compactButton {
+  padding: 6px 10px;
+  gap: 6px;
+}
+
+.iconButton {
+  width: 34px;
+  height: 34px;
+  padding: 6px;
+}
+
+.sendButton {
+  border: 1px solid rgba(14, 165, 233, 0.35);
+  background: rgba(14, 165, 233, 0.18);
+  color: #0ea5e9;
+}
+
+.sendButton:disabled {
+  background: rgba(14, 165, 233, 0.12);
+  color: rgba(14, 165, 233, 0.55);
+  border-color: rgba(14, 165, 233, 0.18);
+}
+
+.iconStack {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.resendBadge {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #10b981;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.8);
+}
+
+.resendBadge svg {
+  width: 10px;
+  height: 10px;
+}
+
+.buttonIcon {
+  flex-shrink: 0;
+}
+
 .buttonWithMenu {
   position: relative;
   display: inline-flex;
-  width: 100%;
-}
-
-.buttonWithMenu > button {
-  width: 100%;
 }
 
 .dropdownMenu {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + 6px);
   right: 0;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 12px;
-  min-width: 260px;
+  padding: 10px;
+  min-width: 220px;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.95);
   box-shadow: 0 16px 32px rgba(15, 23, 42, 0.18);
@@ -179,7 +245,7 @@
 .inviteOptions {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   max-height: 240px;
   overflow-y: auto;
   padding-right: 4px;
@@ -189,7 +255,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
+  font-size: 13px;
   color: #0f172a;
 }
 
@@ -198,13 +264,24 @@
   height: 16px;
 }
 
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
 .dropdownItem {
   border: none;
   background: rgba(148, 163, 184, 0.14);
   color: #0f172a;
-  padding: 10px 14px;
+  padding: 8px 12px;
   border-radius: 10px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   text-align: left;
   cursor: pointer;
@@ -222,10 +299,13 @@
   border-radius: 10px;
   background: linear-gradient(135deg, #2563eb, #3b82f6);
   color: #ffffff;
-  padding: 10px 14px;
-  font-size: 14px;
+  padding: 8px 12px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .dropdownSendButton:disabled {
@@ -266,6 +346,31 @@
   background: linear-gradient(135deg, #b91c1c, #f97316);
 }
 
+.statusButton {
+  min-width: 132px;
+  justify-content: center;
+  background: rgba(37, 99, 235, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  color: #1d4ed8;
+}
+
+.statusButton:disabled {
+  background: rgba(148, 163, 184, 0.12);
+  border-color: rgba(148, 163, 184, 0.28);
+  color: #64748b;
+}
+
+.statusLabel {
+  display: inline-block;
+  min-width: 132px;
+  padding: 6px 12px;
+  border-radius: 10px;
+  background: rgba(148, 163, 184, 0.15);
+  color: #334155;
+  font-weight: 600;
+  text-align: center;
+}
+
 .roundSelect {
   padding: 8px 12px;
   border-radius: 10px;
@@ -276,13 +381,14 @@
 
 
 @media (max-width: 960px) {
-  .actionsGrid {
-    grid-template-columns: 1fr;
-    gap: 10px;
+  .actionToolbar {
+    flex-wrap: wrap;
+    justify-content: flex-end;
   }
 
-  .dropdownMenu {
-    min-width: 220px;
+  .iconButton {
+    width: 32px;
+    height: 32px;
   }
 }
 

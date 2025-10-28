@@ -172,4 +172,29 @@ export class AccountsService {
     }
     return removed;
   }
+
+  async updateAccountRole(id: string, role: AccountRole) {
+    if (role !== 'admin' && role !== 'user') {
+      throw new Error('INVALID_ROLE');
+    }
+
+    const account = await this.repository.findById(id);
+    if (!account) {
+      throw new Error('NOT_FOUND');
+    }
+
+    if (account.role === 'super-admin') {
+      throw new Error('FORBIDDEN');
+    }
+
+    if (account.role === role) {
+      return account;
+    }
+
+    const updated = await this.repository.updateRole(id, role);
+    if (!updated) {
+      throw new Error('NOT_FOUND');
+    }
+    return updated;
+  }
 }

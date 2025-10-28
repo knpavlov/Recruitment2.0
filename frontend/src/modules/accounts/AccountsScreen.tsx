@@ -14,7 +14,7 @@ const INTERVIEWER_ROLES: InterviewerSeniority[] = ['MD', 'SD', 'D', 'SM', 'M', '
 export const AccountsScreen = () => {
   const { session } = useAuth();
   const role = session?.role ?? 'user';
-  const { list, inviteAccount, activateAccount, removeAccount } = useAccountsState();
+  const { list, inviteAccount, activateAccount, removeAccount, updateAccountRole } = useAccountsState();
   const [email, setEmail] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -23,6 +23,9 @@ export const AccountsScreen = () => {
   const [banner, setBanner] = useState<Banner>(null);
   const [sortKey, setSortKey] = useState<SortKey>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [roleUpdates, setRoleUpdates] = useState<Record<string, boolean>>({});
+
+  const canManageAccounts = role === 'super-admin' || role === 'admin';
 
   const sortedAccounts = useMemo(() => {
     const copy = [...list];
@@ -100,16 +103,32 @@ export const AccountsScreen = () => {
     });
   };
 
-  if (role !== 'super-admin') {
+  if (!canManageAccounts) {
     return (
       <section className={styles.wrapper}>
         <div className={styles.restricted}>
           <h1>Access denied</h1>
-          <p>Only the super admin can manage accounts.</p>
+          <p>Only admins can manage accounts.</p>
         </div>
       </section>
     );
   }
+
+  const handleRoleUpdate = async (accountId: string, nextRole: 'admin' | 'user') => {
+    setRoleUpdates((prev) => ({ ...prev, [accountId]: true }));
+    const result = await updateAccountRole(accountId, nextRole);
+    setRoleUpdates((prev) => {
+      const copy = { ...prev };
+      delete copy[accountId];
+      return copy;
+    });
+    if (!result.ok) {
+      setBanner({ type: 'error', text: 'Не удалось обновить уровень доступа. Попробуйте ещё раз.' });
+      return;
+    }
+    const roleLabel = nextRole === 'admin' ? 'админом' : 'пользователем';
+    setBanner({ type: 'info', text: `Права доступа обновлены: ${result.data.email} теперь ${roleLabel}.` });
+  };
 
   const handleInvite = async () => {
     const result = await inviteAccount(email, targetRole, firstName, lastName, interviewerRole);
@@ -126,10 +145,10 @@ export const AccountsScreen = () => {
       return;
     }
     setBanner({ type: 'info', text: `Invitation email sent to ${result.data.email}.` });
-      setEmail('');
-      setFirstName('');
-      setLastName('');
-      setInterviewerRole('MD');
+    setEmail('');
+    setFirstName('');
+    setLastName('');
+    setInterviewerRole('MD');
   };
 
   const handleCopyToken = async (token: string) => {
@@ -319,7 +338,24 @@ export const AccountsScreen = () => {
                     {account.status === 'active' ? 'Active' : 'Pending activation'}
                   </span>
                 </td>
-                <td>{account.role === 'super-admin' ? 'Super admin' : account.role === 'admin' ? 'Admin' : 'User'}</td>
+                <td>
+                  {account.role === 'super-admin' ? (
+                    'Super admin'
+                  ) : (
+                    <select
+                      className={styles.roleSelect}
+                      value={account.role}
+                      aria-label={`Изменить доступ для ${account.email}`}
+                      disabled={roleUpdates[account.id]}
+                      onChange={(event) =>
+                        void handleRoleUpdate(account.id, event.target.value as 'admin' | 'user')
+                      }
+                    >
+                      <option value="admin">Admin</option>
+                      <option value="user">User</option>
+                    </select>
+                  )}
+                </td>
                 <td>{account.interviewerRole ?? '—'}</td>
                 <td>
                   {account.status === 'pending' ? (
