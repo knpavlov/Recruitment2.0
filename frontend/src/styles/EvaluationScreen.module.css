@@ -56,23 +56,35 @@
   border-radius: 24px;
   background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(16px);
-  padding: 24px;
+  padding: 20px 18px;
+  overflow-x: auto;
 }
 
 .table {
   width: 100%;
   border-collapse: collapse;
+  font-size: 13px;
 }
 
 .table th,
 .table td {
-  padding: 16px;
+  padding: 12px 10px;
   text-align: left;
   border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+  vertical-align: top;
+  line-height: 1.45;
+}
+
+.table td {
+  word-break: break-word;
+}
+
+.table th {
+  white-space: nowrap;
 }
 
 .actionsHeader {
-  width: 360px;
+  width: 260px;
 }
 
 .sortButton {
@@ -97,33 +109,33 @@
 }
 
 .actionsCell {
-  padding: 0;
-}
-
-.actionsGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  align-items: stretch;
-}
-
-.actionCell {
   display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 4px;
+  white-space: nowrap;
 }
+
+.actionsCell > * {
+  flex-shrink: 0;
+}
+
 
 .actionButton {
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 8px 16px;
-  border-radius: 12px;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 10px;
   border: none;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
-  width: 100%;
+  min-height: 34px;
 }
 
 .actionButton:not(:disabled):hover,
@@ -153,16 +165,11 @@
 .buttonWithMenu {
   position: relative;
   display: inline-flex;
-  width: 100%;
-}
-
-.buttonWithMenu > button {
-  width: 100%;
 }
 
 .dropdownMenu {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + 6px);
   right: 0;
   display: flex;
   flex-direction: column;
@@ -216,14 +223,14 @@
 }
 
 .dropdownSendButton {
-  margin-top: 8px;
+  margin-top: 6px;
   width: 100%;
   border: none;
   border-radius: 10px;
   background: linear-gradient(135deg, #2563eb, #3b82f6);
   color: #ffffff;
-  padding: 10px 14px;
-  font-size: 14px;
+  padding: 8px 12px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -274,11 +281,49 @@
   font-size: 14px;
 }
 
+.compactButton {
+  white-space: nowrap;
+}
+
+.iconOnlyButton {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+}
+
+.iconGlyph {
+  width: 16px;
+  height: 16px;
+}
+
+.buttonLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.inviteButtonWrapper {
+  min-width: 0;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 
 @media (max-width: 960px) {
-  .actionsGrid {
-    grid-template-columns: 1fr;
-    gap: 10px;
+  .actionsCell {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 6px;
   }
 
   .dropdownMenu {
