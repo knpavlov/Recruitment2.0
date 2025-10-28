@@ -88,6 +88,16 @@ export const SummarySection = ({
             </div>
           </article>
           <article className={styles.metricCard}>
+            <h3 className={styles.metricTitle}>Cross-offer acceptance rate</h3>
+            <div className={styles.metricValue}>{formatPercent(metrics.crossOfferAcceptance.value)}</div>
+            <div className={styles.metricDetails}>
+              {formatDetails(
+                metrics.crossOfferAcceptance.numerator,
+                metrics.crossOfferAcceptance.denominator
+              )}
+            </div>
+          </article>
+          <article className={styles.metricCard}>
             <h3 className={styles.metricTitle}>Offer rate</h3>
             <div className={styles.metricValue}>{formatPercent(metrics.offerRate.value)}</div>
             <div className={styles.metricDetails}>

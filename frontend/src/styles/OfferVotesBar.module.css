@@ -1,7 +1,6 @@
 .wrapper {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
 }
 
 .bar {
@@ -50,12 +49,6 @@
 .segmentFallback {
   flex: 1;
   background: rgba(148, 163, 184, 0.35);
-}
-
-.totalLabel {
-  font-size: 12px;
-  font-weight: 600;
-  color: #475569;
 }
 
 .emptyValue {

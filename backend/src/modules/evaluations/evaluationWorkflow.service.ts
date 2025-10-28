@@ -12,7 +12,8 @@ import {
   InvitationDeliveryFailure,
   InterviewPeerFormView,
   EvaluationRoundSnapshot,
-  InterviewStatusModel
+  InterviewStatusModel,
+  OfferDecisionStatus
 } from './evaluations.types.js';
 import { computeInvitationState } from './evaluationAssignments.utils.js';
 import type { AccountRecord } from '../accounts/accounts.types.js';
@@ -123,7 +124,8 @@ const buildWriteModelFromRecord = (record: EvaluationRecord): EvaluationWriteMod
   processStatus: record.processStatus,
   processStartedAt: record.processStartedAt ?? null,
   roundHistory: record.roundHistory,
-  decision: record.decision ?? null
+  decision: record.decision ?? null,
+  offerDecisionStatus: record.offerDecisionStatus ?? 'pending'
 });
 
 const createEmptySlot = (): EvaluationRecord['interviews'][number] => ({
@@ -630,7 +632,8 @@ export class EvaluationWorkflowService {
       processStartedAt: evaluation.processStartedAt,
       completedAt: new Date().toISOString(),
       createdAt: snapshotCreatedAt,
-      decision: 'progress' as const
+      decision: 'progress' as const,
+      offerDecisionStatus: evaluation.offerDecisionStatus ?? null
     };
 
     const filteredHistory = evaluation.roundHistory.filter((entry) => entry.roundNumber !== currentRound);
@@ -652,6 +655,7 @@ export class EvaluationWorkflowService {
     writeModel.processStatus = 'draft';
     writeModel.processStartedAt = null;
     writeModel.decision = null;
+    writeModel.offerDecisionStatus = 'pending';
     writeModel.roundHistory = [...filteredHistory, snapshot].sort((a, b) => a.roundNumber - b.roundNumber);
 
     const updated = await this.evaluations.updateEvaluation(writeModel, evaluation.version);
@@ -694,7 +698,82 @@ export class EvaluationWorkflowService {
     }
 
     const writeModel = buildWriteModelFromRecord(evaluation);
-    writeModel.decision = decision;
+    const legacyAccepted = decision === 'accepted-offer';
+    const normalizedDecision = legacyAccepted ? 'offer' : decision;
+
+    writeModel.decision = normalizedDecision;
+    if (normalizedDecision === 'offer') {
+      const currentStatus = evaluation.offerDecisionStatus;
+      const allowedStatuses: OfferDecisionStatus[] = [
+        'pending',
+        'accepted',
+        'accepted-co',
+        'declined',
+        'declined-co'
+      ];
+      if (legacyAccepted) {
+        writeModel.offerDecisionStatus = 'accepted';
+      } else {
+        writeModel.offerDecisionStatus = allowedStatuses.includes(currentStatus ?? 'pending')
+          ? (currentStatus as OfferDecisionStatus)
+          : 'pending';
+      }
+    } else {
+      writeModel.offerDecisionStatus = 'pending';
+    }
+
+    const result = await this.evaluations.updateEvaluation(writeModel, expectedVersion);
+    if (result === 'version-conflict') {
+      throw new Error('VERSION_CONFLICT');
+    }
+    if (!result) {
+      throw new Error('NOT_FOUND');
+    }
+
+    return this.loadEvaluationWithState(trimmed);
+  }
+
+  async updateOfferDecisionStatus(
+    id: string,
+    status: OfferDecisionStatus,
+    expectedVersion: number
+  ): Promise<EvaluationRecord> {
+    const trimmed = id.trim();
+    if (!trimmed) {
+      throw new Error('INVALID_INPUT');
+    }
+
+    const allowed: OfferDecisionStatus[] = [
+      'pending',
+      'accepted',
+      'accepted-co',
+      'declined',
+      'declined-co'
+    ];
+    if (!allowed.includes(status)) {
+      throw new Error('INVALID_INPUT');
+    }
+
+    if (!Number.isInteger(expectedVersion) || expectedVersion <= 0) {
+      throw new Error('INVALID_INPUT');
+    }
+
+    const evaluation = await this.evaluations.findEvaluation(trimmed);
+    if (!evaluation) {
+      throw new Error('NOT_FOUND');
+    }
+
+    if (evaluation.decision !== 'offer') {
+      throw new Error('FORBIDDEN');
+    }
+
+    const allSubmitted = evaluation.forms.length > 0 && evaluation.forms.every((form) => form.submitted);
+    if (!allSubmitted) {
+      throw new Error('FORMS_PENDING');
+    }
+
+    const writeModel = buildWriteModelFromRecord(evaluation);
+    writeModel.offerDecisionStatus = status;
 
     const result = await this.evaluations.updateEvaluation(writeModel, expectedVersion);
     if (result === 'version-conflict') {

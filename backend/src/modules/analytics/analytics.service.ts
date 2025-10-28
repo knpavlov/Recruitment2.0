@@ -14,6 +14,7 @@ import type {
   TimelinePoint,
   TimelineResponse
 } from './analytics.types.js';
+import type { OfferDecisionStatus } from '../evaluations/evaluations.types.js';
 
 const FISCAL_YEAR_START_MONTH = 4; // April
 const MIN_TIMELINE_START = new Date(Date.UTC(2025, 8, 1));
@@ -179,6 +180,9 @@ interface MonthlyMetricAccumulator {
   candidateCount: number;
   femaleCount: number;
   acceptedOffers: number;
+  acceptedCrossOffers: number;
+  declinedOffers: number;
+  declinedCrossOffers: number;
   pendingOffers: number;
   rejectedOffers: number;
 }
@@ -228,18 +232,38 @@ const buildMonthlyMetrics = (
     const monthStart = startOfMonthUtc(date);
     const key = toIso(monthStart);
     let bucket = map.get(key);
-      if (!bucket) {
-        bucket = {
-          start: monthStart,
-          candidateCount: 0,
-          femaleCount: 0,
-          pendingOffers: 0,
-          acceptedOffers: 0,
-          rejectedOffers: 0
-        };
+    if (!bucket) {
+      bucket = {
+        start: monthStart,
+        candidateCount: 0,
+        femaleCount: 0,
+        acceptedCrossOffers: 0,
+        pendingOffers: 0,
+        acceptedOffers: 0,
+        declinedOffers: 0,
+        declinedCrossOffers: 0,
+        rejectedOffers: 0
+      };
       map.set(key, bucket);
     }
     return bucket;
+  };
+
+  const resolveStatus = (evaluation: EvaluationSnapshotRow): OfferDecisionStatus => {
+    const status = evaluation.offerDecisionStatus;
+    if (
+      status === 'pending' ||
+      status === 'accepted' ||
+      status === 'accepted-co' ||
+      status === 'declined' ||
+      status === 'declined-co'
+    ) {
+      return status;
+    }
+    if (evaluation.decision === 'accepted-offer') {
+      return 'accepted';
+    }
+    return 'pending';
   };
 
   for (const candidate of candidates) {
@@ -260,10 +284,24 @@ const buildMonthlyMetrics = (
       continue;
     }
     const bucket = ensureMonth(updatedAt);
-    if (evaluation.decision === 'accepted-offer') {
-      bucket.acceptedOffers += 1;
-    } else if (evaluation.decision === 'offer') {
-      bucket.pendingOffers += 1;
+    if (evaluation.decision === 'offer' || evaluation.decision === 'accepted-offer') {
+      const status = resolveStatus(evaluation);
+      switch (status) {
+        case 'accepted':
+          bucket.acceptedOffers += 1;
+          break;
+        case 'accepted-co':
+          bucket.acceptedCrossOffers += 1;
+          break;
+        case 'declined':
+          bucket.declinedOffers += 1;
+          break;
+        case 'declined-co':
+          bucket.declinedCrossOffers += 1;
+          break;
+        default:
+          bucket.pendingOffers += 1;
+      }
     } else if (evaluation.decision === 'reject') {
       bucket.rejectedOffers += 1;
     }
@@ -366,6 +404,9 @@ export class AnalyticsService {
     let femaleCount = 0;
     let candidateCount = 0;
     let acceptedOffers = 0;
+    let acceptedCrossOffers = 0;
+    let declinedOffers = 0;
+    let declinedCrossOffers = 0;
     let pendingOffers = 0;
     let rejectedOffers = 0;
 
@@ -376,12 +417,16 @@ export class AnalyticsService {
       femaleCount += month.femaleCount;
       candidateCount += month.candidateCount;
       acceptedOffers += month.acceptedOffers;
+      acceptedCrossOffers += month.acceptedCrossOffers;
+      declinedOffers += month.declinedOffers;
+      declinedCrossOffers += month.declinedCrossOffers;
       pendingOffers += month.pendingOffers;
       rejectedOffers += month.rejectedOffers;
     }
 
-    const offersMade = acceptedOffers + pendingOffers;
-    const decisionsWithOutcome = offersMade + rejectedOffers;
+    const offersIssued =
+      acceptedOffers + acceptedCrossOffers + declinedOffers + declinedCrossOffers + pendingOffers;
+    const decisionsWithOutcome = offersIssued + rejectedOffers;
 
     const buildMetric = (numerator: number, denominator: number): SummaryMetricValue => ({
       value: ratio(numerator, denominator),
@@ -394,8 +439,9 @@ export class AnalyticsService {
       range: { start: range.start.toISOString(), end: range.end.toISOString() },
       metrics: {
         femaleShare: buildMetric(femaleCount, candidateCount),
-        offerAcceptance: buildMetric(acceptedOffers, offersMade),
-        offerRate: buildMetric(offersMade, decisionsWithOutcome)
+        offerAcceptance: buildMetric(acceptedOffers, offersIssued),
+        crossOfferAcceptance: buildMetric(acceptedCrossOffers, offersIssued),
+        offerRate: buildMetric(offersIssued, decisionsWithOutcome)
       }
     };
   }
@@ -774,9 +820,11 @@ export class AnalyticsService {
       'candidate_count',
       'female_count',
       'female_share',
-      'offers_made',
+      'offers_issued',
       'offers_accepted',
+      'cross_offers_accepted',
       'offer_acceptance',
+      'cross_offer_acceptance',
       'offer_rate'
     ];
 
@@ -784,7 +832,15 @@ export class AnalyticsService {
 
     for (const row of rows) {
       const periodEnd = addDaysUtc(addMonthsUtc(row.start, 1), -1);
-      const offersMade = row.acceptedOffers + row.pendingOffers;
+      const offersIssued =
+        row.acceptedOffers +
+        row.acceptedCrossOffers +
+        row.declinedOffers +
+        row.declinedCrossOffers +
+        row.pendingOffers;
+      const acceptance = formatRatio(row.acceptedOffers, offersIssued);
+      const crossAcceptance = formatRatio(row.acceptedCrossOffers, offersIssued);
+      const offerRate = formatRatio(offersIssued, offersIssued + row.rejectedOffers);
       lines.push(
         [
           row.start.toISOString(),
@@ -792,10 +848,12 @@ export class AnalyticsService {
           String(row.candidateCount),
           String(row.femaleCount),
           formatRatio(row.femaleCount, row.candidateCount),
-          String(offersMade),
+          String(offersIssued),
           String(row.acceptedOffers),
-          formatRatio(row.acceptedOffers, offersMade),
-          formatRatio(row.acceptedOffers, row.candidateCount)
+          String(row.acceptedCrossOffers),
+          acceptance,
+          crossAcceptance,
+          offerRate
         ].join(',')
       );
     }
