@@ -24,5 +24,5 @@ export const navigationItems: NavigationItem[] = [
   { key: 'evaluation', label: 'Evaluations', roleAccess: ['super-admin', 'admin'] },
   { key: 'interviews', label: 'Interviews', roleAccess: ['super-admin', 'admin', 'user'] },
   { key: 'stats', label: 'Analytics', roleAccess: ['super-admin', 'admin'] },
-  { key: 'accounts', label: 'Account management', roleAccess: ['super-admin'] }
+  { key: 'accounts', label: 'Account management', roleAccess: ['super-admin', 'admin'] }
 ];

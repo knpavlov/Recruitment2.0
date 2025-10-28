@@ -1,4 +1,9 @@
-import type { EvaluationDecision, EvaluationRoundSnapshot, InterviewStatusModel } from '../evaluations/evaluations.types.js';
+import type {
+  EvaluationDecision,
+  EvaluationRoundSnapshot,
+  InterviewStatusModel,
+  OfferDecisionStatus
+} from '../evaluations/evaluations.types.js';
 
 export type SummaryPeriodKey = 'rolling_3' | 'fytd' | 'rolling_12';
 export type InterviewerPeriodKey = 'last_month' | 'rolling_3' | 'fytd' | 'rolling_12';
@@ -16,6 +21,7 @@ export interface SummaryResponse {
     femaleShare: SummaryMetricValue;
     offerAcceptance: SummaryMetricValue;
     offerRate: SummaryMetricValue;
+    crossOfferAcceptance: SummaryMetricValue;
   };
 }
 
@@ -82,6 +88,7 @@ export interface EvaluationSnapshotRow {
   createdAt: string;
   updatedAt: string;
   decision: EvaluationDecision | null;
+  offerDecisionStatus: OfferDecisionStatus | null;
   roundHistory: EvaluationRoundSnapshot[];
   forms: InterviewStatusModel[];
 }

@@ -56,23 +56,36 @@
   border-radius: 24px;
   background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(16px);
-  padding: 24px;
+  padding: 20px 18px;
 }
 
 .table {
   width: 100%;
   border-collapse: collapse;
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 .table th,
 .table td {
-  padding: 16px;
+  padding: 10px 8px;
   text-align: left;
   border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+  vertical-align: middle;
+}
+
+.table th {
+  white-space: nowrap;
 }
 
 .actionsHeader {
-  width: 360px;
+  width: 200px;
+  text-align: center;
+}
+
+.decisionHeader {
+  width: 150px;
+  text-align: center;
 }
 
 .sortButton {
@@ -96,19 +109,29 @@
   font-size: 12px;
 }
 
+
+.offerCell {
+  text-align: center;
+}
+
+.formsCell {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.processCell {
+  white-space: nowrap;
+}
+
 .actionsCell {
-  padding: 0;
+  padding: 10px 6px;
+  text-align: center;
 }
 
-.actionsGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  align-items: stretch;
-}
-
-.actionCell {
-  display: flex;
+.actionToolbar {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .actionButton {
@@ -116,14 +139,13 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 8px 16px;
-  border-radius: 12px;
+  padding: 6px 12px;
+  border-radius: 10px;
   border: none;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
-  width: 100%;
 }
 
 .actionButton:not(:disabled):hover,
@@ -150,25 +172,75 @@
   border-color: rgba(148, 163, 184, 0.28);
 }
 
+.compactButton {
+  padding: 6px 10px;
+  gap: 6px;
+}
+
+.iconButton {
+  width: 32px;
+  height: 32px;
+  padding: 6px;
+}
+
+.decisionCell {
+  padding: 10px 6px;
+  text-align: center;
+}
+
+.statusButton {
+  width: 136px;
+  padding: 6px 12px;
+  border-radius: 10px;
+  border: none;
+  background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+  color: #0f172a;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  flex-shrink: 0;
+}
+
+.statusButton:not(:disabled):hover,
+.statusButton:not(:disabled):focus-visible {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
+}
+
+.statusButton:disabled {
+  background: rgba(226, 232, 240, 0.5);
+  color: #64748b;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.buttonIcon {
+  flex-shrink: 0;
+}
+
+.buttonText {
+  white-space: nowrap;
+}
+
 .buttonWithMenu {
   position: relative;
   display: inline-flex;
-  width: 100%;
 }
 
-.buttonWithMenu > button {
-  width: 100%;
+.statusCell {
+  padding: 10px 6px;
+  text-align: center;
 }
 
 .dropdownMenu {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + 6px);
   right: 0;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 12px;
-  min-width: 260px;
+  padding: 10px;
+  min-width: 220px;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.95);
   box-shadow: 0 16px 32px rgba(15, 23, 42, 0.18);
@@ -179,7 +251,7 @@
 .inviteOptions {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   max-height: 240px;
   overflow-y: auto;
   padding-right: 4px;
@@ -189,7 +261,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
+  font-size: 13px;
   color: #0f172a;
 }
 
@@ -198,13 +270,24 @@
   height: 16px;
 }
 
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
 .dropdownItem {
   border: none;
   background: rgba(148, 163, 184, 0.14);
   color: #0f172a;
-  padding: 10px 14px;
+  padding: 8px 12px;
   border-radius: 10px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   text-align: left;
   cursor: pointer;
@@ -215,6 +298,11 @@
   background: rgba(59, 130, 246, 0.2);
 }
 
+.dropdownItemActive {
+  background: rgba(59, 130, 246, 0.28);
+  color: #1e293b;
+}
+
 .dropdownSendButton {
   margin-top: 8px;
   width: 100%;
@@ -222,10 +310,13 @@
   border-radius: 10px;
   background: linear-gradient(135deg, #2563eb, #3b82f6);
   color: #ffffff;
-  padding: 10px 14px;
-  font-size: 14px;
+  padding: 8px 12px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .dropdownSendButton:disabled {
@@ -234,9 +325,72 @@
   cursor: not-allowed;
 }
 
+.resendIconWrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.resendBadge {
+  position: absolute;
+  bottom: -2px;
+  right: -4px;
+  background: #22c55e;
+  color: #ffffff;
+  font-size: 10px;
+  line-height: 1;
+  padding: 1px 3px;
+  border-radius: 999px;
+  box-shadow: 0 4px 8px rgba(34, 197, 94, 0.35);
+}
+
+.scoreBar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 140px;
+}
+
+.scoreTrack {
+  position: relative;
+  flex: 1;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.25);
+  overflow: hidden;
+}
+
+.scoreFill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.scoreFillFit {
+  background: linear-gradient(135deg, #38bdf8, #0ea5e9);
+}
+
+.scoreFillCase {
+  background: linear-gradient(135deg, #a855f7, #6366f1);
+}
+
+.scoreValue {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.scorePlaceholder {
+  color: #94a3b8;
+  font-weight: 600;
+}
+
 .decisionButton {
+  width: 132px;
+  justify-content: center;
   color: #ffffff;
   border: none;
+  flex-shrink: 0;
 }
 
 .decisionButton:disabled {
@@ -257,11 +411,6 @@
   background: linear-gradient(135deg, #15803d, #22c55e);
 }
 
-.decisionAcceptedOffer {
-  background: linear-gradient(135deg, #b45309, #fbbf24);
-  color: #1f2937;
-}
-
 .decisionReject {
   background: linear-gradient(135deg, #b91c1c, #f97316);
 }
@@ -271,18 +420,19 @@
   border-radius: 10px;
   border: 1px solid rgba(148, 163, 184, 0.45);
   background: rgba(241, 245, 249, 0.7);
-  font-size: 14px;
+  font-size: 13px;
 }
 
 
 @media (max-width: 960px) {
-  .actionsGrid {
-    grid-template-columns: 1fr;
-    gap: 10px;
+  .actionToolbar {
+    flex-wrap: wrap;
+    justify-content: flex-end;
   }
 
-  .dropdownMenu {
-    min-width: 220px;
+  .iconButton {
+    width: 32px;
+    height: 32px;
   }
 }
 

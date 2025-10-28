@@ -10,7 +10,7 @@ import {
   useCaseCriteriaState,
   useAccountsState
 } from '../../app/state/AppStateContext';
-import { EvaluationConfig } from '../../shared/types/evaluation';
+import { EvaluationConfig, OfferDecisionStatus } from '../../shared/types/evaluation';
 import { EvaluationTable, EvaluationTableRow } from './components/EvaluationTable';
 import { formatDate } from '../../shared/utils/date';
 import { composeFullName, buildLastNameSortKey } from '../../shared/utils/personName';
@@ -26,17 +26,26 @@ type StatusContext = {
   roundLabel: string;
 };
 
-type DecisionOption = 'offer' | 'accepted-offer' | 'progress' | 'reject';
+type DecisionState = 'offer' | 'accepted-offer' | 'progress' | 'reject';
+type DecisionOption = Exclude<DecisionState, 'accepted-offer'>;
 
-const DECISION_LABELS: Record<DecisionOption, string> = {
+const DECISION_LABELS: Record<DecisionState, string> = {
   offer: 'Offer',
-  'accepted-offer': 'Accepted offer',
+  'accepted-offer': 'Offer',
   progress: 'Next round',
   reject: 'Reject'
 };
 
+const OFFER_STATUS_LABELS: Record<OfferDecisionStatus, string> = {
+  pending: 'Pending',
+  accepted: 'Accepted',
+  'accepted-co': 'Accepted (CO)',
+  declined: 'Declined',
+  'declined-co': 'Declined (CO)'
+};
+
 export const EvaluationScreen = () => {
-  const { list, saveEvaluation, removeEvaluation, sendInvitations, advanceRound, setDecision } =
+  const { list, saveEvaluation, removeEvaluation, sendInvitations, advanceRound, setDecision, setOfferStatus } =
     useEvaluationsState();
   const { list: candidates } = useCandidatesState();
   const { folders } = useCasesState();
@@ -51,6 +60,7 @@ export const EvaluationScreen = () => {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [roundSelections, setRoundSelections] = useState<Record<string, number>>({});
   const [decisionSelections, setDecisionSelections] = useState<Record<string, DecisionOption | null>>({});
+  const [statusSelections, setStatusSelections] = useState<Record<string, OfferDecisionStatus>>({});
 
   const candidateIndex = useMemo(() => {
     const map = new Map<
@@ -192,6 +202,11 @@ export const EvaluationScreen = () => {
         delete next[evaluation.id];
         return next;
       });
+      setStatusSelections((prev) => {
+        const next = { ...prev };
+        delete next[evaluation.id];
+        return next;
+      });
       setBanner({
         type: 'info',
         text: `Candidate moved to round ${nextRound}. Configure the new round and send invites to interviewers.`
@@ -299,7 +314,7 @@ export const EvaluationScreen = () => {
         invitesTooltip = 'Complete all interviewer, case and fit question assignments before sending invites.';
       }
 
-      const invitesButtonLabel = evaluation.invitationState.hasInvitations ? 'Send Invites Again' : 'Send Invites';
+      const invitesButtonLabel = evaluation.invitationState.hasInvitations ? 'Resend Invites' : 'Send Invites';
       const hasInvitations = evaluation.invitationState.hasInvitations && !isHistoricalView;
       if (!invitesDisabled && hasInvitations && evaluation.invitationState.hasPendingChanges) {
         invitesTooltip = 'Select interviewers to resend updated invites.';
@@ -323,7 +338,11 @@ export const EvaluationScreen = () => {
         decisionTooltip = 'Wait until every interviewer submits their evaluation to enable these actions.';
       }
 
-      const storedDecision = snapshot ? snapshot.decision ?? null : evaluation.decision ?? null;
+      const rawStoredDecision = snapshot ? snapshot.decision ?? null : evaluation.decision ?? null;
+      const storedDecision: DecisionState | null =
+        rawStoredDecision === 'accepted-offer'
+          ? 'offer'
+          : (rawStoredDecision as DecisionState | null);
       const hasOverride = Object.prototype.hasOwnProperty.call(decisionSelections, evaluation.id);
       const overrideDecision = hasOverride ? decisionSelections[evaluation.id] ?? null : undefined;
       const effectiveDecision = overrideDecision !== undefined ? overrideDecision : storedDecision ?? null;
@@ -334,6 +353,53 @@ export const EvaluationScreen = () => {
           ? DECISION_LABELS[effectiveDecision]
           : 'Decision';
       const decisionState = isCurrentRoundIncomplete ? null : effectiveDecision;
+
+      const storedStatus = snapshot
+        ? snapshot.offerDecisionStatus ?? null
+        : evaluation.offerDecisionStatus ?? null;
+      const overrideStatus = statusSelections[evaluation.id];
+      const statusPending = Object.prototype.hasOwnProperty.call(statusSelections, evaluation.id);
+      const fallbackStatus: OfferDecisionStatus | null =
+        storedStatus ?? (rawStoredDecision === 'accepted-offer' ? 'accepted' : null);
+      const effectiveStatus: OfferDecisionStatus = overrideStatus ?? fallbackStatus ?? 'pending';
+      const statusLabel = OFFER_STATUS_LABELS[effectiveStatus];
+      const canEditStatus =
+        !isHistoricalView && (effectiveDecision === 'offer' || rawStoredDecision === 'accepted-offer');
+      let statusTooltip: string | undefined;
+      if (isHistoricalView) {
+        statusTooltip = 'Switch to the current round to change the offer status.';
+      } else if (decisionState !== 'offer') {
+        statusTooltip = 'Select the Offer decision to manage the offer follow-up status.';
+      }
+
+      const updateStatus = async (target: OfferDecisionStatus) => {
+        if (!canEditStatus) {
+          return;
+        }
+        setStatusSelections((prev) => ({ ...prev, [evaluation.id]: target }));
+        try {
+          const result = await setOfferStatus(evaluation.id, target, evaluation.version);
+          if (!result.ok) {
+            const message =
+              result.error === 'version-conflict'
+                ? 'Version conflict. Refresh the page to view the latest data.'
+                : result.error === 'not-found'
+                  ? 'Evaluation not found. Refresh the page.'
+                  : result.error === 'invalid-input'
+                    ? 'Failed to update the offer status. Try again.'
+                    : 'Failed to update the offer status.';
+            setBanner({ type: 'error', text: message });
+            return;
+          }
+          setBanner({ type: 'info', text: `Offer status updated: ${OFFER_STATUS_LABELS[target]}.` });
+        } finally {
+          setStatusSelections((prev) => {
+            const next = { ...prev };
+            delete next[evaluation.id];
+            return next;
+          });
+        }
+      };
 
       const evaluationForModal = snapshot
         ? {
@@ -364,11 +430,16 @@ export const EvaluationScreen = () => {
         void handleSendInvites(evaluation, slotIds);
       };
 
-      const updateDecision = async (target: 'offer' | 'accepted-offer' | 'reject') => {
+      const updateDecision = async (target: Extract<DecisionOption, 'offer' | 'reject'>) => {
         setDecisionSelections((prev) => ({ ...prev, [evaluation.id]: target }));
         const result = await setDecision(evaluation.id, target, evaluation.version);
         if (!result.ok) {
           setDecisionSelections((prev) => {
+            const next = { ...prev };
+            delete next[evaluation.id];
+            return next;
+          });
+          setStatusSelections((prev) => {
             const next = { ...prev };
             delete next[evaluation.id];
             return next;
@@ -385,6 +456,11 @@ export const EvaluationScreen = () => {
           return;
         }
         setDecisionSelections((prev) => {
+          const next = { ...prev };
+          delete next[evaluation.id];
+          return next;
+        });
+        setStatusSelections((prev) => {
           const next = { ...prev };
           delete next[evaluation.id];
           return next;
@@ -446,7 +522,13 @@ export const EvaluationScreen = () => {
         decisionTooltip,
         decisionLabel,
         decisionState,
-        onDecisionSelect: decide
+        onDecisionSelect: decide,
+        statusLabel,
+        statusState: effectiveStatus,
+        statusDisabled: !canEditStatus || statusPending,
+        statusTooltip,
+        isStatusPending: statusPending,
+        onStatusSelect: updateStatus
       } satisfies EvaluationTableRow;
     });
   }, [
@@ -454,9 +536,11 @@ export const EvaluationScreen = () => {
     list,
     roundSelections,
     decisionSelections,
+    statusSelections,
     handleSendInvites,
     handleAdvanceRound,
     setDecision,
+    setOfferStatus,
     setBanner
   ]);
 

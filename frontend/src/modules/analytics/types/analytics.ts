@@ -16,6 +16,7 @@ export interface SummaryResponse {
     femaleShare: SummaryMetricValue;
     offerAcceptance: SummaryMetricValue;
     offerRate: SummaryMetricValue;
+    crossOfferAcceptance: SummaryMetricValue;
   };
 }
 
