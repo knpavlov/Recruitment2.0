@@ -1953,6 +1953,15 @@ export const seedDemoData = async (
       const processStatus =
         candidate.evaluation.decision === 'progress' ? 'in-progress' : 'completed';
 
+      const evaluationDecisionStatus =
+        candidate.evaluation.decision === 'offer'
+          ? 'pending'
+          : candidate.evaluation.decision === 'accepted-offer'
+            ? 'accepted'
+            : candidate.evaluation.decision === 'reject'
+              ? 'declined'
+              : null;
+
       const evaluationCreatedAt = daysAgo(oldestRound.processStartedDaysAgo + 1, 12, 0);
       const evaluationUpdatedAt = daysAgo(latestRound.completedDaysAgo, 15, 30);
       const evaluationProcessStartedAt = daysAgo(oldestRound.processStartedDaysAgo, 8, 30).toISOString();
@@ -1961,11 +1970,11 @@ export const seedDemoData = async (
         `INSERT INTO evaluations (
            id, candidate_id, round_number, interview_count, interviews, fit_question_id,
            version, created_at, updated_at, forms, process_status,
-           process_started_at, round_history, decision
+           process_started_at, round_history, decision, decision_status
          ) VALUES (
            $1, $2, $3, $4, $5::jsonb, $6,
            1, $7, $8, $9::jsonb, $10,
-           $11, $12::jsonb, $13
+           $11, $12::jsonb, $13, $14
          )
          ON CONFLICT (id) DO UPDATE SET
            candidate_id = EXCLUDED.candidate_id,
@@ -1978,7 +1987,8 @@ export const seedDemoData = async (
            process_status = EXCLUDED.process_status,
            process_started_at = EXCLUDED.process_started_at,
            round_history = EXCLUDED.round_history,
-           decision = EXCLUDED.decision;`,
+           decision = EXCLUDED.decision,
+           decision_status = EXCLUDED.decision_status;`,
         [
           evaluationId,
           candidateId,
@@ -1992,7 +2002,8 @@ export const seedDemoData = async (
           processStatus,
           evaluationProcessStartedAt,
           JSON.stringify(roundsPayload),
-          candidate.evaluation.decision
+          candidate.evaluation.decision,
+          evaluationDecisionStatus
         ]
       );
 

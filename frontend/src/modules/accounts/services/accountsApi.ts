@@ -135,6 +135,13 @@ export const accountsApi = {
         method: 'POST'
       })
     ),
+  updateRole: async (id: string, role: 'admin' | 'user') =>
+    ensureAccount(
+      await apiRequest<unknown>(`/accounts/${id}/role`, {
+        method: 'PATCH',
+        body: { role }
+      })
+    ),
   remove: async (id: string) =>
     ensureAccount(
       await apiRequest<unknown>(`/accounts/${id}`, {

@@ -12,7 +12,8 @@ import {
   InvitationDeliveryFailure,
   InterviewPeerFormView,
   EvaluationRoundSnapshot,
-  InterviewStatusModel
+  InterviewStatusModel,
+  EvaluationDecisionStatus
 } from './evaluations.types.js';
 import { computeInvitationState } from './evaluationAssignments.utils.js';
 import type { AccountRecord } from '../accounts/accounts.types.js';
@@ -40,6 +41,17 @@ const resolvePortalBaseUrl = (override?: string): string => {
 };
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const decisionStatusOptions: EvaluationDecisionStatus[] = [
+  'pending',
+  'accepted',
+  'accepted-cross-offer',
+  'declined',
+  'declined-cross-offer'
+];
+
+const isDecisionStatus = (value: unknown): value is EvaluationDecisionStatus =>
+  typeof value === 'string' && decisionStatusOptions.includes(value as EvaluationDecisionStatus);
 
 const buildPortalLink = (baseUrl: string, evaluationId: string, slotId: string) => {
   const url = new URL(baseUrl);
@@ -123,7 +135,8 @@ const buildWriteModelFromRecord = (record: EvaluationRecord): EvaluationWriteMod
   processStatus: record.processStatus,
   processStartedAt: record.processStartedAt ?? null,
   roundHistory: record.roundHistory,
-  decision: record.decision ?? null
+  decision: record.decision ?? null,
+  decisionStatus: record.decisionStatus ?? null
 });
 
 const createEmptySlot = (): EvaluationRecord['interviews'][number] => ({
@@ -630,7 +643,8 @@ export class EvaluationWorkflowService {
       processStartedAt: evaluation.processStartedAt,
       completedAt: new Date().toISOString(),
       createdAt: snapshotCreatedAt,
-      decision: 'progress' as const
+      decision: 'progress' as const,
+      decisionStatus: evaluation.decisionStatus ?? null
     };
 
     const filteredHistory = evaluation.roundHistory.filter((entry) => entry.roundNumber !== currentRound);
@@ -652,6 +666,7 @@ export class EvaluationWorkflowService {
     writeModel.processStatus = 'draft';
     writeModel.processStartedAt = null;
     writeModel.decision = null;
+    writeModel.decisionStatus = null;
     writeModel.roundHistory = [...filteredHistory, snapshot].sort((a, b) => a.roundNumber - b.roundNumber);
 
     const updated = await this.evaluations.updateEvaluation(writeModel, evaluation.version);
@@ -695,6 +710,53 @@ export class EvaluationWorkflowService {
 
     const writeModel = buildWriteModelFromRecord(evaluation);
     writeModel.decision = decision;
+    writeModel.decisionStatus = decision === 'offer' ? evaluation.decisionStatus ?? 'pending' : null;
+
+    const result = await this.evaluations.updateEvaluation(writeModel, expectedVersion);
+    if (result === 'version-conflict') {
+      throw new Error('VERSION_CONFLICT');
+    }
+    if (!result) {
+      throw new Error('NOT_FOUND');
+    }
+
+    return this.loadEvaluationWithState(trimmed);
+  }
+
+  async updateDecisionStatus(
+    id: string,
+    status: EvaluationDecisionStatus,
+    expectedVersion: number
+  ): Promise<EvaluationRecord> {
+    const trimmed = id.trim();
+    if (!trimmed) {
+      throw new Error('INVALID_INPUT');
+    }
+
+    if (!isDecisionStatus(status)) {
+      throw new Error('INVALID_INPUT');
+    }
+
+    if (!Number.isInteger(expectedVersion) || expectedVersion <= 0) {
+      throw new Error('INVALID_INPUT');
+    }
+
+    const evaluation = await this.evaluations.findEvaluation(trimmed);
+    if (!evaluation) {
+      throw new Error('NOT_FOUND');
+    }
+
+    if (evaluation.decision !== 'offer') {
+      throw new Error('INVALID_STATE');
+    }
+
+    const allSubmitted = evaluation.forms.length > 0 && evaluation.forms.every((form) => form.submitted);
+    if (!allSubmitted) {
+      throw new Error('FORMS_PENDING');
+    }
+
+    const writeModel = buildWriteModelFromRecord(evaluation);
+    writeModel.decisionStatus = status;
 
     const result = await this.evaluations.updateEvaluation(writeModel, expectedVersion);
     if (result === 'version-conflict') {
@@ -791,7 +853,8 @@ export class EvaluationWorkflowService {
         fitQuestion: questionMap.get(assignment.fitQuestionId) ?? undefined,
         form,
         peerForms,
-        decision: snapshot?.decision ?? evaluation?.decision ?? null
+        decision: snapshot?.decision ?? evaluation?.decision ?? null,
+        decisionStatus: snapshot?.decisionStatus ?? evaluation?.decisionStatus ?? null
       } satisfies InterviewerAssignmentView;
     });
   }

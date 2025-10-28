@@ -72,6 +72,11 @@ const handleError = (error: unknown, res: Response) => {
         .status(409)
         .json({ code: 'forms-pending', message: 'Collect all interview feedback before progressing.' });
       return;
+    case 'INVALID_STATE':
+      res
+        .status(409)
+        .json({ code: 'invalid-state', message: 'Offer decision required before updating the status.' });
+      return;
     default:
       res.status(500).json({ code: 'unknown', message: 'Failed to process the request.' });
   }
@@ -148,6 +153,41 @@ router.post('/:id/decision', async (req, res) => {
     const evaluation = await evaluationWorkflowService.updateDecision(
       req.params.id,
       normalizedDecision,
+      expectedVersion
+    );
+    res.json(evaluation);
+  } catch (error) {
+    handleError(error, res);
+  }
+});
+
+router.post('/:id/decision-status', async (req, res) => {
+  try {
+    const { status, expectedVersion } = (req.body ?? {}) as {
+      status?: unknown;
+      expectedVersion?: unknown;
+    };
+    if (typeof expectedVersion !== 'number') {
+      res.status(400).json({ code: 'invalid-input', message: 'Provide the expected version.' });
+      return;
+    }
+    const allowed: Array<'pending' | 'accepted' | 'accepted-cross-offer' | 'declined' | 'declined-cross-offer'> = [
+      'pending',
+      'accepted',
+      'accepted-cross-offer',
+      'declined',
+      'declined-cross-offer'
+    ];
+    const normalized = allowed.includes(status as typeof allowed[number])
+      ? (status as typeof allowed[number])
+      : undefined;
+    if (!normalized) {
+      res.status(400).json({ code: 'invalid-input', message: 'Provide a valid status value.' });
+      return;
+    }
+    const evaluation = await evaluationWorkflowService.updateDecisionStatus(
+      req.params.id,
+      normalized,
       expectedVersion
     );
     res.json(evaluation);

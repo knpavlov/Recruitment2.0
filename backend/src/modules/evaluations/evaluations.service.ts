@@ -1,5 +1,10 @@
 import { EvaluationsRepository } from './evaluations.repository.js';
-import { EvaluationRecord, EvaluationRoundSnapshot, EvaluationWriteModel } from './evaluations.types.js';
+import {
+  EvaluationDecisionStatus,
+  EvaluationRecord,
+  EvaluationRoundSnapshot,
+  EvaluationWriteModel
+} from './evaluations.types.js';
 import { computeInvitationState } from './evaluationAssignments.utils.js';
 
 const readOptionalString = (value: unknown): string | undefined => {
@@ -61,6 +66,19 @@ const readDecision = (value: unknown): EvaluationRecord['decision'] | undefined 
     return null;
   }
   return undefined;
+};
+
+const readDecisionStatus = (value: unknown): EvaluationDecisionStatus | null => {
+  if (
+    value === 'pending' ||
+    value === 'accepted' ||
+    value === 'accepted-cross-offer' ||
+    value === 'declined' ||
+    value === 'declined-cross-offer'
+  ) {
+    return value;
+  }
+  return null;
 };
 
 const sanitizeSlots = (value: unknown): EvaluationWriteModel['interviews'] => {
@@ -197,7 +215,8 @@ const sanitizeRoundHistory = (value: unknown): EvaluationRoundSnapshot[] => {
       processStartedAt: readOptionalIsoDate(payload.processStartedAt),
       completedAt: readOptionalIsoDate(payload.completedAt),
       createdAt: readOptionalIsoDate(payload.createdAt) ?? new Date().toISOString(),
-      decision: readDecision(payload.decision)
+      decision: readDecision(payload.decision),
+      decisionStatus: readDecisionStatus(payload.decisionStatus)
     });
   }
 
@@ -252,7 +271,8 @@ const buildWriteModel = (payload: unknown): EvaluationWriteModel => {
     processStatus: readProcessStatus(source.processStatus),
     processStartedAt,
     roundHistory,
-    decision: readDecision(source.decision) ?? null
+    decision: readDecision(source.decision) ?? null,
+    decisionStatus: readDecisionStatus(source.decisionStatus)
   };
 };
 

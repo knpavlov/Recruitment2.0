@@ -66,6 +66,32 @@ router.post('/:id/activate', async (req, res) => {
   }
 });
 
+router.patch('/:id/role', async (req, res) => {
+  const { role } = (req.body ?? {}) as { role?: string };
+  if (role !== 'admin' && role !== 'user') {
+    res.status(400).json({ code: 'invalid-input', message: 'Provide a valid role (admin or user).' });
+    return;
+  }
+  try {
+    const account = await accountsService.updateAccountRole(req.params.id, role);
+    res.json(account);
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.message === 'FORBIDDEN') {
+        res
+          .status(403)
+          .json({ code: 'invalid-input', message: 'The super admin role cannot be reassigned.' });
+        return;
+      }
+      if (error.message === 'INVALID_ROLE') {
+        res.status(400).json({ code: 'invalid-input', message: 'Provide a valid role (admin or user).' });
+        return;
+      }
+    }
+    res.status(404).json({ code: 'not-found', message: 'Account not found.' });
+  }
+});
+
 router.delete('/:id', async (req, res) => {
   try {
     const account = await accountsService.removeAccount(req.params.id);

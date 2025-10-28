@@ -16,12 +16,12 @@ const INTERVIEWER_GRAPH_PERIOD: InterviewerPeriod = 'rolling_12';
 
 export const AnalyticsScreen = () => {
   const [summaryPeriod, setSummaryPeriod] = useState<SummaryPeriod>('rolling_3');
-  const [timelineGrouping, setTimelineGrouping] = useState<TimelineGrouping>('month');
+  const [timelineGrouping, setTimelineGrouping] = useState<TimelineGrouping>('week');
   const [timelineFrom, setTimelineFrom] = useState<string | undefined>(undefined);
   const [timelineTo, setTimelineTo] = useState<string | undefined>(undefined);
   const [interviewerPeriod, setInterviewerPeriod] = useState<InterviewerPeriod>('last_month');
-  const [interviewerGraphGrouping, setInterviewerGraphGrouping] = useState<TimelineGrouping>('month');
-  const [interviewerGraphFrom, setInterviewerGraphFrom] = useState<string | undefined>(undefined);
+  const [interviewerGraphGrouping, setInterviewerGraphGrouping] = useState<TimelineGrouping>('week');
+  const [interviewerGraphFrom, setInterviewerGraphFrom] = useState<string | undefined>('2025-09-01');
   const [interviewerGraphTo, setInterviewerGraphTo] = useState<string | undefined>(undefined);
   const [selectedInterviewers, setSelectedInterviewers] = useState<string[]>([]);
   const [selectedRoles, setSelectedRoles] = useState<InterviewerSeniority[]>([]);
