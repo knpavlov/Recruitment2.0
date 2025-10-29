@@ -16,6 +16,7 @@ export interface SummaryResponse {
     femaleShare: SummaryMetricValue;
     offerAcceptance: SummaryMetricValue;
     offerRate: SummaryMetricValue;
+    crossOfferAcceptance: SummaryMetricValue;
   };
 }
 
@@ -82,6 +83,7 @@ export interface EvaluationSnapshotRow {
   createdAt: string;
   updatedAt: string;
   decision: EvaluationDecision | null;
+  offerDecisionStatus: import('../evaluations/evaluations.types.js').OfferDecisionStatus | null;
   roundHistory: EvaluationRoundSnapshot[];
   forms: InterviewStatusModel[];
 }

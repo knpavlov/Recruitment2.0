@@ -799,6 +799,7 @@ export const InterviewerScreen = () => {
     const displayCaseScore = calculatedCaseScore ?? storedCaseScore;
     const targetOffice = candidate?.targetOffice?.trim();
     const targetRole = candidate?.desiredPosition?.trim();
+    const targetPractice = candidate?.targetPractice?.trim();
 
     const ownFitRatingsComplete = areRatingsComplete(fitCriteria, currentFormState.fitCriteria);
     const ownCaseRatingsComplete = areRatingsComplete(caseCriteria, currentFormState.caseCriteria);
@@ -806,15 +807,18 @@ export const InterviewerScreen = () => {
 
     return (
       <div className={styles.detailPanel}>
-        <div className={styles.detailHeader}>
-          <div>
-            <h2 className={styles.detailTitle}>{candidateName}</h2>
-            <div className={styles.detailMeta}>
-              <span className={styles.roundBadge}>{roundLabel}</span>
-              {targetRole && <span className={styles.detailMetaItem}>Target role: {targetRole}</span>}
-              {targetOffice && <span className={styles.detailMetaItem}>Target office: {targetOffice}</span>}
-            </div>
-          </div>
+            <div className={styles.detailHeader}>
+              <div>
+                <h2 className={styles.detailTitle}>{candidateName}</h2>
+                <div className={styles.detailMeta}>
+                  <span className={styles.roundBadge}>{roundLabel}</span>
+                  {targetRole && <span className={styles.detailMetaItem}>Target role: {targetRole}</span>}
+                  {targetOffice && <span className={styles.detailMetaItem}>Target office: {targetOffice}</span>}
+                  {targetPractice && (
+                    <span className={styles.detailMetaItem}>Practice: {targetPractice}</span>
+                  )}
+                </div>
+              </div>
           <span
             className={`${styles.statusPill} ${isSubmitted ? styles.statusPillCompleted : styles.statusPillAssigned}`}
           >
@@ -863,7 +867,6 @@ export const InterviewerScreen = () => {
             <div className={styles.infoCard}>
               <h3>Candidate materials</h3>
               {resumeLink}
-              {candidate?.targetPractice && <p>Practice: {candidate.targetPractice}</p>}
             </div>
             <div className={styles.infoCard}>
               <h3>Fit question</h3>
