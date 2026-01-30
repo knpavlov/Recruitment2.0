@@ -649,7 +649,7 @@ export const ensureCaseLibraryAssets = async (
       [folderId, evaluationCriterionIds]
     );
 
-    logInfo(`Case folder "${folder.name}" синхронизирована.`);
+    logInfo(`Case folder "${folder.name}" synchronized.`);
   }
 };
 
@@ -686,7 +686,7 @@ export const ensureFitQuestionAssets = async (
         throw new Error(`Unknown fit criterion key: ${key}`);
       }
       if (definition.question !== question.key) {
-        throw new Error(`Fit criterion ${definition.slug} назначен на неверный вопрос.`);
+        throw new Error(`Fit criterion ${definition.slug} is assigned to the wrong question.`);
       }
       const criterionId =
         (await fetchExistingId(
@@ -716,7 +716,7 @@ export const ensureFitQuestionAssets = async (
       [questionId, criterionIds]
     );
 
-    logInfo(`Fit question "${question.shortTitle}" синхронизирован.`);
+    logInfo(`Fit question "${question.shortTitle}" synchronized.`);
   }
 };
 
@@ -750,5 +750,5 @@ export const ensureCaseCriteriaCatalog = async (
     [criterionIds]
   );
 
-  logInfo('Case criteria catalog синхронизирован.');
+  logInfo('Case criteria catalog synchronized.');
 };

@@ -1,96 +1,92 @@
-# Подключение собственного домена к Railway
+﻿# Connect a Custom Domain in Railway
 
-Этот чек-лист поможет перенести фронтенд на домен `recruitment.nboard.au` (или любой другой поддомен).
+This checklist describes how to attach a custom domain to the frontend on Railway.
 
-## Предварительные условия
+## Prerequisites
 
-1. У вас есть доступ к панели Railway и к DNS-записям домена `nboard.au` (у регистратора или в стороннем DNS-сервисе — Cloudflare, AWS Route53 и т. д.).
-2. Фронтенд уже задеплоен и открывается по адресу вида `https://recruitment20-frontend-production.up.railway.app`.
-3. В Railway включён HTTPS (он включается автоматически после привязки домена).
+1. Access to the Railway project and DNS records for the domain (via registrar or DNS provider such as Cloudflare or Route53).
+2. Frontend already deployed and reachable at a Railway URL like `https://recruitment20-frontend-production.up.railway.app`.
+3. HTTPS is enabled in Railway (automatically enabled after domain binding).
 
-## Шаг 1. Добавьте поддомен в Railway
+## Step 1. Add the subdomain in Railway
 
-1. Откройте проект `Recruitment 2.0` в Railway и перейдите в сервис фронтенда (`Recruitment2.0-frontend`).
-2. Вкладка **Settings → Domains** → кнопка **Add domain**.
-3. Введите `recruitment.nboard.au` и нажмите **Add**. Railway сразу покажет, какие DNS-записи нужно создать.
+1. Open the `Recruitment 2.0` project in Railway and select the frontend service (`Recruitment2.0-frontend`).
+2. Go to **Settings -> Domains** and click **Add domain**.
+3. Enter `recruitment.nboard.au` (or your desired subdomain). Railway will show the DNS record you must create.
 
-> ⚠️ Railway не может выпустить сертификат, пока DNS-записи не укажут на него. Не переходите к следующему шагу, пока подсказка в Railway не будет скопирована.
+> Railway cannot issue a certificate until DNS points to it. Do not proceed until you have created the DNS record shown by Railway.
 
-## Шаг 2. Настройте DNS у регистратора
+## Step 2. Configure DNS at your registrar
 
-1. **Если используете поддомен (рекомендуется):**
-   - Создайте CNAME-запись для `recruitment`.
-   - Значение укажите таким же, как подсказал Railway, обычно это `recruitment20-frontend-production.up.railway.app`.
-   - TTL можно оставить стандартный (300–600 секунд).
-   - Системная запись `CNAME _domainconnect` (часто встречается в GoDaddy) остаётся как есть — она служит для автоматической настройки DNS и не мешает Railway.
-2. **Если нужно подключить корневой домен (например, `nboard.au`):**
-   - Используйте тип записи ALIAS/ANAME/Flattened CNAME (название зависит от DNS-провайдера) и направьте её на домен Railway.
-   - Если ваш провайдер не поддерживает ALIAS, делегируйте домен в сервис, который умеет такие записи (Cloudflare, DNSimple).
-3. Сохраните изменения и дождитесь, когда Railway отметит домен как «Pending verification». Обычно это 1–5 минут.
+1. **If you use a subdomain (recommended):**
+   - Create a CNAME record for `recruitment`.
+   - Point it to the target Railway hostname shown in the UI (for example, `recruitment20-frontend-production.up.railway.app`).
+   - Keep the TTL standard (300-600 seconds).
+   - Leave any `CNAME _domainconnect` records (used by some registrars) unchanged.
+2. **If you must attach the root domain (for example, `nboard.au`):**
+   - Use ALIAS/ANAME/Flattened CNAME (name depends on DNS provider) and point it to Railway.
+   - If ALIAS is not available, delegate the domain to a provider that supports it (Cloudflare, DNSimple).
+3. Save changes and wait until Railway shows the domain as **Pending verification** (typically 1-5 minutes).
 
-> 💡 Проверьте, что у домена нет старых A/AAAA-записей — они будут мешать CNAME. Для поддомена должна остаться только одна CNAME-запись.
+> Ensure there are no old A/AAAA records for the same name, as they conflict with CNAME.
 
-## Шаг 3. Дождитесь выпуска сертификата
+## Step 3. Wait for certificate issuance
 
-1. На вкладке **Settings → Domains** статус сменится на **Ready**. Railway автоматически выпустит сертификат Let's Encrypt.
-2. Пока статус «Pending», не редактируйте DNS — изменение TTL или удаление записи сбросит проверку.
-3. После перехода в «Ready» нажмите **Refresh certificate**, чтобы убедиться, что цепочка корректна (необязательно, но полезно при первых настройках).
+1. In **Settings -> Domains**, the status should become **Ready**. Railway automatically issues a Let's Encrypt certificate.
+2. While status is **Pending**, do not edit DNS - changing TTL or deleting records will reset verification.
+3. After it becomes **Ready**, optionally click **Refresh certificate** to confirm the chain is healthy.
 
-## Шаг 4. Разрешите домен в предпросмотре Vite
+## Step 4. Allow the domain for Vite preview
 
-Railway для фронтенда использует команду `npm run preview`, а Vite по умолчанию пропускает только заранее перечисленные хосты. Из-за этого при открытии `https://recruitment2.0.nboard.au` появляется сообщение вида:
+Railway runs the frontend using `npm run preview`. Vite only allows a predefined host list, so opening `https://recruitment2.0.nboard.au` may show:
 
-```
-Blocked request. This host ("recruitment2.0.nboard.au") is not allowed. To allow this host, add "recruitment2.0.nboard.au" to preview.allowedHosts in vite.config.js.
-```
+`Blocked request. This host is not allowed. To allow this host, add it to preview.allowedHosts in vite.config.js.`
 
-Чтобы добавить домен в белый список, настройте переменную `VITE_PREVIEW_ALLOWED_HOSTS`:
+To allow your domain, set `VITE_PREVIEW_ALLOWED_HOSTS` in Railway:
 
-1. Откройте сервис фронтенда в Railway.
-2. Перейдите во вкладку **Variables** → **New Variable**.
-3. В поле **Key** введите `VITE_PREVIEW_ALLOWED_HOSTS`, а в **Value** — `recruitment2.0.nboard.au`.
-4. Сохраните переменную и перезапустите деплой (**Deployments → Restart latest**).
+1. Open the frontend service in Railway.
+2. Go to **Variables -> New Variable**.
+3. Set **Key** to `VITE_PREVIEW_ALLOWED_HOSTS` and **Value** to `recruitment2.0.nboard.au`.
+4. Restart the deployment (**Deployments -> Restart latest**).
 
-> ℹ️ Можно указать несколько доменов через запятую, например: `recruitment2.0.nboard.au,recruitment.nboard.au,www.recruitment.nboard.au`.
+> You can list multiple domains separated by commas, for example:
+> `recruitment2.0.nboard.au,recruitment.nboard.au,www.recruitment.nboard.au`.
 
-После перезапуска Vite прочитает переменную и автоматически добавит домен в `preview.allowedHosts`, так что править `vite.config.ts` вручную не нужно.
+After restart, Vite will read the variable and add it to `preview.allowedHosts` automatically.
 
-## Шаг 5. Обновите переменные окружения фронтенда
+## Step 5. Update frontend environment variables
 
-1. Откройте сервис фронтенда в Railway → вкладка **Variables**.
-2. Проверьте значение `VITE_API_URL` — оно должно указывать на актуальный домен бэкенда, например `https://recruitment.nboard.au`.
-3. Если раньше использовалась переменная `VITE_API_BASE_URL`, переименуйте её в `VITE_API_URL` или создайте новую переменную с этим именем. Клиент по-прежнему понимает старый ключ, но в документации и сборке Vite используется `VITE_API_URL`, так что лучше придерживаться единого имени.
-4. После изменения значений перезапустите деплой (**Deployments → Restart latest**), чтобы фронтенд пересобрался с новым адресом API.
+1. Open the frontend service in Railway -> **Variables**.
+2. Ensure `VITE_API_URL` points to the current backend domain, for example `https://recruitment.nboard.au`.
+3. If you previously used `VITE_API_BASE_URL`, rename it to `VITE_API_URL` (the client still accepts the old key, but the docs and Vite build use `VITE_API_URL`).
+4. Restart the deployment so the frontend rebuilds with the new API URL.
 
-> 💡 Если фронтенд и бэкенд всё ещё находятся на доменах Railway с шаблоном `frontend`/`backend`, переменную можно не задавать — приложение попытается определить API автоматически. Для собственных доменов задавайте URL явно, чтобы исключить ошибки при определении.
+> If frontend and backend still use Railway domains with the `frontend/backend` pattern, `VITE_API_URL` can be omitted. For custom domains, set it explicitly to avoid mismatches.
 
-## Шаг 6. Проверьте доступность сайта
+## Step 6. Verify the site
 
-1. Откройте `https://recruitment2.0.nboard.au` (фронтенд) и `https://recruitment.nboard.au` (бэкенд, если подключали) в браузере с чистым кэшем или в режиме инкогнито.
-2. В CLI выполните проверку сертификата (см. [отдельное руководство](./railway-ssl-troubleshooting.md)). Убедитесь, что Issuer — Let's Encrypt, а Subject содержит соответствующий домен.
-3. Если используется CDN или корпоративный прокси, обновите правила, чтобы новые домены были в списке разрешённых.
+1. Open `https://recruitment2.0.nboard.au` (frontend) and `https://recruitment.nboard.au` (backend, if configured) in a clean browser session.
+2. Optionally validate the certificate using CLI (see `railway-ssl-troubleshooting.md`). Confirm the issuer is Let's Encrypt and the subject matches the domain.
+3. If you use a CDN or corporate proxy, update allowlists to include the new domains.
 
-## Шаг 7. Подтвердите отправку писем через Resend
+## Step 7. Verify email delivery with Resend
 
-1. Если `RESEND_FROM` использует адрес на новом домене (например, `login@recruitment2.0.nboard.au`), убедитесь, что этот домен
-   отображается в Resend со статусом **Verified**.
-2. После смены отправителя обновите переменную `RESEND_FROM` в бэкенде Railway и перезапустите деплой, чтобы приложение
-   использовало новый адрес.
-3. Пока домен не подтверждён, Resend вернёт ошибку 403, а API бэкенда ответит HTTP 424 с подсказкой «Sender domain is not
-   verified». После верификации повторный запрос кода пройдёт успешно.
+1. If `RESEND_FROM` uses an address on the new domain (for example, `login@recruitment2.0.nboard.au`), confirm that Resend shows the domain as **Verified**.
+2. Update `RESEND_FROM` in the backend service and restart the deploy to pick up the new sender.
+3. If the domain is not verified, Resend returns HTTP 403 and the backend returns HTTP 424 with `mailer-domain`. Once verified, resend the invitation.
 
-## Нужно ли менять код?
+## Do you need to change code?
 
-- **Frontend.** Код менять не требуется: Railway автоматически проксирует домен на тот же деплой. Важно лишь, чтобы переменные окружения, которые формируют ссылки (например, `VITE_API_URL`), были заданы с учётом нового домена, если вы их используете.
-- **Backend.** Можно оставить адрес `*.railway.app`, либо привязать собственный поддомен (например, `recruitment.nboard.au`). Главное — создать отдельную запись CNAME и добавить домен в Railway именно у сервиса бэкенда.
-- **Инвайты и письма.** Если в письмах или конфигурациях указывается адрес фронтенда, обновите значение (например, `INVITE_URL=https://recruitment.nboard.au/login`). Это можно сделать через вкладку **Variables** в Railway без изменения исходников.
+- **Frontend:** no code changes are required. Railway proxies the custom domain to the same deployment. Ensure environment variables that build URLs (such as `VITE_API_URL`) are correct.
+- **Backend:** you can keep `*.railway.app` or attach a custom domain; if you attach a custom domain, add it to the backend service and create a separate DNS record.
+- **Invitations and emails:** update any environment variables that embed the frontend URL (for example, `INVITE_URL=https://recruitment.nboard.au/login`). This is done in Railway variables without code changes.
 
-## Частые вопросы
+## FAQ
 
-- **Нужно ли покупать SSL-сертификат?** Нет, Railway выпустит Let's Encrypt бесплатно.
-- **Что делать, если Railway не видит CNAME?** Подождите 10–15 минут и проверьте DNS через `nslookup recruitment.nboard.au`. Если всё ещё указывает на старое значение, убедитесь, что на стороне регистратора запись сохранена и не конфликтует с A/AAAA.
-- **Можно ли использовать `www.recruitment.nboard.au`?** Да. Добавьте второй поддомен в Railway и создайте отдельную CNAME-запись `www` → `recruitment20-frontend-production.up.railway.app`, либо сделайте редирект с `www` на основное имя.
-- **Нужно ли подключать корневой домен `nboard.au`?** Нет, если вы планируете открывать сайт только по `recruitment2.0.nboard.au` и `recruitment.nboard.au`. Корневой домен подключают, когда нужен доступ без поддоменов (например, просто `https://nboard.au`).
-- **Что делать с CNAME `_domainconnect` в GoDaddy?** Это служебная запись DomainConnect. Она нужна GoDaddy для подключения внешних сервисов и не конфликтует с Railway, поэтому удалять её не нужно.
+- **Do I need to buy an SSL certificate?** No, Railway issues Let's Encrypt certificates for free.
+- **Railway cannot see the CNAME.** Wait 10-15 minutes and check DNS with `nslookup`. Ensure the record is saved and does not conflict with A/AAAA records.
+- **Can I use `www.recruitment.nboard.au`?** Yes. Add a second subdomain in Railway and create a separate CNAME `www` -> `recruitment20-frontend-production.up.railway.app`, or redirect `www` to the main domain.
+- **Do I need the root domain `nboard.au`?** Not if you only use `recruitment2.0.nboard.au` and `recruitment.nboard.au`. The root domain is only required for `https://nboard.au`.
+- **What about the GoDaddy `_domainconnect` CNAME?** It is a system record used by DomainConnect and does not conflict with Railway.
 
-Следуя этому чек-листу, сайт начнёт открываться по адресу `https://recruitment.nboard.au`, а Railway будет автоматически продлевать сертификат и обслуживать трафик.
+Following this checklist, the site should open at `https://recruitment.nboard.au`, and Railway will handle HTTPS renewal automatically.

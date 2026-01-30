@@ -319,7 +319,7 @@ export class EvaluationWorkflowService {
       return await this.candidates.getCandidate(id);
     } catch (error) {
       if (this.isMissingResourceError(error)) {
-        console.warn('Не удалось загрузить кандидата для интервью', id, error);
+        console.warn('Failed to load candidate for interview', id, error);
         return null;
       }
       throw error;
@@ -333,7 +333,7 @@ export class EvaluationWorkflowService {
       return await this.cases.getFolder(id);
     } catch (error) {
       if (this.isMissingResourceError(error) || this.isInvalidUuidError(error)) {
-        console.warn('Не удалось загрузить кейс для интервью', id, error);
+        console.warn('Failed to load case for interview', id, error);
         return null;
       }
       throw error;
@@ -347,7 +347,7 @@ export class EvaluationWorkflowService {
       return await this.questions.getQuestion(id);
     } catch (error) {
       if (this.isMissingResourceError(error) || this.isInvalidUuidError(error)) {
-        console.warn('Не удалось загрузить fit-вопрос для интервью', id, error);
+        console.warn('Failed to load fit question for interview', id, error);
         return null;
       }
       throw error;
@@ -388,15 +388,15 @@ export class EvaluationWorkflowService {
     if (error instanceof MailerDeliveryError) {
       const message =
         error.reason === 'domain-not-verified'
-          ? 'Домен отправителя не подтверждён в настройках почтового сервиса.'
-          : error.message || 'Почтовый сервис вернул ошибку.';
+          ? 'Sender domain is not verified in the email provider settings.'
+          : error.message || 'The email provider returned an error.';
       return {
         errorCode: error.reason,
         errorMessage: message.slice(0, 500)
       };
     }
     if (error instanceof Error) {
-      const message = `Почтовый сервис вернул ошибку: ${error.message}`;
+      const message = `The email provider returned an error: ${error.message}`;
       return {
         errorCode: 'provider-error',
         errorMessage: message.slice(0, 500)
@@ -404,7 +404,7 @@ export class EvaluationWorkflowService {
     }
     return {
       errorCode: 'unknown',
-      errorMessage: 'Неизвестная ошибка доставки письма.'
+      errorMessage: 'Unknown email delivery error.'
     };
   }
 
@@ -456,7 +456,7 @@ export class EvaluationWorkflowService {
         }
         const deliveryError = this.normalizeDeliveryError(error);
         console.error(
-          'Не удалось отправить приглашение интервьюеру',
+          'Failed to send invitation to interviewer',
           assignment.interviewerEmail,
           deliveryError.errorMessage,
           error
@@ -568,7 +568,7 @@ export class EvaluationWorkflowService {
         const hasQuestion = context.questionMap.get(assignment.fitQuestionId);
         if (!hasCase || !hasQuestion) {
           console.warn(
-            'Пропускаем назначение интервью: отсутствует кейс или fit-вопрос',
+            'Skipping interview assignment: missing case or fit question',
             assignment.interviewerEmail,
             assignment.caseFolderId,
             assignment.fitQuestionId

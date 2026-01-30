@@ -1,54 +1,48 @@
-# Устранение ошибок SSL/TLS на доменах Railway
+﻿# SSL/TLS Troubleshooting for Railway Domains
 
-## Симптомы
+This guide helps diagnose SSL/TLS warnings on Railway-managed domains.
 
-- При открытии `https://recruitment20-frontend-production.up.railway.app` браузер показывает предупреждение вида «Your connection is not private» / `NET::ERR_CERT_AUTHORITY_INVALID`.
-- В разделе *Advanced* браузер сообщает о сертификате, выданном неизвестным центром сертификации (CA), или о несоответствии имени домена.
+## Symptoms
 
-## Почему это происходит
+- When opening `https://recruitment20-frontend-production.up.railway.app`, the browser shows a warning such as "Your connection is not private" / `NET::ERR_CERT_AUTHORITY_INVALID`.
+- In the browser's **Advanced** details, the certificate is issued by an unknown CA or the domain name does not match.
 
-Railway выдаёт бесплатные TLS-сертификаты для поддоменов `*.up.railway.app` через собственную прослойку-прокси. Если служба была недавно пересоздана, перенесена между окружениями или использует новый домен, сертификат может оказаться в одном из следующих состояний:
+## Why it happens
 
-1. **Сертификат ещё не выпущен.** Railway запрашивает его у доверенного CA (Let's Encrypt) только после того, как сервис успешно отдаёт HTTP-ответы. Пока сертификат не выпущен, прокси может отдавать временный сертификат Railway Proxy CA, который не доверен браузерами.
-2. **Сертификат выпущен, но кэш браузера устарел.** После переезда на другой домен или пересоздания сервиса старый сертификат остаётся в HSTS-кэше браузера и приводит к предупреждению.
-3. **Локальная сеть подменяет сертификат.** Корпоративные фильтры (например, Cisco Umbrella, Zscaler, Kaspersky) могут расшифровывать трафик через собственный TLS-прокси и выдавать промежуточный сертификат, неподписанный доверенным корневым центром. Именно такая ситуация показана на скриншоте с сертификатом `Cisco Umbrella Secondary SubCA`. Браузер считает эту цепочку недоверенной и сообщает об ошибке.
-4. **Сертификат повреждён или не привязан к сервису.** Это случается при ручном удалении домена или неудачной миграции окружения в Railway.
+Railway issues free TLS certificates for `*.up.railway.app` through its proxy layer. If a service was recently recreated, moved between environments, or switched domains, the certificate may be in one of these states:
 
-## Как диагностировать проблему
+1. **Certificate not issued yet.** Railway requests a Let's Encrypt certificate only after the service responds to HTTP. Until then, a temporary Railway Proxy CA certificate may be served and is not trusted by browsers.
+2. **Certificate issued, but browser cache is stale.** After a migration, the old certificate can remain in the browser HSTS cache and trigger warnings.
+3. **Local network replaces the certificate.** Corporate filters (Cisco Umbrella, Zscaler, etc.) may intercept TLS and issue an intermediate certificate not trusted by the browser.
+4. **Certificate is broken or detached.** This can happen after manual domain removal or a failed environment migration.
 
-1. **Проверить сертификат с помощью CLI.**
-   ```bash
-   openssl s_client -connect recruitment20-frontend-production.up.railway.app:443 \
-     -servername recruitment20-frontend-production.up.railway.app < /dev/null |
-     openssl x509 -noout -issuer -subject -dates
-   ```
-   - Если в поле `issuer` указан `Let's Encrypt`, сертификат корректен, а ошибка идёт со стороны браузера/кэша.
-   - Если указан `Railway Proxy CA` или другое неизвестное имя, Railway ещё не выпустил доверенный сертификат.
-   - Если вместо Railway/Let's Encrypt отображаются корпоративные прокси (`Cisco Umbrella Secondary SubCA`, `Zscaler Intermediate`, и т. д.), значит трафик перехватывается сетевым фильтром. Проверьте, установлен ли в систему корневой сертификат компании, либо подключитесь к другой сети/VPN.
-2. **Убедиться, что сервис отвечает на HTTP.** В Railway откройте вкладку *Deployments* и проверьте, что последний деплой завершён, а вкладка *Metrics* показывает успешные запросы.
-3. **Проверить вкладку `Networking → Certificates` в панели Railway.** Там отображаются все домены и статус их SSL.
+## How to diagnose
 
-4. **Сравнить сертификат в разных сетях.** Откройте домен через мобильный интернет или VPN. Если предупреждение исчезает, проблема в локальном фильтре, а не в Railway.
+1. **Check the certificate via CLI.**
+   - If the issuer is `Let's Encrypt`, the certificate is valid and the issue is likely a browser cache problem.
+   - If the issuer is `Railway Proxy CA` or another unknown name, Railway has not issued the trusted certificate yet.
+   - If the issuer shows a corporate proxy (for example, `Cisco Umbrella Secondary SubCA`), the network is intercepting TLS. Install the corporate root certificate or test from another network/VPN.
+2. **Ensure the service responds over HTTP.** In Railway, open **Deployments** and confirm the latest deploy finished and **Metrics** shows successful requests.
+3. **Check `Networking -> Certificates` in Railway.** It lists all domains and their SSL status.
+4. **Compare from different networks.** Open the domain on mobile data or a VPN. If the warning disappears, the issue is local network filtering.
 
-## Как исправить
+## How to fix
 
-1. **Принудительно перевыпустить сертификат.**
-   - В Railway откройте сервис `Recruitment2.0-frontend`.
-   - Перейдите в `Settings → Domains` и нажмите `Refresh certificate` (или удалите и заново добавьте домен `recruitment20-frontend-production.up.railway.app`).
-   - Дождитесь статуса *Ready*. Обычно это занимает 1–3 минуты.
-2. **Перезапустить сервис после перевыпуска.** Запустите деплой (`Deploy` → `Manual deploy`) или `Restart deployment`, чтобы прокси подхватила новый сертификат.
-3. **Очистить кэш браузера/HSTS.** После обновления сертификата удалите запись домена из HSTS:
-   - В Chrome откройте `chrome://net-internals/#hsts`, введите домен в блок `Delete domain security policies` и нажмите `Delete`.
-   - Либо откройте домен в режиме инкогнито.
-4. **Если сертификат подменяет корпоративная сеть.**
-   - Установите корневой сертификат организации (обычно ИТ-отдел предоставляет `.crt`/`.cer` файл или устанавливает его через MDM). После этого браузер начнёт доверять цепочке.
-   - Либо временно переключитесь на сеть без TLS-инспекции (мобильный hotspot, домашний Wi-Fi, VPN с туннелированием).
-   - При невозможности отключить проверку запросите у администраторов добавление домена `recruitment20-frontend-production.up.railway.app` в список исключений.
-5. **Проверить локальное время.** Если на клиентском устройстве сброшены дата или часовой пояс, TLS-проверки будут проваливаться даже с корректным сертификатом. Убедитесь, что системные часы синхронизированы.
+1. **Force certificate re-issuance.**
+   - Open the `Recruitment2.0-frontend` service in Railway.
+   - Go to `Settings -> Domains` and click `Refresh certificate` (or remove and re-add the domain `recruitment20-frontend-production.up.railway.app`).
+   - Wait for **Ready** (usually 1-3 minutes).
+2. **Restart the service after re-issuance.** Trigger a new deploy or restart so the proxy picks up the new certificate.
+3. **Clear browser cache/HSTS.**
+   - In Chrome, open `chrome://net-internals/#hsts`, delete the domain under **Delete domain security policies**, or use an incognito window.
+4. **If the certificate is replaced by a corporate network.**
+   - Install the corporate root certificate (typically provided by IT).
+   - Or temporarily switch to a network without TLS inspection (mobile hotspot, home Wi-Fi, VPN).
+   - If you cannot disable inspection, ask admins to allowlist `recruitment20-frontend-production.up.railway.app`.
+5. **Check local time.** If the device date/time is wrong, TLS checks can fail even with a valid certificate.
 
-## Как избежать повторения
+## How to avoid repeat issues
 
-- После каждого изменения инфраструктуры (миграция окружений, переименование сервисов) проверяйте вкладку `Networking → Certificates` в Railway.
-- Добавьте в чек-лист деплоя пункт «Проверить домен в `https://www.ssllabs.com/ssltest/`». Это позволяет убедиться, что цепочка сертификатов корректна.
-- Не запускайте фронтенд через временные домены (`railway.app`), если планируется публичный доступ. Подключите собственный домен — Railway автоматически выпустит Let's Encrypt-сертификат и обновит его до истечения срока.
-
+- After infrastructure changes (environment migration, service renaming), verify `Networking -> Certificates` in Railway.
+- Add a checklist item to verify the domain in `https://www.ssllabs.com/ssltest/`.
+- Avoid using temporary `railway.app` domains for public access. Attach a custom domain so Railway issues and renews a Let's Encrypt certificate automatically.

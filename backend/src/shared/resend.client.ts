@@ -47,7 +47,7 @@ export const sendWithResend = async ({ apiKey, from, to, subject, text }: Resend
       details = (await response.json()) as ResendErrorResponse;
     } catch (error) {
       // Preserve the original error by logging the parse failure.
-      console.error('Не удалось разобрать ответ Resend', error);
+      console.error('Failed to parse Resend response', error);
     }
 
     const code = typeof details?.name === 'string' ? details.name : undefined;

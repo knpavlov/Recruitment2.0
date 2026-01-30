@@ -288,7 +288,7 @@ export class MailerService {
             lastRateLimitError = error;
             const waitMs = Math.max(error.retryAfterMs ?? nextDelay, 250);
             console.warn(
-              `Resend вернул ограничение по скорости для ${to}. Повтор через ${waitMs} мс (попытка ${attempt}).`
+              `Resend rate limit for ${to}. Retrying in ${waitMs} ms (attempt ${attempt}).`
             );
             await this.pause(waitMs);
             nextDelay = Math.min(nextDelay * 2, maxDelay);
@@ -311,7 +311,7 @@ export class MailerService {
 
       const rateLimitMessage =
         lastRateLimitError?.message ??
-        'Почтовый сервис временно ограничил скорость отправки. Попробуйте повторить позже.';
+        'The email provider temporarily rate-limited requests. Please try again later.';
       throw new MailerDeliveryError('provider-error', rateLimitMessage);
     }
 

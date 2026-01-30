@@ -192,7 +192,7 @@ export const TimelineSection = ({
           className={styles.dateConfirmButton}
           onClick={applyDraftRange}
           disabled={!canApplyRange}
-          aria-label="Применить выбранный диапазон"
+          aria-label="Apply selected range"
         >
           <span aria-hidden="true">✓</span>
         </button>

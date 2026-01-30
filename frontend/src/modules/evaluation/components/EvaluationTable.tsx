@@ -275,7 +275,7 @@ export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: 
                 <td>{formsLabel}</td>
                 <td className={styles.processCell}>{row.processLabel}</td>
                 <td className={styles.actionsCell}>
-                  <div className={styles.actionToolbar} role="group" aria-label="Действия с оценкой">
+                  <div className={styles.actionToolbar} role="group" aria-label="Evaluation actions">
                     <button
                       type="button"
                       className={`${styles.actionButton} ${styles.iconButton} ${styles.neutralButton}`}
@@ -283,10 +283,10 @@ export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: 
                         closeMenus();
                         row.onEdit();
                       }}
-                      aria-label="Редактировать оценку"
+                      aria-label="Edit evaluation"
                     >
                       <EditIcon width={16} height={16} />
-                      <span className={styles.srOnly}>Редактировать</span>
+                      <span className={styles.srOnly}>Edit</span>
                     </button>
                     <div className={styles.buttonWithMenu}>
                       <button
@@ -350,10 +350,10 @@ export const EvaluationTable = ({ rows, sortDirection, sortKey, onSortChange }: 
                         closeMenus();
                         row.onOpenStatus();
                       }}
-                      aria-label="Открыть итоги"
+                      aria-label="Open results"
                     >
                       <ResultsIcon width={16} height={16} />
-                      <span className={styles.srOnly}>Результаты</span>
+                      <span className={styles.srOnly}>Results</span>
                     </button>
                   </div>
                 </td>

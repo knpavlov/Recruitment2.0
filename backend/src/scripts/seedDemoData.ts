@@ -1537,7 +1537,7 @@ const loadFitQuestionDirectory = async (
     }
 
     logWarn(
-      `Fit question "${reference.shortTitle}" не найден по названию. Используем вопрос "${fallbackRow.short_title}".`
+      `Fit question "${reference.shortTitle}" not found by title. Using "${fallbackRow.short_title}" instead.`
     );
 
     assigned.set(reference.key, {
@@ -1569,7 +1569,7 @@ const hydrateCaseCriteriaCatalog = async (
   );
 
   if (!result.rows || result.rows.length === 0) {
-    logWarn('В таблице case_criteria не найдено записей. Критерии кейса будут пропущены.');
+    logWarn('No records found in case_criteria. Case criteria will be skipped.');
     return;
   }
 
@@ -1599,7 +1599,7 @@ const hydrateCaseCriteriaCatalog = async (
 
     if (!fallbackId) {
       logWarn(
-        `Для критерия кейса "${definition.title}" не нашлось ни одной подходящей записи в базе. Значение будет пропущено.`
+        `No matching records found in the database for case criterion "${definition.title}". The value will be skipped.`
       );
       continue;
     }
@@ -1607,7 +1607,7 @@ const hydrateCaseCriteriaCatalog = async (
     const fallbackTitle = allTitlesById.get(fallbackId) ?? fallbackId;
 
     logWarn(
-      `Категория кейса "${definition.title}" не найдена по названию. Использован критерий "${fallbackTitle}" (ID ${fallbackId}).`
+      `Case category "${definition.title}" not found by title. Using "${fallbackTitle}" (ID ${fallbackId}).`
     );
     definition.resolvedId = fallbackId;
     unused.delete(fallbackId);
@@ -1628,7 +1628,7 @@ const hydrateFitCriteriaCatalog = async (
   );
 
   if (!result.rows || result.rows.length === 0) {
-    logWarn('В таблице fit_question_criteria отсутствуют записи. Оценки по fit будут без детализации.');
+    logWarn('No records found in fit_question_criteria. Fit scores will not include criterion details.');
   }
 
   const byQuestion = new Map<string, Map<string, string>>();
@@ -1648,7 +1648,7 @@ const hydrateFitCriteriaCatalog = async (
   for (const definition of Object.values(fitCriteriaCatalog)) {
     const questionId = directory.map.get(definition.question);
     if (!questionId) {
-      logWarn(`Фит-вопрос с ключом "${definition.question}" отсутствует в базе. Связанные критерии пропущены.`);
+      logWarn(`Fit question with key "${definition.question}" is missing from the database. Related criteria were skipped.`);
       continue;
     }
 
@@ -1674,7 +1674,7 @@ const hydrateFitCriteriaCatalog = async (
 
     if (!fallbackId) {
       logWarn(
-        `Для фит-критерия "${definition.title}" (вопрос ${definition.question}) нет записей в базе. Критерий будет пропущен.`
+        `No records found for fit criterion "${definition.title}" (question ${definition.question}). The criterion will be skipped.`
       );
       continue;
     }
@@ -1682,7 +1682,7 @@ const hydrateFitCriteriaCatalog = async (
     const fallbackTitle = result.rows.find((row) => row.id === fallbackId)?.title ?? fallbackId;
 
     logWarn(
-      `Критерий fit "${definition.title}" не найден по названию. Использован критерий "${fallbackTitle}" (ID ${fallbackId}).`
+      `Fit criterion "${definition.title}" not found by title. Using "${fallbackTitle}" (ID ${fallbackId}).`
     );
     definition.resolvedId = fallbackId;
     fallbackSet?.delete(fallbackId);
@@ -1734,7 +1734,7 @@ const ensureInterviewerAccounts = async (
 
     if (!resolvedName) {
       logWarn(
-        `Имя для интервьюера ${normalizedEmail} не заполнено в базе. Будет использован адрес e-mail.`
+        `Display name for interviewer ${normalizedEmail} is missing in the database. The email address will be used.`
       );
       resolvedName = normalizedEmail;
     }
@@ -2165,22 +2165,22 @@ if (process.argv[1]) {
       .catch((error) => {
         const connectionError = unwrapConnectionError(error);
         if (connectionError) {
-          console.error('Не удалось подключиться к PostgreSQL. Проверьте доступность базы и переменные окружения.');
+          console.error('Failed to connect to PostgreSQL. Check database availability and environment variables.');
           const socketMeta = connectionError as NodeJS.ErrnoException & { address?: string; port?: number };
           if (socketMeta.address || socketMeta.port) {
             console.error(
-              `Текущее соединение пыталось обратиться к ${socketMeta.address ?? 'неизвестному хосту'}:${
-                socketMeta.port ?? 'неизвестный порт'
+              `The current connection tried to reach ${socketMeta.address ?? 'unknown host'}:${
+                socketMeta.port ?? 'unknown port'
               }.`
             );
           }
-          console.error('Исходная ошибка подключения:', connectionError.message);
+          console.error('Original connection error:', connectionError.message);
         } else {
           console.error('Demo seed script failed:', error);
         }
 
         void postgresPool.end().catch((closeError) => {
-          console.error('Не удалось корректно закрыть пул соединений:', closeError);
+          console.error('Failed to close the connection pool cleanly:', closeError);
         });
         process.exit(1);
       });

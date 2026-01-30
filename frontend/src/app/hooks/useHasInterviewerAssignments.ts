@@ -24,7 +24,7 @@ export const useHasInterviewerAssignments = (email: string | null | undefined): 
         }
       } catch (error) {
         if (!cancelled) {
-          console.error('Не удалось проверить назначения интервьюера:', error);
+          console.error('Failed to check interviewer assignments:', error);
           setHasAssignments(false);
         }
       }

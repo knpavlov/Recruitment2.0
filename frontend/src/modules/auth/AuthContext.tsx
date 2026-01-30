@@ -217,7 +217,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const normalizedRole = normalizeAccountRole(response.role);
         const resolvedRole = normalizedRole ?? 'user';
         if (!normalizedRole) {
-          console.warn('Получена неизвестная роль, по умолчанию используем user:', response.role);
+          console.warn('Unknown role received, defaulting to user:', response.role);
         }
         const expiresAt = Date.now() + (remember ? LONG_SESSION_MS : SHORT_SESSION_MS);
         const nextSession: AuthSession = {

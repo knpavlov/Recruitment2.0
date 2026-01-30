@@ -1,22 +1,14 @@
-﻿# Recruitment 2.0 - Migration to a Corporate Azure Environment
+﻿# Recruitment 2.0 - Corporate Azure Deployment Guide
 
-This repository is a monorepo with a frontend (React + Vite) and a backend (Express + TypeScript). Below are concrete steps to migrate from Railway and the `nboard` domain to a corporate Microsoft Azure environment, plus clear options for handing off the code.
-
----
-
-## 0) Quick Structure Overview
-
-- `frontend/` - SPA (Vite + React).
-- `backend/` - Express API connected to PostgreSQL.
-- `docs/` - legacy notes (including Railway). Keep for history if needed; not applicable to Azure.
+This guide is written for the corporate team deploying Recruitment 2.0 in Microsoft Azure. It covers how to receive the codebase, provision Azure resources, configure domains, and set environment variables so the app runs under your desired public URLs.
 
 ---
 
-## 1) How to Hand Off the Code to Corporate GitHub
+## 1) How to Receive the Code (ZIP Archive)
 
-### Share a ZIP archive
-1. Send a ZIP or a folder snapshot.
-2. Corporate side initializes a new repo:
+1. The project is delivered as a ZIP or folder snapshot.
+2. Create a new repository in the corporate GitHub org.
+3. Initialize and push the code:
    ```bash
    git init
    git add .
@@ -25,37 +17,83 @@ This repository is a monorepo with a frontend (React + Vite) and a backend (Expr
    git push -u origin main
    ```
 
-> Important: ensure **no** `.env` files or secrets are committed. All secrets must live in Azure App Settings.
+Important: do not commit `.env` files or secrets to the repo. Store secrets only in Azure App Settings.
 
 ---
 
-## 2) What Must Be Configured (Railway -> Azure)
+## 2) Deployment Overview
 
-There are no hard Railway dependencies in code, but the following **must** be configured for corporate domains and infrastructure:
+The system is split into three Azure resources:
 
-1. **Frontend API base URL**
-   - Set `VITE_API_URL` (or `VITE_API_BASE_URL`) to the corporate API URL.
-   - This is **required**; otherwise the frontend tries to derive the backend host using the old Railway naming pattern.
-
-2. **Backend URLs used in emails**
-   - `INVITE_URL` - login page link.
-   - `INTERVIEW_PORTAL_URL` - base URL of the interviewer portal (usually the same frontend).
-
-3. **Super admin account**
-   - `SUPER_ADMIN_EMAIL` must be set to a corporate email.
-
-4. **Email delivery**
-   - Replace Railway/Resend with corporate SMTP (or keep Resend if allowed).
-
-5. **(Optional) CORS**
-   - CORS is currently open. If you must restrict it, edit `backend/src/app/server.ts`.
+- Azure Database for PostgreSQL Flexible Server
+- Azure Web App (Linux, Node 20 LTS) for the backend API
+- Azure Static Web App for the frontend
 
 ---
 
-## 3) Environment Variables
+## 3) Choose Your Public URLs (Replace the current nboard domain)
 
-### Backend (Azure Web App -> Configuration -> Application settings)
-Minimum required:
+The app currently runs at `https://recruitment2.0.nboard.au/`. To move it to corporate domains, pick two new public URLs:
+
+- Frontend URL, for example: `https://app.company.com`
+- Backend (API) URL, for example: `https://api.company.com`
+
+These two URLs are the basis of all configuration below.
+
+---
+
+## 4) Configure DNS and Custom Domains in Azure
+
+1. In Azure, add the custom domain for the Static Web App (frontend).
+2. Add the custom domain for the Web App (backend).
+3. Create the DNS records Azure provides (usually CNAME or ALIAS).
+4. Enable TLS certificates in Azure for both domains.
+
+After this, the frontend should be reachable at the chosen frontend URL, and the backend should respond at the chosen API URL.
+
+---
+
+## 5) Azure Database for PostgreSQL Flexible Server
+
+1. Create a PostgreSQL Flexible Server.
+2. Create a database and user.
+3. Configure network access:
+   - If public network is used, allow the Web App outbound IP in firewall rules.
+   - If VNet is used, ensure the Web App has network access.
+4. Keep TLS enabled (Azure expects SSL by default).
+
+---
+
+## 6) Backend Deployment (Azure Web App)
+
+Important: deploy the `backend/` folder as the Web App project, otherwise Azure will not find the correct `package.json`.
+
+Recommended process:
+1. Build in CI/CD using `backend/` only:
+   - `npm install`
+   - `npm run build`
+2. Start command: `npm run start` (from `backend/`).
+3. Verify health: `GET https://api.company.com/health`.
+
+The backend listens on `process.env.PORT`, which Azure sets automatically.
+
+---
+
+## 7) Frontend Deployment (Azure Static Web App)
+
+1. Connect the repo.
+2. Set build paths:
+   - `app_location: "frontend"`
+   - `output_location: "dist"`
+3. Provide `VITE_API_URL` at build time (see section 8).
+
+---
+
+## 8) Environment Variables (Exact Locations in Azure)
+
+### Backend - Web App -> Configuration -> Application settings
+
+Set these keys in the Azure Web App configuration:
 
 ```dotenv
 # PostgreSQL
@@ -73,7 +111,7 @@ DATABASE_URL=postgresql://user:password@host:port/database
 # Super admin
 SUPER_ADMIN_EMAIL=admin@company.com
 
-# Email links
+# Email links (frontend URL)
 INVITE_URL=https://app.company.com/login
 INTERVIEW_PORTAL_URL=https://app.company.com
 
@@ -90,102 +128,57 @@ SMTP_FROM=Recruitment 2.0 <notifications@company.com>
 # RESEND_FROM=Recruitment 2.0 <login@company.com>
 ```
 
-If **neither SMTP nor Resend** is configured, the API returns 503 for invitations and login codes.
+### Frontend - Static Web App -> Configuration -> Application settings
 
-### Frontend (Azure Static Web App)
-Vite variables are injected at build time:
+Set the API base URL for the frontend build:
 
 ```dotenv
 VITE_API_URL=https://api.company.com
 ```
 
-> If frontend and backend hostnames do not follow the `frontend <-> backend` pattern, `VITE_API_URL` is mandatory.
-
-Optional (runtime without rebuild):
-- Add one of these to `frontend/index.html`:
-  ```html
-  <meta name="recruitment:api-base" content="https://api.company.com" />
-  ```
-  or
-  ```html
-  <script>
-    window.__RECRUITMENT_CONFIG__ = { apiBaseUrl: 'https://api.company.com' };
-  </script>
-  ```
+This value is injected at build time and is required when frontend and backend are hosted on separate domains.
 
 ---
 
-## 4) Azure Database for PostgreSQL Flexible Server
+## 9) Email Delivery (What Code It Touches)
 
-1. Create a PostgreSQL Flexible Server.
-2. Create a database and a user.
-3. Configure network access:
-   - If public network is used - allow the Web App outbound IP in firewall rules.
-   - If VNet is used - ensure the Web App has network access.
-4. Keep TLS enabled (Azure expects SSL by default).
-5. Build and set `DATABASE_URL` in Web App settings.
+Email delivery is handled by `backend/src/shared/mailer.service.ts`.
 
-On first backend start, tables and the super admin account are created automatically.
+- If `RESEND_API_KEY` is set, the backend uses Resend.
+- Otherwise, it uses SMTP (`SMTP_*` variables).
+- If neither is set, invitation and login flows return HTTP 503.
 
----
+To move to corporate email:
+- Set either SMTP or Resend variables in the Web App settings (section 8).
+- Ensure the sender domain matches your corporate domain (for Resend, the domain must be verified in Resend).
 
-## 5) Azure Web App (Linux, Node 20 LTS) - Backend
-
-Important: deploy **the `backend/` folder as a separate app**, otherwise Azure will not find `package.json`.
-
-Recommended process:
-1. Use a pipeline (GitHub Actions / Azure DevOps) that:
-   - runs `npm install` and `npm run build` inside `backend/`;
-   - publishes only `backend/`.
-2. Start command: `npm run start` (from the `backend` folder).
-3. Set environment variables (see section 3).
-4. Verify health: `GET https://api.company.com/health`.
-
-> The backend listens on `process.env.PORT`, which Azure sets automatically.
+No code changes are required unless you want a different email provider implementation.
 
 ---
 
-## 6) Azure Static Web App - Frontend
+## 10) CORS (What "CORS is open" Means)
 
-1. Connect the repo.
-2. Set build paths:
-   - `app_location: "frontend"`
-   - `output_location: "dist"`
-3. Provide `VITE_API_URL` at build time (section 3).
-4. After deploy, the frontend should call the corporate API.
+The backend currently allows requests from any origin. This means any website can call the API.
 
----
+If your security policy requires restrictions, update CORS in `backend/src/app/server.ts` to allow only your frontend domain, for example:
 
-## 7) Demo Data (optional)
-
-To seed test data:
-```bash
-cd backend
-npm install
-npm run seed:demo
+```ts
+app.use(cors({ origin: ['https://app.company.com'] }));
 ```
-The script creates test cases, candidates, interviews, etc. Re-running is safe.
 
 ---
 
-## 8) Where `nboard` Appears
+## 11) What to Change When Moving off the nboard Domain
 
-`nboard` appears only in legacy documentation. If you want a full cleanup:
-- Update files under `docs/` and this `README.md` with corporate domains.
-- Code changes are not required if env vars are configured correctly.
+To run the app under new corporate URLs:
 
----
+1. Configure Azure custom domains and DNS (section 4).
+2. Update frontend build variable:
+   - `VITE_API_URL=https://api.company.com`
+3. Update backend email URLs:
+   - `INVITE_URL=https://app.company.com/login`
+   - `INTERVIEW_PORTAL_URL=https://app.company.com`
+4. Update email sender (if applicable):
+   - `RESEND_FROM` or `SMTP_FROM` should use your corporate domain.
 
-## 9) Corporate Checklist
-
-- [ ] Repo transferred or imported into corporate GitHub.
-- [ ] PostgreSQL Flexible Server created and connection string ready.
-- [ ] Web App (Linux, Node 20 LTS) deployed with env vars set.
-- [ ] Static Web App deployed with correct build paths and `VITE_API_URL`.
-- [ ] `SUPER_ADMIN_EMAIL` set to corporate email.
-- [ ] Email delivery works via SMTP/Resend.
-- [ ] `GET /health` and login via emailed link verified.
-
----
-
-If the corporate team needs extra requirements (SSO, private SMTP, VNet-only, Key Vault, etc.), handle that as a separate integration step.
+Once these are set, the app will operate under the new corporate URLs.
