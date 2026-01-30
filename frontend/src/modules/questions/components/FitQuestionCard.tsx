@@ -7,7 +7,7 @@ interface FitQuestionCardProps {
 }
 
 export const FitQuestionCard = ({ question, onOpen }: FitQuestionCardProps) => {
-  // Форматируем дату обновления для карточки
+  // Format the updated date for the card.
   const updatedAt = new Date(question.updatedAt);
   const formatted = new Intl.DateTimeFormat('en-US', {
     dateStyle: 'medium',

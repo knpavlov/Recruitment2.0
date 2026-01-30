@@ -43,8 +43,8 @@ const readGlobalConfig = (): string | undefined => {
 
 // Attempt to derive the backend domain based on the frontend domain.
 // This covers deployments where services follow the "frontend"/"backend" naming pattern on Railway.
-// Удаляет суффиксы вида "-v2", "_3", "4" и т.п. из сегмента домена,
-// чтобы восстановить исходное имя сервиса без числового маркера.
+// Strip suffixes like "-v2", "_3", "4", etc. from a domain segment
+// to restore the base service name without a numeric marker.
 const stripVersionSuffix = (segment: string): string => {
   let current = segment;
 
@@ -104,13 +104,13 @@ const deriveBackendHost = (hostname: string): string | undefined => {
 
   const segments = hostname.split('.');
 
-  // Удаляем сегменты, состоящие только из цифр (часто используются как маркеры версий).
+  // Remove segments that contain only digits (often used as version markers).
   const withoutNumericSegments = segments.filter((segment) => !/^\d+$/.test(segment));
   if (withoutNumericSegments.length > 0 && withoutNumericSegments.length !== segments.length) {
     attempts.push(withoutNumericSegments.join('.'));
   }
 
-  // Формируем кандидата, удаляя числовые суффиксы и маркеры версий из каждого сегмента.
+  // Build a candidate by removing numeric suffixes and version markers from each segment.
   const strippedSegments = segments
     .map((segment) => stripVersionSuffix(segment).trim())
     .filter((segment) => segment.length > 0);
@@ -186,9 +186,9 @@ const resolveApiBaseUrl = (): string => {
     const value = candidate?.trim();
 
     if (value) {
-      // Поддерживаем как новое имя переменной (`VITE_API_URL`),
-      // так и старое (`VITE_API_BASE_URL`), чтобы не ломать
-      // существующие деплои при смене домена.
+      // Support both the new variable name (`VITE_API_URL`)
+      // and the legacy one (`VITE_API_BASE_URL`) so existing
+      // deployments do not break when the domain changes.
       return normalizeUrl(value, fallbackOrigin);
     }
   }

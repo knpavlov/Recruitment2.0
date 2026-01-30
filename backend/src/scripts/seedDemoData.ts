@@ -13,25 +13,25 @@ import {
 } from './demoData.assets.js';
 import { toUuid } from './demoData.shared.js';
 
-// Набор кодов ошибок, которые сигнализируют о невозможности соединиться с базой
+// Set of error codes indicating the database connection cannot be established.
 const CONNECTION_ERROR_CODES = new Set(['ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN', 'ETIMEDOUT', 'ECONNRESET']);
 
-// Интерфейс-описание AggregateError для окружений, где тип не объявлен явно
+// AggregateError interface shape for environments where the type is not declared.
 interface AggregateErrorLike extends Error {
   errors: unknown[];
 }
 
-// Проверка, что ошибка похожа на AggregateError
+// Check whether the error looks like an AggregateError.
 const isAggregateError = (error: unknown): error is AggregateErrorLike => {
   return Boolean(error) && typeof error === 'object' && Array.isArray((error as AggregateErrorLike).errors);
 };
 
-// Проверка, что ошибка похожа на стандартное исключение Node.js с полями errno/code
+// Check whether the error looks like a standard Node.js exception with errno/code fields.
 const isErrnoException = (error: unknown): error is NodeJS.ErrnoException => {
   return Boolean(error) && typeof error === 'object' && 'code' in (error as Record<string, unknown>);
 };
 
-// Рекурсивно ищем первопричину ошибки подключения (AggregateError, cause и т.д.)
+// Recursively locate the root cause of a connection error (AggregateError, cause, etc.).
 const unwrapConnectionError = (error: unknown): NodeJS.ErrnoException | undefined => {
   if (!error) {
     return undefined;
@@ -63,7 +63,7 @@ interface DatabaseClient {
   release: () => void;
 }
 
-// Настройки, позволяющие переиспользовать сидер вне CLI
+// Settings that allow reusing the seeder outside the CLI.
 export interface SeedDemoDataOptions {
   runMigrations?: boolean;
   shutdownPool?: boolean;
@@ -74,7 +74,7 @@ export interface SeedDemoDataOptions {
   };
 }
 
-// Короткое резюме результата прогонки сидера
+// Short summary of the seeder run result.
 export interface SeedDemoDataResult {
   candidatesProcessed: number;
   evaluationsProcessed: number;
@@ -92,9 +92,9 @@ const refreshReferenceNow = () => {
   referenceNow = new Date();
 };
 
-// Базовый час отправки формы, если он не задан явно
+// Default hour for form submission if not explicitly set.
 const BASE_FORM_SUBMISSION_HOUR = 11;
-// Сдвиг между интервью по умолчанию, чтобы их метки не накладывались
+// Default offset between interviews so their timestamps do not overlap.
 const INTERVIEW_OFFSET_HOURS = 30;
 
 // Returns a past date offset by the provided number of days and a fixed time of day
@@ -105,7 +105,7 @@ const daysAgo = (offset: number, hour = 10, minute = 0) => {
   return date;
 };
 
-// Список разрешённых интервьюеров; имена подтянем из базы при запуске
+// Allowed interviewer list; names are pulled from the database at runtime.
 const INTERVIEWER_EMAILS = [
   'knpavlov@gmail.com',
   'kpavlov.me@gmail.com',
@@ -222,7 +222,7 @@ const REQUIRED_FIT_CRITERIA: Record<FitQuestionKey, FitCriterionKey[]> = fitQues
   }
 );
 
-// Сопоставление старых слагов с новыми ключами для каждого фит-вопроса
+// Map legacy slugs to new keys for each fit question.
 const LEGACY_FIT_CRITERION_ALIASES: Record<FitQuestionKey, Record<string, FitCriterionKey>> = {
   'client-trust': {
     'fit-communication': 'clientCommunication',
@@ -247,7 +247,7 @@ const LEGACY_FIT_CRITERION_ALIASES: Record<FitQuestionKey, Record<string, FitCri
   }
 };
 
-// Сопоставление старых слагов критериев кейса с новыми ключами
+// Map legacy case criterion slugs to new keys.
 const LEGACY_CASE_CRITERION_ALIASES: Record<string, CaseCriterionKey> = Object.entries(caseCriteriaCatalog).reduce(
   (acc, [key, definition]) => {
     acc[definition.slug] = key as CaseCriterionKey;
@@ -1693,7 +1693,7 @@ const ensureInterviewerAccounts = async (
   client: DatabaseClient,
   logWarn: (message: string) => void = console.warn
 ): Promise<Map<InterviewerEmail, string>> => {
-  // Проверяем, что все интервьюеры уже имеют аккаунты в системе и вытаскиваем их отображаемые имена
+  // Ensure interviewers already have accounts and fetch their display names.
   const emails = [...INTERVIEWER_EMAILS];
   const result = await client.query<{
     email: string;

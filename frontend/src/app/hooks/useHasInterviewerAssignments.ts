@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { interviewerApi } from '../../modules/evaluation/services/interviewerApi';
 
 /**
- * Хук определяет, есть ли у текущего пользователя хотя бы одно назначение интервьюера.
- * Это позволяет динамически добавлять раздел "Interviews" в навигацию админа.
+ * The hook checks whether the current user has at least one interviewer assignment.
+ * This enables the "Interviews" section to be added dynamically to the admin navigation.
  */
 export const useHasInterviewerAssignments = (email: string | null | undefined): boolean => {
   const [hasAssignments, setHasAssignments] = useState(false);

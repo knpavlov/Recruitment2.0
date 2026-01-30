@@ -4,7 +4,7 @@ import { demoDataApi, DemoSeedSummary } from '../services/demoDataApi';
 
 type LoaderState = 'idle' | 'loading' | 'success' | 'error';
 
-// Хук инкапсулирует сетевую логику запуска сидера
+// The hook encapsulates network logic for running the seeder.
 export const useDemoDataLoader = (email: string | null) => {
   const [state, setState] = useState<LoaderState>('idle');
   const [error, setError] = useState<string | null>(null);

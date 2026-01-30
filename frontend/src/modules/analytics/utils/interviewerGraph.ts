@@ -182,7 +182,7 @@ export const createInterviewerGraphCsv = (data: InterviewerStatsResponse) => {
 };
 
 export const downloadInterviewerGraphCsv = (data: InterviewerStatsResponse) => {
-  // Формируем CSV в том же табличном виде, что и блок Performance over time
+  // Build the CSV in the same tabular layout as the Performance over time block.
   const csvContent = createInterviewerGraphCsv(data);
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const fileName = `interviewer-performance-${data.groupBy}.csv`;

@@ -50,7 +50,7 @@ export const CaseCriterionEditorCard = ({
   const titleBackupRef = useRef(criterion.title);
 
   useEffect(() => {
-    // Сбрасываем локальное состояние, если пришла новая версия критерия
+    // Reset local state when a new criterion version arrives.
     setDraft(criterion);
     titleBackupRef.current = criterion.title;
     setIsEditingTitle(mode === 'new' && !criterion.title.trim());

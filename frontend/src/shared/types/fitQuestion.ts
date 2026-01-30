@@ -1,4 +1,4 @@
-// Типы данных для управления фит-вопросами
+// Data types for managing fit questions.
 export interface FitQuestionCriterion {
   id: string;
   title: string;

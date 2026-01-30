@@ -4,7 +4,7 @@ import { demoDataService } from './demo.service.js';
 
 const router = Router();
 
-// Обрабатываем запрос на загрузку демо-данных только от суперадмина
+// Handle demo-data load requests only from the super admin.
 router.post('/seed', async (req, res) => {
   const { email } = req.body as { email?: string };
   const normalized = typeof email === 'string' ? email.trim().toLowerCase() : '';

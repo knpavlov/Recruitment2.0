@@ -1,4 +1,4 @@
-// Вспомогательная функция для преобразования дат к формату ДД/ММ/ГГГГ (en-AU).
+// Helper to format dates as DD/MM/YYYY (en-AU).
 export const formatDate = (
   value: string | number | Date | null | undefined,
   emptyPlaceholder = '—'

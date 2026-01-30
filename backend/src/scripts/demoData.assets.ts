@@ -1,7 +1,7 @@
 import { Buffer } from 'buffer';
 import { QueryableClient, toUuid } from './demoData.shared.js';
 
-// Тип ключей для фит-критериев
+// Keys for fit criteria.
 export type FitCriterionKey =
   | 'clientCommunication'
   | 'clientOwnership'
@@ -13,7 +13,7 @@ export type FitCriterionKey =
   | 'collaborationCommunication'
   | 'collaborationExecution';
 
-// Тип ключей для критериев кейсов
+// Keys for case criteria.
 export type CaseCriterionKey =
   | 'structure'
   | 'quant'
@@ -25,7 +25,7 @@ export type CaseCriterionKey =
   | 'synthesis'
   | 'clientImpact';
 
-// Определение фит-критерия с текстом описания уровней
+// Fit criterion definition with rating descriptions.
 interface FitCriterionDefinition {
   id: string;
   resolvedId?: string;
@@ -35,7 +35,7 @@ interface FitCriterionDefinition {
   ratings: Partial<Record<1 | 2 | 3 | 4 | 5, string>>;
 }
 
-// Определение глобального критерия кейса
+// Global case criterion definition.
 interface CaseCriterionDefinition {
   id: string;
   resolvedId?: string;
@@ -44,7 +44,7 @@ interface CaseCriterionDefinition {
   ratings: Partial<Record<1 | 2 | 3 | 4 | 5, string>>;
 }
 
-// Определение файла кейса
+// Case file definition.
 interface CaseFileSeed {
   key: string;
   fileName: string;
@@ -52,14 +52,14 @@ interface CaseFileSeed {
   content: string;
 }
 
-// Определение критерия оценки внутри конкретной папки кейса
+// Evaluation criterion inside a specific case folder.
 interface CaseEvaluationCriterionSeed {
   key: string;
   title: string;
   ratings: Partial<Record<1 | 2 | 3 | 4 | 5, string>>;
 }
 
-// Описание папки кейса
+// Case folder definition.
 interface CaseFolderSeed {
   key: 'infrastructure' | 'retail-pricing' | 'supply-chain' | 'digital-growth';
   id?: string;
@@ -68,7 +68,7 @@ interface CaseFolderSeed {
   evaluationCriteria: CaseEvaluationCriterionSeed[];
 }
 
-// Описание фит-вопроса
+// Fit question definition.
 interface FitQuestionSeed {
   id: string;
   key: 'client-trust' | 'leadership' | 'collaboration';
@@ -77,7 +77,7 @@ interface FitQuestionSeed {
   criteria: FitCriterionKey[];
 }
 
-// Каталог фит-критериев, общий для сидера
+// Fit criteria catalog shared by the seeder.
 export const fitCriteriaCatalog: Record<FitCriterionKey, FitCriterionDefinition> = {
   clientCommunication: {
     id: toUuid('fit-criterion:listening'),
@@ -198,7 +198,7 @@ export const fitCriteriaCatalog: Record<FitCriterionKey, FitCriterionDefinition>
   }
 };
 
-// Каталог критериев кейса
+// Case criteria catalog.
 export const caseCriteriaCatalog: Record<CaseCriterionKey, CaseCriterionDefinition> = {
   structure: {
     id: toUuid('case-criterion:structure'),
@@ -310,7 +310,7 @@ export const caseCriteriaCatalog: Record<CaseCriterionKey, CaseCriterionDefiniti
   }
 };
 
-// Хелпер для получения data URL из текстового содержимого
+// Helper to build a data URL from text content.
 const buildDataUrl = (content: string, mimeType: string) => {
   const buffer = Buffer.from(content, 'utf8');
   const base64 = buffer.toString('base64');
@@ -320,7 +320,7 @@ const buildDataUrl = (content: string, mimeType: string) => {
   };
 };
 
-// Описания папок кейсов с файлами и критериями
+// Case folder definitions with files and criteria.
 export const caseFolderSeeds: CaseFolderSeed[] = [
   {
     key: 'infrastructure',
@@ -513,7 +513,7 @@ export const caseFolderSeeds: CaseFolderSeed[] = [
   }
 ];
 
-// Описание фит-вопросов с привязкой к критериям
+// Fit question definitions with linked criteria.
 export const fitQuestionSeeds: FitQuestionSeed[] = [
   {
     id: '0c073434-6a3a-4344-8b80-79e284b7ed9f',
@@ -569,7 +569,7 @@ const fetchExistingId = async (
   return null;
 };
 
-// Готовим или обновляем папки кейсов, файлы и критерии
+// Create or update case folders, files, and criteria.
 export const ensureCaseLibraryAssets = async (
   client: QueryableClient,
   logInfo: (message: string) => void
@@ -653,7 +653,7 @@ export const ensureCaseLibraryAssets = async (
   }
 };
 
-// Готовим каталог фит-вопросов и их критериев
+// Build the fit question catalog and its criteria.
 export const ensureFitQuestionAssets = async (
   client: QueryableClient,
   logInfo: (message: string) => void
@@ -720,7 +720,7 @@ export const ensureFitQuestionAssets = async (
   }
 };
 
-// Восстанавливаем глобальные критерии кейсов
+// Restore the global case criteria catalog.
 export const ensureCaseCriteriaCatalog = async (
   client: QueryableClient,
   logInfo: (message: string) => void

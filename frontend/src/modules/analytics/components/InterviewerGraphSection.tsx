@@ -98,7 +98,7 @@ const formatRangeDescription = (
   end: string | undefined,
   groupingLabel: string
 ) => {
-  // Формируем читабельную подпись в зависимости от выбранного диапазона
+  // Build a readable label based on the selected range.
   const safeStart = start ? new Date(start) : null;
   const safeEnd = end ? new Date(end) : null;
 

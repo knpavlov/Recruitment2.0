@@ -41,7 +41,7 @@ const AppContent = () => {
           return hasInterviewerAssignments;
         }
 
-        // Для админов не требуем назначений интервью, чтобы все админские разделы оставались доступными
+        // Admins do not require interviewer assignments so all admin sections remain accessible.
         return true;
       }
 

@@ -12,12 +12,12 @@ export const FitQuestionCriterionEditor = ({
   onChange,
   onRemove
 }: FitQuestionCriterionEditorProps) => {
-  // Обновляем название критерия с сохранением остального состояния
+  // Update the criterion title while preserving the rest of the state.
   const handleTitleChange = (value: string) => {
     onChange({ ...criterion, title: value });
   };
 
-  // Обновляем описание конкретной оценки
+  // Update the description for a specific rating.
   const handleRatingChange = (score: 1 | 2 | 3 | 4 | 5, value: string) => {
     const ratings = { ...criterion.ratings };
     const trimmed = value.trim();

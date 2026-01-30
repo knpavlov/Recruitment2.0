@@ -4,7 +4,7 @@ import { demoDataApi, DemoEraseSummary } from '../services/demoDataApi';
 
 type EraseState = 'idle' | 'loading' | 'success' | 'error';
 
-// Хук инкапсулирует сетевую логику очистки демо-данных
+// The hook encapsulates network logic for clearing demo data.
 export const useDemoDataEraser = (email: string | null) => {
   const [state, setState] = useState<EraseState>('idle');
   const [error, setError] = useState<string | null>(null);

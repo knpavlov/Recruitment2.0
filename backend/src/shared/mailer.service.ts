@@ -29,7 +29,7 @@ export const MAILER_NOT_CONFIGURED = 'MAILER_NOT_CONFIGURED';
 
 type MailerDeliveryReason = 'domain-not-verified' | 'provider-error';
 
-// Ошибка верхнего уровня, чтобы модули могли различать причину сбоя доставки
+// Top-level error so modules can distinguish delivery failure reasons.
 export class MailerDeliveryError extends Error {
   constructor(
     public readonly reason: MailerDeliveryReason,
@@ -229,12 +229,12 @@ const sendViaSmtp = async (config: SmtpMailerConfig, to: string, subject: string
   }
 };
 
-// Если SMTP не настроен, предупреждаем и выкидываем контролируемую ошибку
+// If SMTP is not configured, warn and throw a controlled error.
 export class MailerService {
   private readonly config = resolveConfig();
   private warned = false;
 
-  // Универсальный helper для ожидания между повторными попытками
+  // Generic helper to wait between retry attempts.
   private async pause(ms: number) {
     if (ms <= 0) {
       return;
@@ -284,7 +284,7 @@ export class MailerService {
           return;
         } catch (error) {
           if (error instanceof ResendError && error.status === 429) {
-            // Плавно замедляем отправку при превышении лимита, чтобы не терять письма
+            // Gradually slow down on rate limits to avoid losing emails.
             lastRateLimitError = error;
             const waitMs = Math.max(error.retryAfterMs ?? nextDelay, 250);
             console.warn(

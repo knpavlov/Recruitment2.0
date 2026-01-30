@@ -74,7 +74,7 @@
   color: rgba(226, 232, 240, 0.86);
 }
 
-/* Подчеркиваем отделение визуального слоя от логики стилями полей ввода */
+/* Emphasize the visual layer separation with input field styling. */
 .input {
   border-radius: 16px;
   border: 1px solid rgba(148, 163, 184, 0.35);

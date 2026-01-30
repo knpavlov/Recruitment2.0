@@ -394,7 +394,7 @@ const createTables = async () => {
        AND last_delivery_attempt_at IS NULL;
   `);
 
-  // Удаляем возможные дубли записей по слоту, оставляя самую свежую отправку
+  // Remove possible duplicate slot entries, keeping the most recent send.
   await postgresPool.query(`
     WITH ranked AS (
       SELECT
@@ -411,7 +411,7 @@ const createTables = async () => {
        AND ranked.row_number > 1;
   `);
 
-  // Гарантируем наличие уникального ограничения для пары (evaluation_id, slot_id)
+  // Ensure a unique constraint exists for (evaluation_id, slot_id).
   await postgresPool.query(`
     DO $$
     DECLARE

@@ -11,13 +11,13 @@ interface ResendErrorResponse {
   message?: string;
 }
 
-// Собственный класс ошибки помогает передавать статус и код Resend дальше по цепочке
+// Custom error class to propagate the Resend status and code up the chain.
 export class ResendError extends Error {
   constructor(
     message: string,
     public readonly status: number,
     public readonly code?: string,
-    // Дополнительная информация о паузе перед повтором запроса
+    // Additional info about the wait before retrying the request.
     public readonly retryAfterMs?: number
   ) {
     super(message);
@@ -25,7 +25,7 @@ export class ResendError extends Error {
   }
 }
 
-// Минимальный HTTP-клиент для Resend, чтобы изолировать сетевую логику от остального приложения
+// Minimal HTTP client for Resend to isolate network logic from the rest of the app.
 export const sendWithResend = async ({ apiKey, from, to, subject, text }: ResendRequest) => {
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -46,7 +46,7 @@ export const sendWithResend = async ({ apiKey, from, to, subject, text }: Resend
     try {
       details = (await response.json()) as ResendErrorResponse;
     } catch (error) {
-      // Нам важно не потерять исходную ошибку, поэтому просто логируем сбой парсинга
+      // Preserve the original error by logging the parse failure.
       console.error('Не удалось разобрать ответ Resend', error);
     }
 

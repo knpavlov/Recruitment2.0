@@ -265,8 +265,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const MAX_TIMEOUT_MS = 0x7fffffff;
     let timerId: ReturnType<typeof window.setTimeout>;
 
-    // Чтобы не слететь сессией в браузерах с ограничением таймера ~24.8 дня,
-    // дробим ожидание на несколько шагов.
+    // To avoid session loss in browsers with a ~24.8-day timer limit,
+    // split the wait into smaller steps.
     const scheduleLogout = (delay: number): ReturnType<typeof window.setTimeout> => {
       const safeDelay = Math.min(delay, MAX_TIMEOUT_MS);
       return window.setTimeout(() => {

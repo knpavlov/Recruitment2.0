@@ -5,7 +5,7 @@ import {
   type SeedDemoDataResult
 } from '../../scripts/seedDemoData.js';
 
-// Сервис отвечает за запуск сидера и предотвращает параллельные прогоны
+// The service triggers the seeder and prevents parallel runs.
 export class DemoDataService {
   private running = false;
 

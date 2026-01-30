@@ -46,7 +46,7 @@ export const FitQuestionModal = ({
 
   const expectedVersion = initialQuestion ? initialQuestion.version : null;
 
-  // Обновление полей вопроса по ключу
+  // Update question fields by key.
   const handleFieldChange = (field: 'shortTitle' | 'content', value: string) => {
     onFeedbackClear();
     setQuestion((prev) => ({ ...prev, [field]: value }));

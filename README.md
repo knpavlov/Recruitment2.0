@@ -1,132 +1,191 @@
-# Recruitment 2.0
+﻿# Recruitment 2.0 - Migration to a Corporate Azure Environment
 
-Monorepo for the recruiting team portal. The structure is split into the frontend (React + Vite) and backend (Express + TypeScript) with future migration of business logic into independent packages in mind.
+This repository is a monorepo with a frontend (React + Vite) and a backend (Express + TypeScript). Below are concrete steps to migrate from Railway and the `nboard` domain to a corporate Microsoft Azure environment, plus clear options for handing off the code.
 
-## Structure
+---
 
-- `frontend/` — SPA with a modern interface, left navigation menu, and screens for cases, candidates, evaluations, and account management.
-- `backend/` — Express API layer with modular domains.
-- `docs/` — documentation about architecture and next steps. See [`docs/authentication-setup.md`](docs/authentication-setup.md) for the email + login checklist and [`docs/railway-ssl-troubleshooting.md`](docs/railway-ssl-troubleshooting.md) for SSL/TLS diagnostics on Railway deployments.
+## 0) Quick Structure Overview
 
-## Getting started
+- `frontend/` - SPA (Vite + React).
+- `backend/` - Express API connected to PostgreSQL.
+- `docs/` - legacy notes (including Railway). Keep for history if needed; not applicable to Azure.
 
-### Frontend
+---
 
-```bash
-cd frontend
-npm install
-npm run dev
+## 1) How to Hand Off the Code to Corporate GitHub
+
+### Share a ZIP archive
+1. Send a ZIP or a folder snapshot.
+2. Corporate side initializes a new repo:
+   ```bash
+   git init
+   git add .
+   git commit -m "Initial import"
+   git remote add origin <corporate_repo_url>
+   git push -u origin main
+   ```
+
+> Important: ensure **no** `.env` files or secrets are committed. All secrets must live in Azure App Settings.
+
+---
+
+## 2) What Must Be Configured (Railway -> Azure)
+
+There are no hard Railway dependencies in code, but the following **must** be configured for corporate domains and infrastructure:
+
+1. **Frontend API base URL**
+   - Set `VITE_API_URL` (or `VITE_API_BASE_URL`) to the corporate API URL.
+   - This is **required**; otherwise the frontend tries to derive the backend host using the old Railway naming pattern.
+
+2. **Backend URLs used in emails**
+   - `INVITE_URL` - login page link.
+   - `INTERVIEW_PORTAL_URL` - base URL of the interviewer portal (usually the same frontend).
+
+3. **Super admin account**
+   - `SUPER_ADMIN_EMAIL` must be set to a corporate email.
+
+4. **Email delivery**
+   - Replace Railway/Resend with corporate SMTP (or keep Resend if allowed).
+
+5. **(Optional) CORS**
+   - CORS is currently open. If you must restrict it, edit `backend/src/app/server.ts`.
+
+---
+
+## 3) Environment Variables
+
+### Backend (Azure Web App -> Configuration -> Application settings)
+Minimum required:
+
+```dotenv
+# PostgreSQL
+DATABASE_URL=postgresql://user:password@host:port/database
+# or individual variables:
+# PGHOST=...
+# PGPORT=5432
+# PGUSER=...
+# PGPASSWORD=...
+# PGDATABASE=...
+
+# SSL (Azure usually requires TLS)
+# PGSSL=false  # only if TLS is disabled (not recommended)
+
+# Super admin
+SUPER_ADMIN_EMAIL=admin@company.com
+
+# Email links
+INVITE_URL=https://app.company.com/login
+INTERVIEW_PORTAL_URL=https://app.company.com
+
+# Email provider (option 1 - SMTP)
+SMTP_HOST=smtp.company.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=notifications@company.com
+SMTP_PASSWORD=super-secret
+SMTP_FROM=Recruitment 2.0 <notifications@company.com>
+
+# Email provider (option 2 - Resend)
+# RESEND_API_KEY=...
+# RESEND_FROM=Recruitment 2.0 <login@company.com>
 ```
 
-### Backend
+If **neither SMTP nor Resend** is configured, the API returns 503 for invitations and login codes.
 
+### Frontend (Azure Static Web App)
+Vite variables are injected at build time:
+
+```dotenv
+VITE_API_URL=https://api.company.com
+```
+
+> If frontend and backend hostnames do not follow the `frontend <-> backend` pattern, `VITE_API_URL` is mandatory.
+
+Optional (runtime without rebuild):
+- Add one of these to `frontend/index.html`:
+  ```html
+  <meta name="recruitment:api-base" content="https://api.company.com" />
+  ```
+  or
+  ```html
+  <script>
+    window.__RECRUITMENT_CONFIG__ = { apiBaseUrl: 'https://api.company.com' };
+  </script>
+  ```
+
+---
+
+## 4) Azure Database for PostgreSQL Flexible Server
+
+1. Create a PostgreSQL Flexible Server.
+2. Create a database and a user.
+3. Configure network access:
+   - If public network is used - allow the Web App outbound IP in firewall rules.
+   - If VNet is used - ensure the Web App has network access.
+4. Keep TLS enabled (Azure expects SSL by default).
+5. Build and set `DATABASE_URL` in Web App settings.
+
+On first backend start, tables and the super admin account are created automatically.
+
+---
+
+## 5) Azure Web App (Linux, Node 20 LTS) - Backend
+
+Important: deploy **the `backend/` folder as a separate app**, otherwise Azure will not find `package.json`.
+
+Recommended process:
+1. Use a pipeline (GitHub Actions / Azure DevOps) that:
+   - runs `npm install` and `npm run build` inside `backend/`;
+   - publishes only `backend/`.
+2. Start command: `npm run start` (from the `backend` folder).
+3. Set environment variables (see section 3).
+4. Verify health: `GET https://api.company.com/health`.
+
+> The backend listens on `process.env.PORT`, which Azure sets automatically.
+
+---
+
+## 6) Azure Static Web App - Frontend
+
+1. Connect the repo.
+2. Set build paths:
+   - `app_location: "frontend"`
+   - `output_location: "dist"`
+3. Provide `VITE_API_URL` at build time (section 3).
+4. After deploy, the frontend should call the corporate API.
+
+---
+
+## 7) Demo Data (optional)
+
+To seed test data:
 ```bash
 cd backend
 npm install
-npm run dev
+npm run seed:demo
 ```
+The script creates test cases, candidates, interviews, etc. Re-running is safe.
 
-### Демонстрационное наполнение базы
+---
 
-Скрипт `seedDemoData` не запускается автоматически — его нужно выполнить вручную после настройки соединения с PostgreSQL.
+## 8) Where `nboard` Appears
 
-1. Перейдите в каталог бэкенда: `cd backend`.
-2. Убедитесь, что в `.env` указаны параметры подключения к базе (см. раздел «Database configuration»).
-3. Выполните команду `npm run seed:demo`. Скрипт соберёт TypeScript-проект, прогонит миграции и заполнит базу семью кандидатами и связанными интервью с оценками, повторно используя уже созданные кейсы и fit-вопросы.
+`nboard` appears only in legacy documentation. If you want a full cleanup:
+- Update files under `docs/` and this `README.md` with corporate domains.
+- Code changes are not required if env vars are configured correctly.
 
-Суперадмин также может управлять демо-данными из интерфейса: в левом меню под кнопкой `Sign out` есть ссылки `Load demo data` и `Erase demo data`. Первая отправляет запрос в API, запускает сидер и выводит краткий статус после завершения, вторая удаляет созданных кандидатов и оценки.
+---
 
-Если названия кейсов или fit-вопросов отличаются от шаблонных, скрипт возьмёт последние доступные записи из базы и выведет предупреждение с фактически выбранными значениями. Главное — чтобы в базе было минимум четыре кейса и три fit-вопроса.
+## 9) Corporate Checklist
 
-Скрипт использует детерминированные идентификаторы и `ON CONFLICT`, поэтому его можно запускать повторно: данные обновятся без дублирования.
+- [ ] Repo transferred or imported into corporate GitHub.
+- [ ] PostgreSQL Flexible Server created and connection string ready.
+- [ ] Web App (Linux, Node 20 LTS) deployed with env vars set.
+- [ ] Static Web App deployed with correct build paths and `VITE_API_URL`.
+- [ ] `SUPER_ADMIN_EMAIL` set to corporate email.
+- [ ] Email delivery works via SMTP/Resend.
+- [ ] `GET /health` and login via emailed link verified.
 
-> ℹ️ Если соединение с базой данных недоступно, скрипт завершится сообщением «Не удалось подключиться к PostgreSQL» и подскажет адрес/порт, к которому пытался обратиться. Проверьте переменные окружения и статус экземпляра базы, затем запустите команду повторно.
+---
 
-### Database configuration
-
-The backend uses PostgreSQL. Both the connection string `DATABASE_URL` and individual parameters (`PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE`) are supported.
-
-1. Create a `.env` file in the `backend/` directory and provide Railway (or another database) environment variables. Example:
-   ```dotenv
-   DATABASE_URL=postgresql://user:password@host:port/database
-   # or alternatively
-   # PGHOST=...
-   # PGPORT=...
-   # PGUSER=...
-   # PGPASSWORD=...
-   # PGDATABASE=...
-   SUPER_ADMIN_EMAIL=knpavlov@gmail.com
-   ```
-2. Run `npm install` — the `pg` driver will be installed together with the rest of the packages, and a local `package-lock.json` will be generated.
-3. On the first `npm run dev` or `npm run start`, tables and the super admin account will be created automatically.
-
-> ⚙️ For Railway deployment the repository contains `.nixpacks.toml`. It explicitly runs `npm install` in `backend/`, so new dependencies are installed even without a pre-generated `package-lock.json`.
-
-### Email delivery configuration
-
-You can use either Resend (recommended for Railway) or a custom SMTP server. The backend automatically prefers Resend when the related variables are present and falls back to SMTP otherwise. If neither provider is configured the API returns HTTP 503 and logs messages to the console instead of sending emails.
-
-#### Option A — Resend via Railway
-
-1. In Railway open your project → `Resend Starter` plugin and copy the `RESEND_API_KEY` from the "Variables" tab.
-2. Open the backend service in Railway (`Recruitment2.0-backend`), add the following variables and redeploy:
-   ```dotenv
-   RESEND_API_KEY=your-resend-token
-   RESEND_FROM=Recruitment 2.0 <login@your-domain.com>
-   INVITE_URL=https://your-frontend-domain/login
-   ```
-   *`RESEND_FROM` must be a verified sender/domain inside Resend.*
-3. Trigger any invitation or access-code flow — letters will be delivered through the Resend API.
-
-> 📬 Если вы меняете домен отправителя (например, после переноса фронтенда на `recruitment2.0.nboard.au`), обновите
-> переменную `RESEND_FROM` и подтвердите домен в Resend заново. Пока домен не верифицирован, API вернёт HTTP 424 с
-> сообщением о необходимости проверить DNS-записи.
-
-##### Как недорого подтвердить домен для Resend
-
-- **Выберите дешёвый регистратор.** Для минимальных затрат подойдут регистраторы с оплатой «по себестоимости» (например, Cloudflare Registrar) или поставщики с акциями на новые домены (`.click`, `.link`, `.shop` и т. п.). Первое приобретение обычно стоит 1–3 USD в год, а продление зависит от выбранной зоны.
-- **Перенесите DNS в сервис с бесплатным тарифом.** Даже если регистратор не даёт гибких настроек, можно делегировать домен на Cloudflare или другой бесплатный DNS-сервис и там добавить TXT и CNAME, которые покажет Resend.
-- **Подтвердите домен в Resend.** На вкладке *Domains* создайте запись, введите домен, а затем внесите предложенные DNS-записи. После подтверждения используйте адрес вида `Recruitment 2.0 <login@your-domain.com>` в переменной `RESEND_FROM`.
-- **Платные почтовые ящики от регистратора не обязательны.** Resend берёт на себя отправку писем, поэтому достаточно владеть доменом и управлять его DNS. Дополнительные услуги вроде «Microsoft 365 Email» на GoDaddy можно пропустить, если не нужен отдельный почтовый ящик для чтения входящих сообщений на этом домене.
-  - **Railway не подходит в роли почтового домена.** Бесплатные поддомены Railway (`*.up.railway.app`) управляются самим сервисом: вы не можете добавить собственные DNS-записи, поэтому их нельзя подтвердить в Resend. Для отправки писем нужен домен, которым вы управляете полностью.
-
-##### Пошагово: что делать, когда Resend показал DNS-записи
-
-1. **Откройте панель управления DNS у регистратора или в выбранном DNS-сервисе.** Внесите три записи из блока *DKIM and SPF*:
-   - MX с приоритетом `10`, указывающий на `feedback-smtp.ap-northeast-1.amazonses.com`.
-   - TXT-запись `send` со значением `v=spf1 include:amazonses.com ~all`.
-   - TXT-запись `resend._domainkey` с длинным ключом, который вы видите в интерфейсе Resend.
-2. **Добавьте запись DMARC (опционально, но желательно).** Создайте TXT `_dmarc` со значением `v=DMARC1; p=none;` или более строгой политикой, если уже готовы блокировать подделки.
-3. **Сохраните изменения и дождитесь распространения DNS.** Обычно это занимает от пары минут до часа. В Resend кнопка «I've added the records» станет активной — нажмите её и дождитесь, пока статус домена сменится на *Verified*.
-4. **Проверьте, что `RESEND_FROM` использует новый домен.** Например, `Recruitment 2.0 <login@nboard.au>`. После верификации Resend начнёт отправлять письма с этого адреса.
-5. **(Опционально) Настройте переадресацию входящих писем.** Если хотите получать ответы, добавьте на стороне регистратора или почтового сервиса правило пересылки входящих с `login@nboard.au` на ваш основной ящик. Это не влияет на отправку писем через Resend.
-
-#### Option B — Custom SMTP
-
-1. Provide credentials in `backend/.env`:
-   ```dotenv
-   SMTP_HOST=smtp.mailprovider.com
-   SMTP_PORT=587
-   SMTP_SECURE=false
-   SMTP_USER=notifications@company.com
-   SMTP_PASSWORD=super-secret
-   SMTP_FROM=Recruitment 2.0 <notifications@company.com>
-   ```
-2. Restart the backend — the service uses authenticated SMTP (LOGIN mechanism). All outgoing emails are sent from `SMTP_FROM` (or `SMTP_USER` if the first value is omitted).
-
-> ℹ️ When neither Resend nor SMTP variables are set, the backend refuses to send invitations and access codes, keeping the database clean and avoiding misleading success messages.
-
-## Current functionality
-
-- Case management: creation, renaming, drag & drop files, and version conflict detection.
-- Candidate database with resume uploads, auto-filled fields, and card versioning.
-- Evaluation setup: candidate and case selection, automatic interview status generation.
-- Account management: invitations, activation, deletion, and one-time login code generation.
-- Authentication through temporary codes and a stub email service.
-
-## Next steps
-
-- Connect a production database (for example, PostgreSQL) and move data access to repositories.
-- Integrate an enterprise email provider and persistent storage for codes/sessions.
-- Integrate a fully featured AI API for resume parsing and interviewer feedback.
-- Add real-time synchronization (WebSocket) and database-level locking mechanisms.
+If the corporate team needs extra requirements (SSO, private SMTP, VNet-only, Key Vault, etc.), handle that as a separate integration step.

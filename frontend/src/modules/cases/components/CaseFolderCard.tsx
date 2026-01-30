@@ -24,7 +24,7 @@ export const CaseFolderCard = ({ folder, onRename, onDelete, onUpload, onRemoveF
   const [renaming, setRenaming] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const nameBackupRef = useRef(folder.name);
-  // Счётчик нужен, чтобы корректно отслеживать вложенные события dragenter/leave
+  // Counter is needed to track nested dragenter/leave events correctly.
   const dragCounterRef = useRef(0);
   const [isDragActive, setIsDragActive] = useState(false);
   const [uploadState, setUploadState] = useState<UploadState>({ status: 'idle', progress: 0 });
@@ -38,7 +38,7 @@ export const CaseFolderCard = ({ folder, onRename, onDelete, onUpload, onRemoveF
   }, [folder.name]);
 
   useEffect(() => {
-    // При размонтировании очищаем таймер скрытия индикатора загрузки
+    // Clear the loading-indicator hide timer on unmount.
     return () => {
       if (hideProgressTimeout.current) {
         window.clearTimeout(hideProgressTimeout.current);

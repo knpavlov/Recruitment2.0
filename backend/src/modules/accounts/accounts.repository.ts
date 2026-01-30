@@ -80,7 +80,7 @@ const mapRowToAccount = (row: any): AccountRecord => {
   return {
     id: row.id,
     email: row.email,
-    // Сохраняем роли в едином нижнем регистре, чтобы фронтенд и бэкенд использовали одинаковые ключи.
+    // Store roles in lowercase so frontend and backend use consistent keys.
     role: normalizeRole(row.role),
     status: row.status,
     interviewerRole: normalizeInterviewerRole(row.interviewer_role),
