@@ -53,6 +53,26 @@ After this, the frontend should be reachable at the chosen frontend URL, and the
 
 ---
 
+## 4.1) Domain/DNS and Email Inputs - What We Need From the Corporate Team
+
+To complete migration, the team must provide (or confirm who owns) these items:
+
+- **Frontend domain** (e.g., `https://app.company.com`)
+- **Backend/API domain** (e.g., `https://api.company.com`)
+- **DNS admin** who can create the CNAME/ALIAS records that Azure provides for both domains
+- **TLS/cert confirmation**: permission to enable Azure-managed certificates for both domains
+
+Email delivery (choose one path):
+
+- **SMTP option**: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`
+  - Plus confirmation that the sender domain is allowed by the corporate mail system
+- **Resend option**: `RESEND_API_KEY`, `RESEND_FROM`
+  - Plus DNS ownership to verify the sender domain in Resend (DKIM/SPF/MX)
+
+Without the DNS and email inputs above, the application can deploy but will not be reachable on corporate domains or send invitations and login codes.
+
+---
+
 ## 5) Azure Database for PostgreSQL Flexible Server
 
 1. Create a PostgreSQL Flexible Server.
